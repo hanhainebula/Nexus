@@ -7,8 +7,11 @@ from UniRetrieval.abc.training.dataset import AbsDataset
 
 logger = logging.getLogger(__name__)
 
-
-class AbsRerankerTrainer(AbsTrainer, Trainer):
+"""
+此处未继承AbsTrainer，因为AbsTrainer的未implement的train和evaluate函数会覆盖Trainer的对应函数。
+但保留了save_model这一abstractmethod，以保持和AbsTrainer的一致
+"""
+class AbsRerankerTrainer(Trainer):
     """
     Abstract class for the trainer of reranker.
     """
