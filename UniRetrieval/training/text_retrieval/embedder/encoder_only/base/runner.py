@@ -75,7 +75,7 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         Returns:
             EncoderOnlyEmbedderTrainer: Loaded trainer instance.
         """
-        # TODO 此处要注意把data_collator和tokenizer去掉
+        # TODO data_collator和tokenizer
     
         trainer = EncoderOnlyEmbedderTrainer(
             model=self.model,

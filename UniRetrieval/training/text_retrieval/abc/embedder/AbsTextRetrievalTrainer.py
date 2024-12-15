@@ -8,7 +8,11 @@ from UniRetrieval.abc.training.dataset import AbsDataset
 logger = logging.getLogger(__name__)
 
 
-class AbsEmbedderTrainer(AbsTrainer, Trainer):
+"""
+此处未继承AbsTrainer，因为AbsTrainer的未implement的train和evaluate函数会覆盖Trainer的对应函数。
+但保留了save_model这一abstractmethod，以保持和AbsTrainer的一致
+"""
+class AbsEmbedderTrainer(Trainer):
     # TODO 增加了save_model函数
     """
     Abstract class for the trainer of embedder.
