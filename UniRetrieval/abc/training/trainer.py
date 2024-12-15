@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import torch
 
@@ -12,14 +13,12 @@ class AbsTrainer(ABC):
         self,
         model: AbsModel,
         train_args: AbsTrainingArguments,
-        train: bool = True
     ):
         self.model = model
         self.train_args = train_args
-        self.train_mode = train
-    
+
     @abstractmethod
-    def _save(self, *args, **kwargs):
+    def save_model(self, output_dir: Optional[str] = None, *args, **kwargs):
         pass
 
     @abstractmethod
