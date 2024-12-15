@@ -2,7 +2,7 @@ import os
 from typing import Optional
 from dataclasses import dataclass, field
 from UniRetrieval.abc.training.arguments import AbsDataArguments,  AbsModelArguments, AbsTrainingArguments
-
+from transformers import TrainingArguments
 
 
 @dataclass
@@ -120,7 +120,7 @@ class AbsEmbedderDataArguments(AbsDataArguments):
 
 
 @dataclass
-class AbsEmbedderTrainingArguments(AbsTrainingArguments):
+class AbsEmbedderTrainingArguments(AbsTrainingArguments, TrainingArguments):
     negatives_cross_device: bool = field(default=False, metadata={"help": "share negatives across devices"})
     temperature: Optional[float] = field(default=0.02, metadata={"help": "temperature used for similarity score"})
     fix_position_embedding: bool = field(default=False, metadata={"help": "Freeze the parameters of position embeddings"})
