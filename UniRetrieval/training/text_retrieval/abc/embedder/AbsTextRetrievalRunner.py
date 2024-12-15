@@ -75,16 +75,30 @@ class AbsEmbedderRunner(AbsRunner):
         self.train_dataset = self.load_train_dataset()
         self.data_collator = self.load_data_collator()
         self.trainer = self.load_trainer()
-
+    # TODO 增加了load_model函数 (继承自AbsRunner)
     @abstractmethod
     def load_model(self, *args, **kwargs) -> AbsEmbedderModel:
         pass
-    
-    @abstractmethod
-    def load_tokenizer(self, *args, **kwargs) -> PreTrainedTokenizer:
-        pass 
 
-    def load_dataset(self, *args, **kwargs) -> AbsEmbedderTrainDataset:
+    @abstractmethod
+    def load_tokenizer_and_model(self) -> Tuple[PreTrainedTokenizer, AbsEmbedderModel]:
+        """Abstract method to load the tokenizer and model.
+
+        Returns:
+            Tuple[PreTrainedTokenizer, AbsEmbedderModel]: Loaded tokenizer and model instances.
+        """
+        pass
+        
+    @abstractmethod
+    def load_trainer(self) -> AbsEmbedderTrainer:
+        """Abstract method to load the trainer.
+
+        Returns:
+            AbsEmbedderTrainer: The loaded trainer instance.
+        """
+        pass
+
+    def load_train_dataset(self) -> AbsEmbedderTrainDataset:
         """Loads the training dataset based on data arguments.
 
         Returns:
@@ -108,14 +122,8 @@ class AbsEmbedderRunner(AbsRunner):
             )
         return train_dataset
 
-    @abstractmethod
-    def load_trainer(self) -> AbsEmbedderTrainer:
-        """Abstract method to load the trainer.
-
-        Returns:
-            AbsEmbedderTrainer: The loaded trainer instance.
-        """
-        pass
+    def load_dataset(self, *args, **kwargs) -> AbsEmbedderTrainDataset:
+        return self.load_train_dataset()
 
     def load_data_collator(self) -> AbsEmbedderCollator:
         """Loads the appropriate data collator.

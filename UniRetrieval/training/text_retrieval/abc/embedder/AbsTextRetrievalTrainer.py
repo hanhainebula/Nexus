@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class AbsEmbedderTrainer(AbsTrainer, Trainer):
+    # TODO 增加了save_model函数
     """
     Abstract class for the trainer of embedder.
     """

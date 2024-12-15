@@ -8,9 +8,9 @@ from UniRetrieval.training.text_retrieval.abc.embedder import AbsEmbedderTrainer
 logger = logging.getLogger(__name__)
 
 
-class EncoderOnlyEmbedderTrainer(AbsEmbedderTrainer):
+class EncoderOnlyEmbedderM3Trainer(AbsEmbedderTrainer):
     """
-    Trainer class for base encoder models.
+    Trainer class for M3.
     """
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         """Save the model to directory.
@@ -42,6 +42,5 @@ class EncoderOnlyEmbedderTrainer(AbsEmbedderTrainer):
         #     save_ckpt_for_sentence_transformers(output_dir,
         #                                         pooling_mode=self.args.sentence_pooling_method,
         #                                         normlized=self.args.normlized)
-
     def save_model(self, output_dir: Optional[str] = None, state_dict=None):
-        return self._save(output_dir,state_dict)
+        return self._save(output_dir, state_dict)

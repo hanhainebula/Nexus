@@ -25,7 +25,7 @@ class EmbedderOutput(AbsModelOutput, ModelOutput):
     scores: Optional[Tensor] = None
 
 
-class AbsEmbedderModel(ABC, nn.Module):
+class AbsEmbedderModel(AbsModel, nn.Module):
     """Abstract class of embedding model for training.
 
     Args:
