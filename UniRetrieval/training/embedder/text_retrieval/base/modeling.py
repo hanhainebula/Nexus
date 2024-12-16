@@ -6,9 +6,17 @@ from transformers import AutoModel, AutoTokenizer
 import torch.distributed as dist
 import torch.nn.functional as F
 from UniRetrieval.training.abc.embedder import AbsEmbedderModel, EmbedderOutput
+from dataclasses import dataclass
 from typing import Dict, Optional, List, Union
 logger = logging.getLogger(__name__)
 
+
+@dataclass
+class TextEmbedderOutput(EmbedderOutput):
+    q_reps: Optional[Tensor] = None
+    p_reps: Optional[Tensor] = None
+    loss: Optional[Tensor] = None
+    scores: Optional[Tensor] = None
 
 class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
     """Embedder class for encoder only model.
@@ -350,7 +358,7 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
             no_in_batch_neg_flag (bool, optional): If True, use no in-batch negatives and no cross-device negatives. Defaults to ``False``.
 
         Returns:
-            EmbedderOutput: Output of the forward call of model.
+            TextEmbedderOutput: Output of the forward call of model.
         """
         q_reps = self.encode(queries) # (batch_size, dim)
         p_reps = self.encode(passages) # (batch_size * group_size, dim)
@@ -375,7 +383,7 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
         else:
             loss = None
 
-        return EmbedderOutput(
+        return TextEmbedderOutput(
             loss=loss,
         )
 

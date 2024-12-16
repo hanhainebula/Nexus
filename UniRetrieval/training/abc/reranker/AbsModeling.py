@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RerankerOutput(AbsModelOutput, ModelOutput):
-    loss: Optional[Tensor] = None
     scores: Optional[Tensor] = None
 
 

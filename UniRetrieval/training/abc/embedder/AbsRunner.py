@@ -69,8 +69,8 @@ class AbsEmbedderRunner(AbsRunner):
         # Set seed
         set_seed(training_args.seed)
 
-        self.tokenizer, self.model = self.load_tokenizer_and_model()
-        self.train_dataset = self.load_train_dataset()
+        self.tokenizer, self.model = self.load_model()
+        self.train_dataset = self.load_dataset()
         self.data_collator = self.load_data_collator()
         self.trainer = self.load_trainer()
         
@@ -88,17 +88,9 @@ class AbsEmbedderRunner(AbsRunner):
         pass
 
     @abstractmethod
-    def load_train_dataset(self) -> AbsEmbedderTrainDataset:
-        """Loads the training dataset based on data arguments.
-
-        Returns:
-            AbsEmbedderTrainDataset: The loaded dataset instance.
-        """
-        pass
-
     def load_dataset(self, *args, **kwargs) -> AbsEmbedderTrainDataset:
-        return self.load_train_dataset()
-
+        pass
+    
     @abstractmethod
     def load_data_collator(self) -> AbsEmbedderCollator:
         """Loads the appropriate data collator.

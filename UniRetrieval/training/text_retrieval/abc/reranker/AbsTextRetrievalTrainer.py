@@ -17,12 +17,11 @@ class AbsRerankerTrainer(Trainer):
     """
     # TODO 增加save_model
     @abstractmethod
-    def _save(self, output_dir: Optional[str] = None, state_dict=None):
-        pass
-
-    @abstractmethod
     def save_model(self, output_dir: Optional[str] = None, state_dict=None):
         pass
+
+    def _save(self, output_dir: Optional[str] = None, state_dict=None):
+        return self.save_model(output_dir, state_dict)
 
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         """

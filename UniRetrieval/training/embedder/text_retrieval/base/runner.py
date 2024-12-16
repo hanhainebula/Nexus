@@ -6,7 +6,7 @@ from transformers import (
     AutoTokenizer, PreTrainedTokenizer
 )
 from transformers import set_seed, PreTrainedTokenizer
-from UniRetrieval.training.abc.embedder import AbsEmbedderRunner, AbsEmbedderModel, EmbedderTrainerCallbackForDataRefresh
+from UniRetrieval.training.abc.embedder import AbsEmbedderRunner
 from .arguments import AbsTextEmbedderModelArguments, AbsTextEmbedderDataArguments, AbsTextEmbedderTrainingArguments
 from .datasets import AbsTextEmbedderTrainDataset, AbsTextEmbedderCollator, AbsEmbedderSameDatasetTrainDataset, AbsEmbedderSameDatasetCollator, EmbedderTrainerCallbackForDataRefresh
 from .modeling import BiEncoderOnlyEmbedderModel
@@ -63,16 +63,17 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         set_seed(training_args.seed)
 
         self.model = self.load_model()
-        self.train_dataset = self.load_train_dataset()
+        self.tokenizer=self.model.tokenizer
+        self.train_dataset = self.load_dataset()
         self.data_collator = self.load_data_collator()
         self.trainer = self.load_trainer()
 
     
-    def load_model(self) -> AbsEmbedderModel:
+    def load_model(self) -> BiEncoderOnlyEmbedderModel:
         """Load tokenizer and model.
 
         Returns:
-            Tuple[PreTrainedTokenizer, AbsEmbedderModel]: Tokenizer and model instances.
+            AbsEmbedderModel: Tokenizer and model instances.
         """
         tokenizer = AutoTokenizer.from_pretrained(
             self.model_args.model_name_or_path,
@@ -117,7 +118,6 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
                     logging.info(f"Freeze the parameters for {k}")
                     v.requires_grad = False
                     
-        self.tokenizer=tokenizer
         return model
 
     def load_trainer(self) -> EncoderOnlyEmbedderTrainer:
@@ -139,7 +139,7 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
             trainer.add_callback(EmbedderTrainerCallbackForDataRefresh(self.train_dataset))
         return trainer
     
-    def load_train_dataset(self) -> AbsTextEmbedderTrainDataset:
+    def load_dataset(self) -> AbsTextEmbedderTrainDataset:
         """Loads the training dataset based on data arguments.
 
         Returns:

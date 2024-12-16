@@ -35,5 +35,5 @@ class AbsRerankerDataArguments(AbsDataArguments):
 
 
 @dataclass
-class AbsRerankerTrainingArguments(AbsTrainingArguments, TrainingArguments):
+class AbsRerankerTrainingArguments(AbsTrainingArguments):
     pass

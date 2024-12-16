@@ -72,8 +72,9 @@ class AbsRerankerRunner(AbsRunner):
         # Set seed
         set_seed(training_args.seed)
 
-        self.tokenizer, self.model = self.load_tokenizer_and_model()
-        self.train_dataset = self.load_train_dataset()
+        self.model = self.load_model()
+        self.tokenizer = self.model.tokenizer
+        self.train_dataset = self.load_dataset()
         self.data_collator = self.load_data_collator()
         self.trainer = self.load_trainer()
 
@@ -91,11 +92,6 @@ class AbsRerankerRunner(AbsRunner):
             AbsRerankerTrainer: The loaded trainer instance.
         """
         pass
-
-    def load_train_dataset(self,*args, **kwargs) -> AbsRerankerTrainDataset:
-        """Loads the training dataset based on data arguments.
-        """
-        return self.load_dataset(*args, **kwargs)
 
     @abstractmethod
     def load_dataset(self, *args, **kwargs):
