@@ -37,7 +37,7 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
         sentence_pooling_method: str = 'cls',
         normalize_embeddings: bool = False,
     ):
-        
+        super.__init__()
         self.model = base_model
         self.tokenizer = tokenizer
 

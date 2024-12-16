@@ -110,5 +110,5 @@ class AbsTextEmbedderTrainingArguments(AbsEmbedderTrainingArguments, TrainingArg
     normalize_embeddings: bool = field(default=True, metadata={"help": "whether to normalize the embeddings"})
     sub_batch_size: Optional[int] = field(default=None, metadata={"help": "sub batch size for training"})
     kd_loss_type: str = field(default='kl_div', metadata={"help": "the loss type for knowledge distillation. Available options: kl_div, m3_kd_loss. Default: kl_div.", "choices": ['kl_div', 'm3_kd_loss']})
-
+    
     
