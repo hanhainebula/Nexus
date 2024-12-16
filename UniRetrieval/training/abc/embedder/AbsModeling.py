@@ -46,12 +46,8 @@ class AbsEmbedderModel(AbsEmbedder, nn.Module):
         pass
 
     @abstractmethod
-    def compute_score(self, q_reps, p_reps):
+    def compute_score(self, *args, **kwargs):
         """Abstract method to compute the score.
-
-        Args:
-            q_reps (torch.Tensor): Queries representations.
-            p_reps (torch.Tensor): Passages rerpresentations.
         """
         pass
 
