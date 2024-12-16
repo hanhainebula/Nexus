@@ -1,6 +1,6 @@
 from transformers import HfArgumentParser
 
-
+from UniRetrieval.training.embedder.text_retrieval.base import *
 
 def main():
     parser = HfArgumentParser((

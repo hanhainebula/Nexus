@@ -8,7 +8,7 @@ from transformers import (
 from transformers import set_seed, PreTrainedTokenizer
 from UniRetrieval.training.abc.embedder import AbsEmbedderRunner, AbsEmbedderModel, EmbedderTrainerCallbackForDataRefresh
 from .arguments import AbsTextEmbedderModelArguments, AbsTextEmbedderDataArguments, AbsTextEmbedderTrainingArguments
-from .datasets import AbsTextEmbedderCollator, AbsTextEmbeddingDataset
+from .datasets import AbsTextEmbedderTrainDataset, AbsTextEmbedderCollator, AbsEmbedderSameDatasetTrainDataset, AbsEmbedderSameDatasetCollator, EmbedderTrainerCallbackForDataRefresh
 from .modeling import BiEncoderOnlyEmbedderModel
 from .trainer import EncoderOnlyEmbedderTrainer
 
@@ -62,7 +62,7 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         # Set seed
         set_seed(training_args.seed)
 
-        self.tokenizer, self.model = self.load_tokenizer_and_model()
+        self.model = self.load_model()
         self.train_dataset = self.load_train_dataset()
         self.data_collator = self.load_data_collator()
         self.trainer = self.load_trainer()
@@ -116,6 +116,8 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
                 if "position_embeddings" in k:
                     logging.info(f"Freeze the parameters for {k}")
                     v.requires_grad = False
+                    
+        self.tokenizer=tokenizer
         return model
 
     def load_trainer(self) -> EncoderOnlyEmbedderTrainer:
@@ -137,7 +139,7 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
             trainer.add_callback(EmbedderTrainerCallbackForDataRefresh(self.train_dataset))
         return trainer
     
-    def load_train_dataset(self) -> AbsEmbedderTrainDataset:
+    def load_train_dataset(self) -> AbsTextEmbedderTrainDataset:
         """Loads the training dataset based on data arguments.
 
         Returns:
@@ -155,13 +157,13 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
             self.training_args.per_device_train_batch_size = 1
             self.training_args.dataloader_num_workers = 0   # avoid multi-processing
         else:
-            train_dataset = AbsEmbedderTrainDataset(
+            train_dataset = AbsTextEmbedderTrainDataset(
                 args=self.data_args,
                 tokenizer=self.tokenizer
             )
         return train_dataset
 
-    def load_data_collator(self) -> AbsEmbedderCollator:
+    def load_data_collator(self) -> AbsTextEmbedderCollator:
         """Loads the appropriate data collator.
 
         Returns:
@@ -170,7 +172,7 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         if self.data_args.same_dataset_within_batch:
             EmbedCollator = AbsEmbedderSameDatasetCollator
         else:
-            EmbedCollator = AbsEmbedderCollator
+            EmbedCollator = AbsTextEmbedderCollator
 
         data_collator = EmbedCollator(
             tokenizer=self.tokenizer,

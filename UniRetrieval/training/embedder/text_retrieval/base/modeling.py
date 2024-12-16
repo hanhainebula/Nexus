@@ -37,14 +37,7 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
         sentence_pooling_method: str = 'cls',
         normalize_embeddings: bool = False,
     ):
-        super().__init__(
-            base_model,
-            tokenizer=tokenizer,
-            negatives_cross_device=negatives_cross_device,
-            temperature=temperature,
-            sub_batch_size=sub_batch_size,
-            kd_loss_type=kd_loss_type,
-        )
+        
         self.model = base_model
         self.tokenizer = tokenizer
 

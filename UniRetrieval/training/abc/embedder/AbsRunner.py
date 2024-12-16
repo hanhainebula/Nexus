@@ -96,7 +96,6 @@ class AbsEmbedderRunner(AbsRunner):
         """
         pass
 
-    @abstractmethod
     def load_dataset(self, *args, **kwargs) -> AbsEmbedderTrainDataset:
         return self.load_train_dataset()
 
