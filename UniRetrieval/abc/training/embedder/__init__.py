@@ -2,7 +2,8 @@ from .AbsArguments import AbsEmbedderModelArguments, AbsEmbedderDataArguments,Ab
 from .AbsDataset import (
     AbsEmbedderTrainDataset,
     AbsEmbedderCollator,
-    AbsCallback
+    AbsCallback,
+    CallbackOutput
 )
 from .AbsModeling import (
     EmbedderOutput,
@@ -21,5 +22,6 @@ __all__ = [
     'AbsEmbedderModel',
     'AbsEmbedderRunner',
     'AbsEmbedderTrainer',
-    'AbsCallback'
+    'AbsCallback',
+    'CallbackOutput'
 ]

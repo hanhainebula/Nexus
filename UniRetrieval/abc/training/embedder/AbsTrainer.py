@@ -19,7 +19,7 @@ class AbsEmbedderTrainer():
     def save_model(self, output_dir: Optional[str] = None, state_dict=None):
         pass
 
-    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+    def compute_loss(self, model, inputs, return_outputs=False ,*args, **kwargs):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
 
@@ -35,7 +35,6 @@ class AbsEmbedderTrainer():
             Union[torch.Tensor, tuple(torch.Tensor, EmbedderOutput)]: The computed loss. If ``return_outputs`` is ``True``, 
                 also returns the model's outputs in a tuple ``(loss, outputs)``.
         """
-
         outputs = model(**inputs)
         loss = outputs.loss
 

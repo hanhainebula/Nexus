@@ -40,7 +40,12 @@ class AbsEmbedderCollator(DataCollatorWithPadding):
     def __call__(self, features):
         return features
 
-class AbsCallback(TrainerCallback):
+@dataclass
+class CallbackOutput:
+    save_checkpoint: str = None
+    stop_training: bool = False
+
+class AbsCallback():
     # TODO 结合 rec studio 的callback组件
     def __init__(self, train_dataset):
         self.train_dataset = train_dataset

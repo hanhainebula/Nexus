@@ -597,7 +597,7 @@ class AbsEmbedderSameDatasetCollator(DataCollatorWithPadding):
         }
 
 
-class EmbedderTrainerCallbackForDataRefresh(AbsCallback):
+class EmbedderTrainerCallbackForDataRefresh(AbsCallback,TrainerCallback):
     """
     Callback class to inspect the state of the training loop and take decision.
     """

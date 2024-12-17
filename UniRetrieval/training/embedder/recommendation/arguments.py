@@ -92,7 +92,7 @@ class DataAttr4Model(AbsArguments):
 class ModelArguments(AbsEmbedderModelArguments):
     model_name: str = None
     embedding_dim: int = 10
-    DataAttr4Model: DataAttr4Model
+    data_config: Optional[DataAttr4Model] = None
     
 class RetrieverArguments(ModelArguments):
     embedding_dim: int = 10
