@@ -1,5 +1,5 @@
 import torch
-from rs4industry.model.module import get_activation
+from . import get_activation
 
 
 class InnerProductScorer(torch.nn.Module):

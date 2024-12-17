@@ -1,6 +1,6 @@
 import torch
 from typing import OrderedDict
-from UniRetrieval.training.embedder.recommendation.utils import get_seq_data
+from UniRetrieval.utils import get_seq_data
 from . import AverageAggregator, MLPModule, MultiFeatEmbedding
 
 
