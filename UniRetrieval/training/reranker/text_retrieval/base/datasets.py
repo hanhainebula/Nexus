@@ -16,7 +16,7 @@ from transformers import (
 from typing import List
 
 from .arguments import AbsTextRerankerDataArguments
-from UniRetrieval.training.abc.reranker import AbsRerankerTrainDataset, AbsRerankerCollator
+from UniRetrieval.abc.training.reranker import AbsRerankerTrainDataset, AbsRerankerCollator
 
 logger = logging.getLogger(__name__)
 

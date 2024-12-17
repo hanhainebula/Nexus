@@ -1,4 +1,4 @@
-from UniRetrieval.training.abc.embedder import AbsEmbedderModelArguments, AbsEmbedderDataArguments, AbsEmbedderTrainingArguments
+from UniRetrieval.abc.training.embedder import AbsEmbedderModelArguments, AbsEmbedderDataArguments, AbsEmbedderTrainingArguments
 import os
 from typing import Optional
 from dataclasses import dataclass, field

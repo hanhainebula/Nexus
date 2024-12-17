@@ -5,7 +5,7 @@ from typing import Dict, Optional, List, Union
 import torch
 from dataclasses import dataclass
 # from UniRetrieval.training.text_retrieval.abc.reranker import AbsRerankerModel
-from UniRetrieval.training.abc.reranker import AbsRerankerModel, RerankerOutput
+from UniRetrieval.abc.training.reranker import AbsRerankerModel, RerankerOutput
 
 logger = logging.getLogger(__name__)
 

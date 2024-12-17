@@ -3,7 +3,7 @@ import torch
 import logging
 from typing import Optional
 from transformers.trainer import Trainer
-from UniRetrieval.training.abc.embedder import AbsEmbedderTrainer
+from UniRetrieval.abc.training.embedder import AbsEmbedderTrainer
 
 logger = logging.getLogger(__name__)
 

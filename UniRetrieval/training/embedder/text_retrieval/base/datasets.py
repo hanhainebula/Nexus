@@ -16,7 +16,7 @@ from transformers import (
 )
 
 from .arguments import AbsTextEmbedderDataArguments, AbsTextEmbedderTrainingArguments
-from UniRetrieval.training.abc.embedder import AbsEmbedderTrainDataset, AbsEmbedderCollator, AbsCallback
+from UniRetrieval.abc.training.embedder import AbsEmbedderTrainDataset, AbsEmbedderCollator, AbsCallback
 
 logger = logging.getLogger(__name__)
 

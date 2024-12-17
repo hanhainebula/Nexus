@@ -5,7 +5,7 @@ from torch import nn, Tensor
 from transformers import AutoModel, AutoTokenizer
 import torch.distributed as dist
 import torch.nn.functional as F
-from UniRetrieval.training.abc.embedder import AbsEmbedderModel, EmbedderOutput
+from UniRetrieval.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
 from dataclasses import dataclass
 from typing import Dict, Optional, List, Union
 logger = logging.getLogger(__name__)

@@ -3,7 +3,7 @@ import torch
 import logging
 from typing import Optional
 
-from UniRetrieval.training.abc.reranker import AbsRerankerTrainer
+from UniRetrieval.abc.training.reranker import AbsRerankerTrainer
 from transformers.trainer import Trainer
 
 logger = logging.getLogger(__name__)

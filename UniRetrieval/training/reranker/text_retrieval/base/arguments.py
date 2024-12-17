@@ -3,7 +3,7 @@ from typing import Optional
 from dataclasses import dataclass, field
 
 from transformers import TrainingArguments
-from UniRetrieval.training.abc.reranker import AbsRerankerDataArguments, AbsRerankerModelArguments, AbsRerankerTrainingArguments
+from UniRetrieval.abc.training.reranker import AbsRerankerDataArguments, AbsRerankerModelArguments, AbsRerankerTrainingArguments
 
 
 @dataclass

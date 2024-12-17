@@ -6,7 +6,7 @@ from transformers import (
     AutoTokenizer, PreTrainedTokenizer
 )
 from transformers import set_seed
-from UniRetrieval.training.abc.reranker import AbsRerankerRunner, AbsRerankerModel
+from UniRetrieval.abc.training.reranker import AbsRerankerRunner, AbsRerankerModel
 from .arguments import AbsTextRerankerModelArguments, AbsTextRerankerDataArguments, AbsTextRerankerTrainingArguments
 from .modeling import CrossEncoderModel
 from .trainer import EncoderOnlyRerankerTrainer

@@ -6,7 +6,7 @@ from transformers import (
     AutoTokenizer, PreTrainedTokenizer
 )
 from transformers import set_seed, PreTrainedTokenizer
-from UniRetrieval.training.abc.embedder import AbsEmbedderRunner
+from UniRetrieval.abc.training.embedder import AbsEmbedderRunner
 from .arguments import AbsTextEmbedderModelArguments, AbsTextEmbedderDataArguments, AbsTextEmbedderTrainingArguments
 from .datasets import AbsTextEmbedderTrainDataset, AbsTextEmbedderCollator, AbsEmbedderSameDatasetTrainDataset, AbsEmbedderSameDatasetCollator, EmbedderTrainerCallbackForDataRefresh
 from .modeling import BiEncoderOnlyEmbedderModel
