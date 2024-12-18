@@ -1,6 +1,6 @@
 from accelerate import Accelerator
 from loguru import logger as loguru_logger
-from rs4industry.config import TrainingArguments
+from UniRetrieval.training.embedder.recommendation.arguments import TrainingArguments
 
 
 def get_logger(config: TrainingArguments):

@@ -2,7 +2,7 @@ from operator import itemgetter
 from typing import Dict, Tuple
 
 import torch
-from rs4industry.data.dataset import DataAttr4Model
+from UniRetrieval.training.embedder.recommendation.arguments import DataAttr4Model
 
 import importlib
 
