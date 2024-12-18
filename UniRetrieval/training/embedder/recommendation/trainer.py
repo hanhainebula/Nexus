@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from accelerate import Accelerator
 
 from UniRetrieval.logger import get_logger
+# TODO eval部分暂未移植
 from rs4industry.eval import get_eval_metrics
 from .arguments import TrainingArguments
 from .datasets import Callback, EarlyStopCallback, CheckpointCallback

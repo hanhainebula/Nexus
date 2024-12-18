@@ -8,6 +8,7 @@ from transformers import (
 from transformers import set_seed, PreTrainedTokenizer
 from UniRetrieval.abc.training.embedder import AbsEmbedderRunner
 from .arguments import RetrieverArguments, TrainingArguments, ModelArguments
+# TODO datasets部分暂未实现
 from .datasets import 
 from .modeling import MLPRetriever
 from .trainer import RetrieverTrainer
@@ -15,6 +16,7 @@ from .trainer import RetrieverTrainer
 logger = logging.getLogger(__name__)
 
 
+# TODO 暂未完成
 class RetrieverRunner(AbsEmbedderRunner):
     """
     Finetune Runner for base embedding models.

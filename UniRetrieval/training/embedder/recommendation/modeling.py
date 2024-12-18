@@ -295,4 +295,6 @@ class MLPRetriever(BaseRetriever):
     def get_negative_sampler(self):
         return UniformSampler(num_items=self.data_config.num_items)
     
+    # TODO to be implemented
+    def encode_info(self, *args, **kwargs):
         return super().encode_info(*args, **kwargs)

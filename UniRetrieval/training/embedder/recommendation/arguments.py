@@ -101,7 +101,7 @@ class RetrieverArguments(ModelArguments):
     dropout: float = 0.3
     batch_norm: bool = True
 
-# TODO LLM生成，待完成 待检查
+# TODO 待检查
 
 REQUIRED_DATA_CONFIG = [
     "name",
