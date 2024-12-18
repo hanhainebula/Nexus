@@ -113,7 +113,7 @@ class BaseEmbedder(AbsEmbedder):
         return instruction_format.format(instruction, sentence)
     
 
-    def encode_queries(
+    def encode_query(
         self,
         queries: Union[List[str], str],
         batch_size: Optional[int] = None,
