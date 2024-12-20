@@ -14,7 +14,7 @@ class EncoderOnlyEmbedderTrainer(AbsEmbedderTrainer):
     """
     
     
-    def save_model(self, output_dir: Optional[str] = None, state_dict=None):
+    def _save(self, output_dir: Optional[str] = None, state_dict=None):
         """Save the model to directory.
 
         Args:
@@ -45,8 +45,6 @@ class EncoderOnlyEmbedderTrainer(AbsEmbedderTrainer):
         #                                         pooling_mode=self.args.sentence_pooling_method,
         #                                         normlized=self.args.normlized)
     
-    def _save(self, output_dir: Optional[str] = None, state_dict=None):
-        return self.save_model(output_dir, state_dict)
     
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         """

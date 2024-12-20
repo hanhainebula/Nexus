@@ -13,9 +13,9 @@ class AbsEmbedderTrainer(AbsTrainer):
     Abstract class for the trainer of embedder.
     """
     @abstractmethod
-    def save_model(self, output_dir: Optional[str] = None, state_dict=None):
+    def _save(self, output_dir: Optional[str] = None, state_dict=None):
         pass
-
+    
     def compute_loss(self, model, inputs, return_outputs=False ,*args, **kwargs):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.

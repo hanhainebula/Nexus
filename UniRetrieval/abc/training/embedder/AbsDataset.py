@@ -29,16 +29,16 @@ class AbsEmbedderTrainDataset(AbsDataset):
         args (AbsEmbedderDataArguments): Data arguments.
     """
     
-    def __init__(self, args: AbsEmbedderDataArguments):
-        self.args = args
+    pass
 
 @dataclass
 class AbsEmbedderCollator(DataCollatorWithPadding):
     """
     The abstract embedder collator.
     """
+    @abstractmethod
     def __call__(self, features):
-        return features
+        return super().call(features)
 
 @dataclass
 class CallbackOutput:

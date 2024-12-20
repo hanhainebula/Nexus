@@ -10,14 +10,10 @@ from transformers import Trainer
 
 class AbsTrainer(Trainer):
     @abstractmethod
-    def save_model(self, output_dir: Optional[str] = None, *args, **kwargs):
-        pass
-
-    @abstractmethod
-    def train(self, train_dataset: AbsDataset=None, eval_dataset: AbsDataset=None, *args, **kwargs):
-        pass
+    def _save(self, output_dir: Optional[str] = None, *args, **kwargs):
+        return super()._save(output_dir, *args, **kwargs)
 
     @torch.no_grad()
     @abstractmethod
     def evaluate(self, eval_dataset: AbsDataset, *args, **kwargs):
-        pass
+        return super().evaluate(eval_dataset, **args, **kwargs)
