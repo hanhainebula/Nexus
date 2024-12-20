@@ -54,8 +54,10 @@ class BaseEmbedder(AbsEmbedder):
         query_max_length: int = 512,
         passage_max_length: int = 512,
         convert_to_numpy: bool = True,
+        *args,
         **kwargs: Any,
     ):
+        super().__init__(*args, **kwargs)
         query_instruction_format = query_instruction_format.replace('\\n', '\n')
         self.model_name_or_path = model_name_or_path
         self.normalize_embeddings = normalize_embeddings
@@ -68,23 +70,14 @@ class BaseEmbedder(AbsEmbedder):
         self.query_max_length = query_max_length
         self.passage_max_length = passage_max_length
         self.convert_to_numpy = convert_to_numpy
+        
         for k in kwargs:
             setattr(self, k, kwargs[k])
+            
         self.kwargs = kwargs
+        
         self.pool = None
-        super().__init__(
-            model_name_or_path,
-            normalize_embeddings=normalize_embeddings,
-            use_fp16=use_fp16,
-            query_instruction_for_retrieval=query_instruction_for_retrieval,
-            query_instruction_format=query_instruction_format,
-            devices=devices,
-            batch_size=batch_size,
-            query_max_length=query_max_length,
-            passage_max_length=passage_max_length,
-            convert_to_numpy=convert_to_numpy,
-            **kwargs
-        )
+
         self.pooling_method = pooling_method
 
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -378,3 +371,24 @@ class BaseEmbedder(AbsEmbedder):
         else:
             raise NotImplementedError(f"pooling method {self.pooling_method} not implemented")
         
+
+
+if __name__=='__main__':
+    import pdb
+    sentences_1 = ["样例数据-1", "样例数据-2"]
+    sentences_2 = ["样例数据-3", "样例数据-4"]
+    # pdb.set_trace()
+    model = BaseEmbedder(model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5', query_instruction_for_retrieval="为这个句子生成表示以用于检索相关文章：", use_fp16=True, devices=['cuda:1','cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
+    embeddings_1 = model.encode(sentences_1)
+    embeddings_2 = model.encode(sentences_2)
+    similarity = embeddings_1 @ embeddings_2.T
+    print(similarity)
+
+    # for s2p(short query to long passage) retrieval task, suggest to use encode_queries() which will automatically add the instruction to each query
+    # corpus in retrieval task can still use encode_corpus(), since they don't need instruction
+    queries = ['query_1', 'query_2']
+    passages = ["样例文档-1", "样例文档-2"]
+    q_embeddings = model.encode_query(queries)
+    p_embeddings = model.encode_info(passages)
+    scores = q_embeddings @ p_embeddings.T
+    print(scores)

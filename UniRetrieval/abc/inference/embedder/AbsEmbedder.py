@@ -22,12 +22,9 @@ class AbsEmbedder(ABC):
     Base class for embedder.
     Extend this class and implement :meth:`encode_queries`, :meth:`encode_corpus`, :meth:`encode` for custom embedders.
     """
-
-    def __init__(
-        self,*args, **kwargs):
-        pass
-    
-    @abstractmethod
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
     def stop_self_pool(self):
         if self.pool is not None:
             self.stop_multi_process_pool(self.pool)

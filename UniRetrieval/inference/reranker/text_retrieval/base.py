@@ -1,7 +1,8 @@
 import torch
 import numpy as np
 from tqdm import tqdm, trange
-from typing import Any, List, Union, Tuple, Optional
+from typing import Any, List, Union, Tuple, Optional,Dict, Literal
+import math
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from UniRetrieval.abc.inference import AbsReranker
@@ -285,3 +286,46 @@ class BaseReranker(AbsReranker):
             all_scores = [sigmoid(score) for score in all_scores]
 
         return all_scores
+
+    def encode_multi_process(
+        self,
+        sentence_pairs: List,
+        pool: Dict[Literal["input", "output", "processes"], Any],
+        **kwargs
+    ) -> np.ndarray:
+        chunk_size = math.ceil(len(sentence_pairs) / len(pool["processes"]))
+
+        input_queue = pool["input"]
+        last_chunk_id = 0
+        chunk = []
+
+        for sentence_pair in sentence_pairs:
+            chunk.append(sentence_pair)
+            if len(chunk) >= chunk_size:
+                input_queue.put(
+                    [last_chunk_id, chunk, kwargs]
+                )
+                last_chunk_id += 1
+                chunk = []
+
+        if len(chunk) > 0:
+            input_queue.put([last_chunk_id, chunk, kwargs])
+            last_chunk_id += 1
+
+        output_queue = pool["output"]
+        results_list = sorted(
+            [output_queue.get() for _ in trange(last_chunk_id, desc="Chunks")],
+            key=lambda x: x[0],
+        )
+        scores = np.concatenate([result[1] for result in results_list])
+        return scores
+
+if __name__=='__main__':
+    from . import FlagReranker
+    model_name_or_path='/data2/OpenLLMs/bge-reranker-base'
+    model=FlagReranker(
+        model_name_or_path,use_fp16=True,devices=['cuda:1','cuda:0'], normalize=True)
+    
+    qa=['what is love?','love is ...']
+    print(model.compute_score(qa),)
+    
