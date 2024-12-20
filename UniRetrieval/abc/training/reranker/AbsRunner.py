@@ -41,43 +41,6 @@ class AbsRerankerRunner(AbsRunner):
         self.data_args = data_args
         self.training_args = training_args
 
-        if (
-            os.path.exists(training_args.output_dir)
-            and os.listdir(training_args.output_dir)
-            and training_args.do_train
-            and not training_args.overwrite_output_dir
-        ):
-            raise ValueError(
-                f"Output directory ({training_args.output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
-            )
-
-        # Setup logging
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-            datefmt="%m/%d/%Y %H:%M:%S",
-            level=logging.INFO if training_args.local_rank in [-1, 0] else logging.WARN,
-        )
-        logger.warning(
-            "Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s",
-            training_args.local_rank,
-            training_args.device,
-            training_args.n_gpu,
-            bool(training_args.local_rank != -1),
-            training_args.fp16,
-        )
-        logger.info("Training/evaluation parameters %s", training_args)
-        logger.info("Model parameters %s", model_args)
-        logger.info("Data parameters %s", data_args)
-
-        # Set seed
-        set_seed(training_args.seed)
-
-        self.model = self.load_model()
-        self.tokenizer = self.model.tokenizer
-        self.train_dataset = self.load_dataset()
-        self.data_collator = self.load_data_collator()
-        self.trainer = self.load_trainer()
-
 
     # TODO 增加了load_model函数 (继承自AbsRunner)
     @abstractmethod

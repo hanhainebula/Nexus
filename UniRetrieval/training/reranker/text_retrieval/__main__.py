@@ -1,6 +1,6 @@
 from transformers import HfArgumentParser
 
-from UniRetrieval.training.reranker.text_retrieval.base import *
+from UniRetrieval.training.reranker.text_retrieval import *
 from .runner import EncoderOnlyRerankerRunner
 
 

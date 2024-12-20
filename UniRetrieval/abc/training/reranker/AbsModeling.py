@@ -27,12 +27,15 @@ class AbsRerankerModel(AbsReranker, nn.Module):
         train_batch_size (int, optional): Batch size used for training. Defaults to ``4``.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
     def forward(self,*args, **kwargs):
         """The computation performed at every call.
         """
         pass
+
+    def compute_score(self, *args, **kwargs):
+        return super().compute_score(*args, **kwargs)
 
     def compute_loss(self, *args, **kwargs):
         """Compute the loss.

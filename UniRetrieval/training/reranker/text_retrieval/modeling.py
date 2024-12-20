@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 class TextRerankerOutput(RerankerOutput):
     loss: Optional[Tensor] = None
 
+
 class CrossEncoderModel(AbsRerankerModel):
     """Model class for reranker.
 
@@ -27,8 +28,9 @@ class CrossEncoderModel(AbsRerankerModel):
         base_model: PreTrainedModel,
         tokenizer: AutoTokenizer = None,
         train_batch_size: int = 4,
+        *args, **kwargs
     ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self.model = base_model
         self.tokenizer = tokenizer
         self.cross_entropy = nn.CrossEntropyLoss(reduction='mean')
@@ -54,7 +56,7 @@ class CrossEncoderModel(AbsRerankerModel):
         self.model.enable_input_require_grads(**kwargs)
 
 
-    def encode(self, features):
+    def compute_score(self, features):
         """Encodes input features to logits.
 
         Args:
@@ -75,7 +77,7 @@ class CrossEncoderModel(AbsRerankerModel):
         Returns:
             TextRerankerOutput: Output of reranker model.
         """
-        ranker_logits = self.encode(pair) # (batch_size * num, dim)
+        ranker_logits = self.compute_score(pair) # (batch_size * num, dim)
         if teacher_scores is not None:
             teacher_scores = torch.Tensor(teacher_scores)
             teacher_targets = teacher_scores.view(self.train_batch_size, -1)
@@ -130,3 +132,4 @@ class CrossEncoderModel(AbsRerankerModel):
         """
         self.tokenizer.save_pretrained(*args, **kwargs)
         return self.model.save_pretrained(*args, **kwargs)
+

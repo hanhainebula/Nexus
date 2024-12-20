@@ -1,0 +1,37 @@
+torchrun --nproc_per_node 2 -m UniRetrieval.training.embedder.text_retrieval --model_name_or_path /data2/OpenLLMs/bge-base-zh-v1.5 --cache_dir /data2/home/angqing/.cache/huggingface/hub --train_data /data2/home/angqing/code/UniRetrieval/eval_scripts/training/text_retrieval/example_data/retrieval /data2/home/angqing/code/UniRetrieval/eval_scripts/training/text_retrieval/example_data/sts/sts.jsonl /data2/home/angqing/code/UniRetrieval/eval_scripts/training/text_retrieval/example_data/classification-no_in_batch_neg /data2/home/angqing/code/UniRetrieval/eval_scripts/training/text_retrieval/example_data/clustering-no_in_batch_neg --cache_path ~/.cache --train_group_size 8 --query_max_len 512 --passage_max_len 512 --pad_to_multiple_of 8 --query_instruction_for_retrieval 'Represent this sentence for searching relevant passages: ' --query_instruction_format '{}{}' --knowledge_distillation True --same_dataset_within_batch True --small_threshold 0 --drop_threshold 0 --output_dir /data2/home/angqing/code/UniRetrieval/checkpoints/test_embedder_same_dataset --overwrite_output_dir --learning_rate 1e-5 --fp16 --num_train_epochs 5 --per_device_train_batch_size 10 --dataloader_drop_last True --warmup_ratio 0.1 --gradient_checkpointing --deepspeed /data2/home/angqing/code/UniRetrieval/eval_scripts/training/ds_stage0.json --logging_steps 1 --save_steps 10 --negatives_cross_device --temperature 0.02 --sentence_pooling_method cls --normalize_embeddings True --kd_loss_type kl_div
+[2024-12-20 15:36:45,169] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2024-12-20 15:36:45,245] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2024-12-20 15:36:46,240] [INFO] [comm.py:652:init_distributed] cdb=None
+[2024-12-20 15:36:46,240] [INFO] [comm.py:683:init_distributed] Initializing TorchBackend in DeepSpeed with backend nccl
+[2024-12-20 15:36:46,519] [INFO] [comm.py:652:init_distributed] cdb=None
+ninja: no work to do.
+Time to load fused_adam op: 0.022869586944580078 seconds
+[2024-12-20 15:36:50,286] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started
+Time to load fused_adam op: 0.1016240119934082 seconds
+[2024-12-20 15:36:50,368] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started
+{'loss': 0.1232, 'grad_norm': 7.538643274856366, 'learning_rate': 0.0, 'epoch': 0.2}
+{'loss': 2.4141, 'grad_norm': 62.769520432392184, 'learning_rate': 6.309297535714574e-06, 'epoch': 0.4}
+{'loss': 0.9858, 'grad_norm': 83.29954653613068, 'learning_rate': 1e-05, 'epoch': 0.6}
+{'loss': 1.769, 'grad_norm': 70.11258733168924, 'learning_rate': 1e-05, 'epoch': 0.8}
+{'loss': 2.0459, 'grad_norm': 51.639412334475686, 'learning_rate': 9.545454545454547e-06, 'epoch': 1.0}
+{'loss': 0.7678, 'grad_norm': 63.26394632250564, 'learning_rate': 9.090909090909091e-06, 'epoch': 1.2}
+{'loss': 1.4941, 'grad_norm': 65.29080829977141, 'learning_rate': 8.636363636363637e-06, 'epoch': 1.4}
+{'loss': 1.6411, 'grad_norm': 49.94298507110383, 'learning_rate': 8.181818181818183e-06, 'epoch': 1.6}
+{'loss': 0.0126, 'grad_norm': 0.9182781590839246, 'learning_rate': 7.727272727272727e-06, 'epoch': 1.8}
+{'loss': 1.7339, 'grad_norm': 43.843383874540436, 'learning_rate': 7.272727272727273e-06, 'epoch': 2.0}
+{'loss': 1.6719, 'grad_norm': 47.767815107625026, 'learning_rate': 6.818181818181818e-06, 'epoch': 2.2}
+{'loss': 0.8203, 'grad_norm': 37.03252404190217, 'learning_rate': 6.363636363636364e-06, 'epoch': 2.4}
+{'loss': 0.0427, 'grad_norm': 7.116188892106823, 'learning_rate': 5.90909090909091e-06, 'epoch': 2.6}
+{'loss': 0.0307, 'grad_norm': 2.260558362700582, 'learning_rate': 5.4545454545454545e-06, 'epoch': 2.8}
+{'loss': 1.4163, 'grad_norm': 40.59712986314427, 'learning_rate': 5e-06, 'epoch': 3.0}
+{'loss': 1.0071, 'grad_norm': 48.24929413748583, 'learning_rate': 4.5454545454545455e-06, 'epoch': 3.2}
+{'loss': 0.014, 'grad_norm': 1.8207833659330726, 'learning_rate': 4.0909090909090915e-06, 'epoch': 3.4}
+{'loss': 0.0311, 'grad_norm': 2.490912706325669, 'learning_rate': 3.6363636363636366e-06, 'epoch': 3.6}
+{'loss': 1.0659, 'grad_norm': 36.482086384321896, 'learning_rate': 3.181818181818182e-06, 'epoch': 3.8}
+{'loss': 1.4512, 'grad_norm': 37.88346420737631, 'learning_rate': 2.7272727272727272e-06, 'epoch': 4.0}
+{'loss': 0.0061, 'grad_norm': 0.593379733431387, 'learning_rate': 2.2727272727272728e-06, 'epoch': 4.2}
+{'loss': 0.7695, 'grad_norm': 43.21826983645053, 'learning_rate': 1.8181818181818183e-06, 'epoch': 4.4}
+{'loss': 0.0028, 'grad_norm': 0.4914307301644582, 'learning_rate': 1.3636363636363636e-06, 'epoch': 4.6}
+{'loss': 1.5806, 'grad_norm': 39.78582339432052, 'learning_rate': 9.090909090909091e-07, 'epoch': 4.8}
+{'loss': 1.3848, 'grad_norm': 43.88611638021186, 'learning_rate': 4.5454545454545457e-07, 'epoch': 5.0}
+{'train_runtime': 85.3068, 'train_samples_per_second': 0.586, 'train_steps_per_second': 0.293, 'train_loss': 0.9713011169433594, 'epoch': 5.0}

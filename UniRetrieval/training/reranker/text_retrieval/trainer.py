@@ -37,7 +37,5 @@ class EncoderOnlyRerankerTrainer(AbsRerankerTrainer):
         # Good practice: save your training arguments together with the trained model
         torch.save(self.args, os.path.join(output_dir, "training_args.bin"))
 
-    def save_model(self, output_dir: Optional[str] = None, state_dict=None):
-        return self._save(output_dir,state_dict)
     
     

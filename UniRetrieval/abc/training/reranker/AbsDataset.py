@@ -28,10 +28,7 @@ class AbsRerankerTrainDataset(AbsDataset):
         args (AbsRerankerDataArguments): Data arguments.
         tokenizer (PreTrainedTokenizer): Tokenizer to use.
     """
-    def __init__(
-        self,
-        args: AbsRerankerDataArguments):
-        pass
+    pass
 
 @dataclass
 class AbsRerankerCollator(DataCollatorWithPadding):
@@ -39,6 +36,6 @@ class AbsRerankerCollator(DataCollatorWithPadding):
     The abstract reranker collator.
     """
     def __call__(self, features):
-        return features
+        return super().__call__(features)
 
 # remove Abs LLM reranker class

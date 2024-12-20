@@ -11,12 +11,10 @@ class AbsRerankerTrainer(AbsTrainer):
     """
     Abstract class for the trainer of reranker.
     """
+    @abstractmethod
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         pass
 
-    @abstractmethod
-    def save_model(self, output_dir: Optional[str] = None, state_dict=None):
-        pass
 
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         """

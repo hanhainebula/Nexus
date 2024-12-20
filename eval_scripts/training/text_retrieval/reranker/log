@@ -1,0 +1,28 @@
+torchrun --nproc_per_node 2 -m UniRetrieval.training.reranker.text_retrieval --model_name_or_path /data2/OpenLLMs/bge-base-zh-v1.5 --cache_dir /data2/home/angqing/.cache/huggingface/hub --train_data /data2/home/angqing/code/UniRetrieval/eval_scripts/training/text_retrieval/example_data/normal/examples.jsonl --cache_path ~/.cache --train_group_size 8 --query_max_len 256 --passage_max_len 256 --pad_to_multiple_of 8 --knowledge_distillation True --output_dir /data2/home/angqing/code/UniRetrieval/checkpoints/test_reranker --overwrite_output_dir --learning_rate 6e-5 --fp16 --num_train_epochs 8 --per_device_train_batch_size 2 --gradient_accumulation_steps 1 --dataloader_drop_last True --warmup_ratio 0.1 --gradient_checkpointing --weight_decay 0.01 --deepspeed /data2/home/angqing/code/UniRetrieval/eval_scripts/training/ds_stage0.json --logging_steps 1 --save_steps 100
+[2024-12-20 15:53:22,272] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2024-12-20 15:53:22,314] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2024-12-20 15:53:23,310] [INFO] [comm.py:652:init_distributed] cdb=None
+[2024-12-20 15:53:23,310] [INFO] [comm.py:683:init_distributed] Initializing TorchBackend in DeepSpeed with backend nccl
+[2024-12-20 15:53:23,480] [INFO] [comm.py:652:init_distributed] cdb=None
+ninja: no work to do.
+Time to load fused_adam op: 0.025509357452392578 seconds
+[2024-12-20 15:53:25,486] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started
+Time to load fused_adam op: 0.10181641578674316 seconds
+[2024-12-20 15:53:25,565] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started
+{'loss': 4.166, 'grad_norm': 5.754232093094714, 'learning_rate': 0.0, 'epoch': 0.5}
+{'loss': 4.2109, 'grad_norm': 7.236974129818626, 'learning_rate': 6e-05, 'epoch': 1.0}
+{'loss': 4.1934, 'grad_norm': 7.008846687206507, 'learning_rate': 6e-05, 'epoch': 1.5}
+{'loss': 4.0566, 'grad_norm': 6.007695666939405, 'learning_rate': 5.5714285714285715e-05, 'epoch': 2.0}
+{'loss': 3.916, 'grad_norm': 6.560332894136148, 'learning_rate': 5.142857142857143e-05, 'epoch': 2.5}
+{'loss': 3.8418, 'grad_norm': 7.41564268551344, 'learning_rate': 4.714285714285714e-05, 'epoch': 3.0}
+{'loss': 3.6787, 'grad_norm': 11.590965409575535, 'learning_rate': 4.2857142857142856e-05, 'epoch': 3.5}
+{'loss': 3.3359, 'grad_norm': 11.337250500071312, 'learning_rate': 3.857142857142858e-05, 'epoch': 4.0}
+{'loss': 3.3213, 'grad_norm': 17.50492833087701, 'learning_rate': 3.4285714285714284e-05, 'epoch': 4.5}
+{'loss': 2.2852, 'grad_norm': 16.1797393694847, 'learning_rate': 3e-05, 'epoch': 5.0}
+{'loss': 2.3682, 'grad_norm': 38.457981712797604, 'learning_rate': 2.5714285714285714e-05, 'epoch': 5.5}
+{'loss': 2.2422, 'grad_norm': 24.230436948330734, 'learning_rate': 2.1428571428571428e-05, 'epoch': 6.0}
+{'loss': 2.0869, 'grad_norm': 17.699689890413246, 'learning_rate': 1.7142857142857142e-05, 'epoch': 6.5}
+{'loss': 1.0649, 'grad_norm': 6.567278766020596, 'learning_rate': 1.2857142857142857e-05, 'epoch': 7.0}
+{'loss': 2.1011, 'grad_norm': 66.35829150575307, 'learning_rate': 8.571428571428571e-06, 'epoch': 7.5}
+{'loss': 2.0947, 'grad_norm': 51.47640539606471, 'learning_rate': 4.2857142857142855e-06, 'epoch': 8.0}
+{'train_runtime': 56.1561, 'train_samples_per_second': 1.425, 'train_steps_per_second': 0.285, 'train_loss': 3.06024169921875, 'epoch': 8.0}

@@ -38,7 +38,7 @@ class AbsEmbedderCollator(DataCollatorWithPadding):
     """
     @abstractmethod
     def __call__(self, features):
-        return super().call(features)
+        return super().__call__(features)
 
 @dataclass
 class CallbackOutput:
