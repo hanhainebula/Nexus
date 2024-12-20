@@ -12,9 +12,6 @@ class AbsEmbedderTrainer(AbsTrainer):
     """
     Abstract class for the trainer of embedder.
     """
-    def __init__(self, *args, **kwargs):
-        pass
-    
     @abstractmethod
     def save_model(self, output_dir: Optional[str] = None, state_dict=None):
         pass

@@ -126,21 +126,22 @@ DEFAULT_CONFIG = {
     "filter_settings": None,
     "item_info": None,
 }
+
 @dataclass
 class DataArguments(AbsEmbedderDataArguments):
     # Required fields without default values
-    name: str
-    type: str
-    url: str
-    labels: List[str]
-    stats: Dict[str, Any]
-    item_col: str
-    context_features: List[str]
-    item_features: List[str]
-    train_settings: Dict[str, datetime] = field(metadata={"required_keys": ["start_date", "end_date"]})
-    test_settings: Dict[str, datetime] = field(metadata={"required_keys": ["start_date", "end_date"]})
+    name: str=None
+    type: str=None
+    url: str=None
+    labels: List[str]=None
+    stats: Dict[str, Any]=None
+    item_col: str=None
+    context_features: List[str]=None
+    item_features: List[str]=None
 
     # Optional fields with default values
+    train_settings: Dict[str, datetime] = field(default=None,metadata={"required_keys": ["start_date", "end_date"]})
+    test_settings: Dict[str, datetime] = field(default=None,metadata={"required_keys": ["start_date", "end_date"]})
     file_format: str = "auto"
     date_format: str = "%Y-%m-%d"
     user_sequential_info: Optional[Dict[str, Any]] = None
@@ -148,6 +149,7 @@ class DataArguments(AbsEmbedderDataArguments):
     filter_settings: Optional[Dict[str, Any]] = None
     item_info: Optional[Dict[str, Any]] = None
     seq_features: List[str] = field(default_factory=list)
+
 
     def __post_init__(self):
         # Validate required keys in dictionaries after initialization

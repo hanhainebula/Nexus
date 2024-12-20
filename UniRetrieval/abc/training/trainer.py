@@ -9,20 +9,12 @@ from .arguments import AbsTrainingArguments
 from transformers import Trainer
 
 class AbsTrainer(Trainer):
-    def __init__(
-        self,
-        model: AbsModel,
-        train_args: AbsTrainingArguments,
-    ):
-        self.model = model
-        self.train_args = train_args
-
     @abstractmethod
     def save_model(self, output_dir: Optional[str] = None, *args, **kwargs):
         pass
 
     @abstractmethod
-    def train(self, train_dataset: AbsDataset, eval_dataset: AbsDataset, *args, **kwargs):
+    def train(self, train_dataset: AbsDataset=None, eval_dataset: AbsDataset=None, *args, **kwargs):
         pass
 
     @torch.no_grad()

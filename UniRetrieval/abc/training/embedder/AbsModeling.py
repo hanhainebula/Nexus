@@ -33,7 +33,7 @@ class AbsEmbedderModel(AbsEmbedder, nn.Module):
         kd_loss_type (str, optional): Type of knowledge distillation loss. Defaults to ``"kl_div"``.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
     @abstractmethod
     def compute_loss(self, scores, target):

@@ -44,8 +44,9 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
         kd_loss_type: str = 'kl_div',
         sentence_pooling_method: str = 'cls',
         normalize_embeddings: bool = False,
+        *args, **kwargs
     ):
-        super.__init__()
+        super().__init__(*args, **kwargs)
         self.model = base_model
         self.tokenizer = tokenizer
 
