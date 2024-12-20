@@ -8,7 +8,7 @@ from UniRetrieval.abc.training.embedder import AbsEmbedderTrainer
 logger = logging.getLogger(__name__)
 
 
-class EncoderOnlyEmbedderTrainer(Trainer, AbsEmbedderTrainer):
+class EncoderOnlyEmbedderTrainer(AbsEmbedderTrainer):
     """
     Trainer class for base encoder models.
     """

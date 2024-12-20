@@ -9,7 +9,7 @@ from transformers.trainer import Trainer
 logger = logging.getLogger(__name__)
 
 
-class EncoderOnlyRerankerTrainer(AbsRerankerTrainer, Trainer):
+class EncoderOnlyRerankerTrainer(AbsRerankerTrainer):
     """
     Trainer class for encoder only base reranker models.
     """

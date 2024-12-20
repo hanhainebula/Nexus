@@ -127,5 +127,5 @@ class AbsTextRerankerDataArguments(AbsRerankerDataArguments):
 
 
 @dataclass
-class AbsTextRerankerTrainingArguments(AbsRerankerTrainingArguments ,TrainingArguments):
+class AbsTextRerankerTrainingArguments(AbsRerankerTrainingArguments):
     sub_batch_size: Optional[int] = field(default=None, metadata={"help": "sub batch size for training, not implemented yet"})

@@ -8,7 +8,7 @@ from UniRetrieval.abc.training.dataset import AbsDataset
 logger = logging.getLogger(__name__)
 
 
-class AbsEmbedderTrainer():
+class AbsEmbedderTrainer(AbsTrainer):
     """
     Abstract class for the trainer of embedder.
     """

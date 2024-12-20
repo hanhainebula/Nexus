@@ -102,7 +102,7 @@ class AbsTextEmbedderDataArguments(AbsEmbedderDataArguments):
     )
 
 @dataclass
-class AbsTextEmbedderTrainingArguments(AbsEmbedderTrainingArguments, TrainingArguments):
+class AbsTextEmbedderTrainingArguments(AbsEmbedderTrainingArguments):
     negatives_cross_device: bool = field(default=False, metadata={"help": "share negatives across devices"})
     temperature: Optional[float] = field(default=0.02, metadata={"help": "temperature used for similarity score"})
     fix_position_embedding: bool = field(default=False, metadata={"help": "Freeze the parameters of position embeddings"})
