@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from UniRetrieval.abc.arguments import AbsArguments
-
+from transformers import TrainingArguments
 
 @dataclass
 class AbsDataArguments(AbsArguments):
@@ -32,5 +32,5 @@ class AbsModelArguments(AbsArguments):
 
 
 @dataclass
-class AbsTrainingArguments(AbsArguments):
+class AbsTrainingArguments(AbsArguments, TrainingArguments):
     pass

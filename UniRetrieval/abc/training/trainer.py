@@ -6,9 +6,9 @@ import torch
 from .dataset import AbsDataset
 from .modeling import AbsModel
 from .arguments import AbsTrainingArguments
+from transformers import Trainer
 
-
-class AbsTrainer(ABC):
+class AbsTrainer(Trainer):
     def __init__(
         self,
         model: AbsModel,
