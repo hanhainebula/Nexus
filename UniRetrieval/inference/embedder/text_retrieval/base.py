@@ -392,3 +392,5 @@ if __name__=='__main__':
     p_embeddings = model.encode_info(passages)
     scores = q_embeddings @ p_embeddings.T
     print(scores)
+    
+    del model
