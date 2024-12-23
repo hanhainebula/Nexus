@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RerankerOutput(AbsModelOutput, ModelOutput):
     scores: Optional[Tensor] = None
+    embedding: Optional[Tensor] = None
 
 
 class AbsRerankerModel(AbsReranker, nn.Module):

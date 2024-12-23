@@ -1,11 +1,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from UniRetrieval.abc.training.embedder import AbsCallback, CallbackOutput
 import os
 import json
 import torch
 from dataclasses import dataclass
-
 from typing import List, Union
 from datetime import datetime
 import pandas as pd
@@ -14,44 +12,13 @@ from torch.utils.data import IterableDataset, Dataset
 from multiprocessing import Process, Queue, Pool
 from accelerate import Accelerator
 import pandas as pd
-
 from torch.utils.data import IterableDataset, Dataset
-
-from UniRetrieval.training.embedder.recommendation.arguments import REQUIRED_DATA_CONFIG, DEFAULT_CONFIG
 from copy import deepcopy
 import re
 import fsspec
 
-
-class ItemDataset(Dataset):
-    def __init__(self, item_feat_df: torch.Tensor):
-        super().__init__()
-        self.item_feat_df = item_feat_df
-        self.item_ids = item_feat_df.index.to_numpy()
-        self.item_id_2_offset = pd.DataFrame.from_dict(
-            {item_id: i for i, item_id in enumerate(self.item_ids)},
-            orient="index",
-            columns=["offset"]
-        )
-        self.item_id_col = self.item_feat_df.index.name
-
-    def __getitem__(self, index):
-        feat_dict = self.item_feat_df.loc[self.item_ids[index]].to_dict()
-        if self.item_id_col is not None:
-            feat_dict.update({self.item_id_col: self.item_ids[index]})
-        return feat_dict
-    
-    def __len__(self):
-        return len(self.item_ids)
-    
-
-    def get_item_feat(self, item_ids: torch.LongTensor):
-        item_ids_list = item_ids.view(-1).tolist()
-        item_ids_list = self.item_ids[item_ids_list]
-        feats = self.item_feat_df.loc[item_ids_list].to_dict("list")
-        feats = {k: torch.tensor(v).reshape(*item_ids.shape).to(item_ids.device) for k,v in feats.items()}
-        return feats
-
+from UniRetrieval.abc.training.embedder import AbsCallback, CallbackOutput
+from UniRetrieval.training.embedder.recommendation.arguments import REQUIRED_DATA_CONFIG, DEFAULT_CONFIG
 
 
 # callback添加在了datasets里面

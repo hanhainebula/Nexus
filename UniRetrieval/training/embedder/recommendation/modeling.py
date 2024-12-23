@@ -9,12 +9,14 @@ from typing import OrderedDict
 import torch
 
 from UniRetrieval.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
-from .arguments import DataAttr4Model, ModelArguments
-from .datasets import ItemDataset
+from UniRetrieval.training.embedder.recommendation.arguments import DataAttr4Model, ModelArguments
+from UniRetrieval.training.embedder.recommendation.datasets import ItemDataset
 from UniRetrieval.modules import QueryEncoder, ItemEncoder, UniformSampler
 from UniRetrieval.modules.score import InnerProductScorer
 from UniRetrieval.modules.loss import BPRLoss
-from UniRetrieval.utils import get_model_cls
+
+from UniRetrieval.training.embedder.recommendation.arguments import get_model_cls
+
 
 @dataclass
 class RetrieverModelOutput(EmbedderOutput):
@@ -27,6 +29,9 @@ class RetrieverModelOutput(EmbedderOutput):
     neg_item_vector: torch.tensor = None
     pos_item_id: torch.tensor = None
     neg_item_id: torch.tensor = None
+    
+    def to_dict(self):
+        return {k: v for k, v in self.__dict__.items()}
 
 
 # TODO 实现data_config合并到model_config中
@@ -134,6 +139,7 @@ class BaseRetriever(AbsEmbedderModel):
 
     def compute_loss(self, batch, *args, **kwargs) -> Dict:
         output = self.forward(batch, *args, **kwargs)
+        # print('output:',output)
         output_dict = output.to_dict()
         labels = batch[self.flabel]
         output_dict['label'] = labels
@@ -275,8 +281,8 @@ class BaseRetriever(AbsEmbedderModel):
 
 
 class MLPRetriever(BaseRetriever):
-    def __init__(self, config, *args, **kwargs):
-        super().__init__(config, *args, **kwargs)
+    def __init__(self, retriever_data_config, retriever_model_config, *args, **kwargs):
+        super().__init__(retriever_data_config, retriever_model_config, *args, **kwargs)
 
     def get_item_encoder(self):
         return ItemEncoder(self.data_config, self.model_config)

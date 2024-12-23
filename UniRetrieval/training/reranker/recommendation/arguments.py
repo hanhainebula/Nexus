@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
-from UniRetrieval.abc.training.embedder import AbsEmbedderModelArguments, AbsEmbedderDataArguments, AbsEmbedderTrainingArguments
+from UniRetrieval.abc.training.reranker import AbsRerankerModelArguments, AbsRerankerDataArguments, AbsRerankerTrainingArguments
 from UniRetrieval.abc.arguments import AbsArguments
 from typing import Dict, Tuple
 import torch
@@ -12,7 +12,7 @@ from loguru import logger as loguru_logger
 import importlib
 
 @dataclass
-class TrainingArguments(AbsEmbedderTrainingArguments):
+class TrainingArguments(AbsRerankerTrainingArguments):
     device: str = "cuda"    # "cuda" or "cpu" or "0,1,2"
     # accelerate
     epochs: int = 10
@@ -97,12 +97,13 @@ class DataAttr4Model(AbsArguments):
 
 # TODO 添加了DataAttr4Model
 @dataclass
-class ModelArguments(AbsEmbedderModelArguments):
+class ModelArguments(AbsRerankerModelArguments):
     # model_name: str = None
     # embedding_dim: int = 10
     # data_config: Optional[DataAttr4Model] = None
     embedding_dim: int = 10
     mlp_layers: list[int] = field(default_factory=list)
+    prediction_layers: list[int] = field(default_factory=list)
     num_neg: int = 50
     activation: str = "relu"
     dropout: float = 0.3
@@ -110,7 +111,7 @@ class ModelArguments(AbsEmbedderModelArguments):
     model_name_or_path: str = ''
     
     
-class RetrieverArguments(ModelArguments):
+class RankerArguments(ModelArguments):
     embedding_dim: int = 10
     mlp_layers: list[int] = field(default_factory=list)
     num_neg: int = 50
@@ -146,7 +147,7 @@ DEFAULT_CONFIG = {
 }
 
 @dataclass
-class DataArguments(AbsEmbedderDataArguments):
+class DataArguments(AbsRerankerDataArguments):
     # Required fields without default values
     name: str=None
     type: str=None
@@ -224,25 +225,22 @@ def read_json(json_path: str) -> Dict[str, Any]:
     
 def get_modules(module_type: str, module_name: str):
     assert module_type in ["loss", "sampler", "encoder", "interaction", "score", "module"], f"{module_type} is not a valid module type"
-    # import the module {module_name} from "rs4industry.model.{module_type}"
     try:
-        # from "rs4industry.model.{module_type}" import {module_name}
-        module = importlib.import_module(f"rs4industry.model.{module_type}")
+        module = importlib.import_module(f"UniRetrieval.modules.{module_type}")
         cls = getattr(module, module_name)
-        # module = importlib.import_module(module_name, package=pkg)
         return cls
     except ImportError as e:
-        raise ImportError(f"Could not import {module_name} from rs4industry.model.{module_type}") from e
+        raise ImportError(f"Could not import {module_name} from UniRetrieval.modules.{module_type}") from e
     
 
 def get_model_cls(model_type: str, model_name: str):
     assert model_type in ["retriever", "ranker"], f"{model_type} is not a valid model type"
     try:
-        module = importlib.import_module(f"rs4industry.model.{model_type}s")
+        module = importlib.import_module(f"UniRetrieval.modules.{model_type}s")
         cls = getattr(module, model_name)
         return cls
     except ImportError as e:
-        raise ImportError(f"Could not import {model_name} from rs4industry.model.{model_type}s") from e
+        raise ImportError(f"Could not import {model_name} from UniRetrieval.modules.{model_type}s") from e
 
 
 def get_seq_data(d: dict):

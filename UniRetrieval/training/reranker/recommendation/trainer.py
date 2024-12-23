@@ -7,12 +7,10 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from accelerate import Accelerator
 
-from UniRetrieval.training.embedder.recommendation.arguments import get_logger
-# TODO eval部分暂未移植
-# from rs4industry.eval import get_eval_metrics
+from UniRetrieval.training.reranker.recommendation.arguments import get_logger
 from .arguments import TrainingArguments
 from .datasets import Callback, EarlyStopCallback, CheckpointCallback
-from UniRetrieval.abc.training.embedder import AbsEmbedderTrainer
+from UniRetrieval.abc.training.reranker import AbsRerankerTrainer
 
 import sys
 from typing import *
@@ -22,9 +20,9 @@ import torchmetrics.functional as M
 
 # copied from rec studio Trainer
 # TODO 添加datacollator逻辑?
-class RetrieverTrainer(AbsEmbedderTrainer):
+class RankerTrainer(AbsRerankerTrainer):
     def __init__(self, model, config=None, train=True, *args, **kwargs):
-        super(RetrieverTrainer, self).__init__(model, *args, **kwargs)
+        super(RankerTrainer, self).__init__(model, *args, **kwargs)
         self.config: TrainingArguments = self.load_config(config)
         self.train_mode = train
         self.model_type = model.model_type
@@ -374,7 +372,7 @@ class RetrieverTrainer(AbsEmbedderTrainer):
         model = self.accelerator.unwrap_model(self.model)
         outputs = model.eval_step(batch, k=k, *args, **kwargs)
         outputs = self.accelerator.gather_for_metrics(outputs)
-        metrics = RetrieverTrainer.compute_metrics(self.config.metrics, self.model_type, self.config.cutoffs, outputs)
+        metrics = RankerTrainer.compute_metrics(self.config.metrics, self.model_type, self.config.cutoffs, outputs)
         return metrics
     
 
