@@ -2,10 +2,19 @@
 Toolkit for Universal Retrieval, such as text retrieval, item recommendation, image retrieval, etc.
 
 
-Top-1: Training (Evaluation)
-    - Top-1.1: Text Retrieval (12.16 15:00)
-    - Top-1.2: Recommendation (12.19 15:00)
+Training 部分：
+- Text Retrieval 部分：已经完成
+- Recommendation 部分：已经完成
+- TODO: 
+    - 两部分的代码的整理，去掉一些冗余的代码，使得整体的代码更加一体化
 
-Top-2: Inference (Deployment)
-    - Top-2.1: Text Retrieval
-    - Top-2.2: Recommendation
+Inference 部分：
+- Text Retrieval 部分：已经完成了基本的代码
+- TODO:
+    - 在 Text Retrieval 部分集成进去 RecStudio4Industry 中用到的加速方法
+    - Recommendation 部分的代码整理
+
+Evaluation 部分：
+- Text Retrieval 部分: 评测框架已经完成
+- TODO:
+    - Recommendation 部分: 评测框架的搭建
