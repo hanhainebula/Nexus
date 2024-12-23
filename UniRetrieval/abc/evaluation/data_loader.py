@@ -13,7 +13,3 @@ class AbsEvalDataLoader(ABC):
         **kwargs
     ):
         pass
-
-    @abstractmethod
-    def load_dataset(self, *args, **kwargs):
-        pass
