@@ -25,8 +25,12 @@ class AbsArguments:
     @classmethod
     def from_dict(cls, _dict: dict):
         for _field in fields(cls):
-            if _field.name in _dict and isinstance(_field.type, type) and issubclass(_field.type, AbsArguments):
+            if _field.name not in _dict:
+                raise ValueError(f"{_field.name} is missing in the input dictionary.")
+            if issubclass(_field.type, AbsArguments):
                 _dict[_field.name] = _field.type.from_dict(_dict[_field.name])
+            else:
+                _dict[_field.name] = _field.type(_dict[_field.name])
         return cls(**_dict)
 
     @classmethod
