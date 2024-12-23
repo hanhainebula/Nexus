@@ -31,7 +31,7 @@ class AbsRerankerTrainDataset(AbsDataset):
     pass
 
 @dataclass
-class AbsRerankerCollator(DataCollatorWithPadding):
+class AbsRerankerCollator():
     """
     The abstract reranker collator.
     """

@@ -31,7 +31,7 @@ class AbsEmbedderTrainDataset(AbsDataset):
     pass
 
 @dataclass
-class AbsEmbedderCollator(DataCollatorWithPadding):
+class AbsEmbedderCollator():
     """
     The abstract embedder collator.
     """
