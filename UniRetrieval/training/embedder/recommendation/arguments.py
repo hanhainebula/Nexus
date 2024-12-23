@@ -5,6 +5,12 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from UniRetrieval.abc.training.embedder import AbsEmbedderModelArguments, AbsEmbedderDataArguments, AbsEmbedderTrainingArguments
 from UniRetrieval.abc.arguments import AbsArguments
+from typing import Dict, Tuple
+import torch
+from accelerate import Accelerator
+from loguru import logger as loguru_logger
+import importlib
+
 @dataclass
 class TrainingArguments(AbsEmbedderTrainingArguments):
     device: str = "cuda"    # "cuda" or "cpu" or "0,1,2"
@@ -42,6 +48,8 @@ class TrainingArguments(AbsEmbedderTrainingArguments):
     # TODO: use below
     learning_rate_schedule: str = "cosine"
     warmup_steps: int = 1000
+    
+    output_dir: str = checkpoint_dir
     
     
 # TODO 检查该类是否冗余
@@ -90,16 +98,26 @@ class DataAttr4Model(AbsArguments):
 # TODO 添加了DataAttr4Model
 @dataclass
 class ModelArguments(AbsEmbedderModelArguments):
-    model_name: str = None
+    # model_name: str = None
+    # embedding_dim: int = 10
+    # data_config: Optional[DataAttr4Model] = None
     embedding_dim: int = 10
-    data_config: Optional[DataAttr4Model] = None
-    
-class RetrieverArguments(ModelArguments):
-    embedding_dim: int = 10
-    mlp_layers: list[int] = [128, 128]
+    mlp_layers: list[int] = field(default_factory=list)
+    num_neg: int = 50
     activation: str = "relu"
     dropout: float = 0.3
     batch_norm: bool = True
+    model_name_or_path: str = ''
+    
+    
+class RetrieverArguments(ModelArguments):
+    embedding_dim: int = 10
+    mlp_layers: list[int] = field(default_factory=list)
+    num_neg: int = 50
+    activation: str = "relu"
+    dropout: float = 0.3
+    batch_norm: bool = True
+    model_name_or_path: str = ''
 
 # TODO 待检查
 
@@ -203,3 +221,62 @@ def read_json(json_path: str) -> Dict[str, Any]:
     """Helper function to read a JSON file into a dictionary."""
     with open(json_path, 'r') as f:
         return json.load(f)
+    
+def get_modules(module_type: str, module_name: str):
+    assert module_type in ["loss", "sampler", "encoder", "interaction", "score", "module"], f"{module_type} is not a valid module type"
+    # import the module {module_name} from "rs4industry.model.{module_type}"
+    try:
+        # from "rs4industry.model.{module_type}" import {module_name}
+        module = importlib.import_module(f"rs4industry.model.{module_type}")
+        cls = getattr(module, module_name)
+        # module = importlib.import_module(module_name, package=pkg)
+        return cls
+    except ImportError as e:
+        raise ImportError(f"Could not import {module_name} from rs4industry.model.{module_type}") from e
+    
+
+def get_model_cls(model_type: str, model_name: str):
+    assert model_type in ["retriever", "ranker"], f"{model_type} is not a valid model type"
+    try:
+        module = importlib.import_module(f"rs4industry.model.{model_type}s")
+        cls = getattr(module, model_name)
+        return cls
+    except ImportError as e:
+        raise ImportError(f"Could not import {model_name} from rs4industry.model.{model_type}s") from e
+
+
+def get_seq_data(d: dict):
+    if "seq" in d:
+        return d['seq']
+    else:
+        return {}
+
+
+def split_batch(batch: dict, data_attr: DataAttr4Model) -> Tuple[Dict, Dict, Dict]:
+    context_feat = {}; item_feat = {}
+    seq_feat = get_seq_data(batch)
+    for k, v in batch.items():
+        if k in data_attr.context_features:
+            context_feat[k] = v
+        elif k in data_attr.item_features:
+            item_feat[k] = v
+    return context_feat, seq_feat, item_feat
+
+
+def batch_to_device(batch, device) -> Dict:
+    for key, value in batch.items():
+        if isinstance(value, torch.Tensor):
+            batch[key] = value.to(device)
+        elif isinstance(value, dict):
+            batch[key] = batch_to_device(value, device)
+    return batch
+
+def get_logger(config: TrainingArguments):
+    accelerator = Accelerator()
+    logger = loguru_logger
+    if accelerator.is_local_main_process:
+        if config.logging_dir is not None:
+            logger.add(f"{config.logging_dir}/train.log", level='INFO')
+        elif config.checkpoint_dir is not None:
+            logger.add(f"{config.checkpoint_dir}/train.log", level='INFO')
+    return logger

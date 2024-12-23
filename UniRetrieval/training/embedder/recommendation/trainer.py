@@ -7,18 +7,24 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from accelerate import Accelerator
 
-from UniRetrieval.logger import get_logger
+from UniRetrieval.training.embedder.recommendation.arguments import get_logger
 # TODO eval部分暂未移植
-from rs4industry.eval import get_eval_metrics
+# from rs4industry.eval import get_eval_metrics
 from .arguments import TrainingArguments
 from .datasets import Callback, EarlyStopCallback, CheckpointCallback
 from UniRetrieval.abc.training.embedder import AbsEmbedderTrainer
+
+import sys
+from typing import *
+
+import torch.nn.functional as F
+import torchmetrics.functional as M
 
 # copied from rec studio Trainer
 # TODO 添加datacollator逻辑?
 class RetrieverTrainer(AbsEmbedderTrainer):
     def __init__(self, model, config=None, train=True, *args, **kwargs):
-        super(RetrieverTrainer, self).__init__(*args, **kwargs)
+        super(RetrieverTrainer, self).__init__(model, *args, **kwargs)
         self.config: TrainingArguments = self.load_config(config)
         self.train_mode = train
         self.model_type = model.model_type
@@ -47,79 +53,16 @@ class RetrieverTrainer(AbsEmbedderTrainer):
         self._total_eval_samples = 0
         self.item_vectors = None
         self.item_ids = None
-
-    def load_config(self, config: Union[Dict, str]) -> TrainingArguments:
-        if config is None:
-            return TrainingArguments()
-        if isinstance(config, TrainingArguments):
-            return config
-        if isinstance(config, dict):
-            config_dict = config
-        elif isinstance(config, str):
-            with open(config, "r", encoding="utf-8") as f:
-                config_dict = json.load(f)
-        else:
-            raise ValueError(f"Config should be either a dictionary or a path to a JSON file, got {type(config)} instead.")
-        return TrainingArguments.from_dict(config_dict)
-
-    def get_callbacks(self):
-        callbacks = []
-        if self.config.earlystop_metric is not None:
-            callbacks.append(EarlyStopCallback(
-                monitor_metric=self.config.earlystop_metric,
-                strategy=self.config.earlystop_strategy,
-                patience=self.config.earlystop_patience,
-                maximum="max" in self.config.earlystop_metric_mode,
-                save=self.config.checkpoint_best_ckpt,
-                checkpoint_dir=self.config.checkpoint_dir,
-                is_main_process=self.accelerator.is_main_process
-            ))
-        if self.config.checkpoint_steps is not None:
-            callbacks.append(CheckpointCallback(
-                step_interval=self.config.checkpoint_steps,
-                checkpoint_dir=self.config.checkpoint_dir,
-                is_main_process=self.accelerator.is_main_process
-            ))
-        return callbacks
         
-    def get_train_loader(self, train_dataset: Optional[Union[Dataset, str]]=None):
-        """
-        Returns the evaluation [`~torch.utils.data.DataLoader`].
+    def compute_loss(self, model, batch, return_outputs=False,*args, **kwargs):
+        outputs = model(batch=batch, cal_loss=True,*args, **kwargs)
+        loss = outputs['loss']
 
-        Subclass and override this method if you want to inject some custom behavior.
-
-        Args:
-            train_dataset (`str` or `torch.utils.data.Dataset`, *optional*):
-                If a `str`, will use `self.train_dataset[train_dataset]` as the evaluation dataset. If a `Dataset`, will override `self.train_dataset` and must implement `__len__`. If it is a [`~datasets.Dataset`], columns not accepted by the `model.forward()` method are automatically removed.
-        """
-        loader = DataLoader(train_dataset, batch_size=self.config.train_batch_size)
-        return loader
+        return (loss, outputs) if return_outputs else loss
     
-    def get_eval_loader(self, eval_dataset: Optional[Union[Dataset, str]]=None):
-        """
-        Returns the evaluation [`~torch.utils.data.DataLoader`].
-
-        Subclass and override this method if you want to inject some custom behavior.
-
-        Args:
-            train_dataset (`str` or `torch.utils.data.Dataset`, *optional*):
-                If a `str`, will use `self.train_dataset[train_dataset]` as the evaluation dataset. If a `Dataset`, will override `self.train_dataset` and must implement `__len__`. If it is a [`~datasets.Dataset`], columns not accepted by the `model.forward()` method are automatically removed.
-        """
-        loader = DataLoader(eval_dataset, batch_size=self.config.eval_batch_size)
-        return loader
-    
-    def get_item_loader(self, eval_dataset: Optional[Union[Dataset, str]]=None):
-        """
-        Returns the evaluation [`~torch.utils.data.DataLoader`].
-
-        Subclass and override this method if you want to inject some custom behavior.
-
-        Args:
-            train_dataset (`str` or `torch.utils.data.Dataset`, *optional*):
-                If a `str`, will use `self.train_dataset[train_dataset]` as the evaluation dataset. If a `Dataset`, will override `self.train_dataset` and must implement `__len__`. If it is a [`~datasets.Dataset`], columns not accepted by the `model.forward()` method are automatically removed.
-        """
-        loader = DataLoader(eval_dataset, batch_size=self.config.item_batch_size)
-        return loader
+    # TODO
+    def save_model(self, output_dir = None, state_dict=None):
+        return self.save_state(output_dir)
 
     def train(self, train_dataset, eval_dataset=None, *args, **kwargs):
         train_loader = self.get_train_loader(train_dataset)
@@ -249,6 +192,79 @@ class RetrieverTrainer(AbsEmbedderTrainer):
         
         self.save_state(self.config.checkpoint_dir)
 
+    def load_config(self, config: Union[Dict, str]) -> TrainingArguments:
+        if config is None:
+            return TrainingArguments()
+        if isinstance(config, TrainingArguments):
+            return config
+        if isinstance(config, dict):
+            config_dict = config
+        elif isinstance(config, str):
+            with open(config, "r", encoding="utf-8") as f:
+                config_dict = json.load(f)
+        else:
+            raise ValueError(f"Config should be either a dictionary or a path to a JSON file, got {type(config)} instead.")
+        return TrainingArguments.from_dict(config_dict)
+
+    def get_callbacks(self):
+        callbacks = []
+        if self.config.earlystop_metric is not None:
+            callbacks.append(EarlyStopCallback(
+                monitor_metric=self.config.earlystop_metric,
+                strategy=self.config.earlystop_strategy,
+                patience=self.config.earlystop_patience,
+                maximum="max" in self.config.earlystop_metric_mode,
+                save=self.config.checkpoint_best_ckpt,
+                checkpoint_dir=self.config.checkpoint_dir,
+                is_main_process=self.accelerator.is_main_process
+            ))
+        if self.config.checkpoint_steps is not None:
+            callbacks.append(CheckpointCallback(
+                step_interval=self.config.checkpoint_steps,
+                checkpoint_dir=self.config.checkpoint_dir,
+                is_main_process=self.accelerator.is_main_process
+            ))
+        return callbacks
+        
+    def get_train_loader(self, train_dataset: Optional[Union[Dataset, str]]=None):
+        """
+        Returns the evaluation [`~torch.utils.data.DataLoader`].
+
+        Subclass and override this method if you want to inject some custom behavior.
+
+        Args:
+            train_dataset (`str` or `torch.utils.data.Dataset`, *optional*):
+                If a `str`, will use `self.train_dataset[train_dataset]` as the evaluation dataset. If a `Dataset`, will override `self.train_dataset` and must implement `__len__`. If it is a [`~datasets.Dataset`], columns not accepted by the `model.forward()` method are automatically removed.
+        """
+        loader = DataLoader(train_dataset, batch_size=self.config.train_batch_size)
+        return loader
+    
+    def get_eval_loader(self, eval_dataset: Optional[Union[Dataset, str]]=None):
+        """
+        Returns the evaluation [`~torch.utils.data.DataLoader`].
+
+        Subclass and override this method if you want to inject some custom behavior.
+
+        Args:
+            train_dataset (`str` or `torch.utils.data.Dataset`, *optional*):
+                If a `str`, will use `self.train_dataset[train_dataset]` as the evaluation dataset. If a `Dataset`, will override `self.train_dataset` and must implement `__len__`. If it is a [`~datasets.Dataset`], columns not accepted by the `model.forward()` method are automatically removed.
+        """
+        loader = DataLoader(eval_dataset, batch_size=self.config.eval_batch_size)
+        return loader
+    
+    def get_item_loader(self, eval_dataset: Optional[Union[Dataset, str]]=None):
+        """
+        Returns the evaluation [`~torch.utils.data.DataLoader`].
+
+        Subclass and override this method if you want to inject some custom behavior.
+
+        Args:
+            train_dataset (`str` or `torch.utils.data.Dataset`, *optional*):
+                If a `str`, will use `self.train_dataset[train_dataset]` as the evaluation dataset. If a `Dataset`, will override `self.train_dataset` and must implement `__len__`. If it is a [`~datasets.Dataset`], columns not accepted by the `model.forward()` method are automatically removed.
+        """
+        loader = DataLoader(eval_dataset, batch_size=self.config.item_batch_size)
+        return loader
+
 
     @torch.no_grad()
     def evaluation(self, eval_dataset, *args, **kwargs):
@@ -303,6 +319,11 @@ class RetrieverTrainer(AbsEmbedderTrainer):
                 self._last_eval_epoch = epoch
                 return True
             return False
+            # if (epoch % self.config.eval_interval == 0) and (self._last_eval_epoch != epoch):
+            #     # do not valid before the first epoch
+            #     self._last_eval_epoch = epoch
+            #     return True
+            # return False
         elif self.config.evaluation_strategy == 'step':
             if step % self.config.eval_interval == 0:
                 return True
@@ -316,6 +337,29 @@ class RetrieverTrainer(AbsEmbedderTrainer):
         return loss_dict
 
 
+    @torch.no_grad()
+    @staticmethod
+    def compute_metrics(metrics, model_type, cutoffs, output: Tuple):
+        """ Compute the metrics given the output of the model.
+
+        Args:
+            output (Tuple): The output of the model.
+
+        Returns:
+            Dict: The computed metrics.
+        """
+        metrics: list = get_eval_metrics(metrics, model_type)
+        output_dict = {}
+        if model_type == "retriever":
+            for metric, func in metrics:
+                for cutoff in cutoffs:
+                    output_dict[f"{metric}@{cutoff}"] = func(*output, cutoff)
+        else:
+            output_dict = (output[0].cpu(), output[1].cpu())    # (pred, target)
+        return output_dict
+
+
+    @torch.no_grad()
     def _eval_batch(self, batch, *args, **kwargs) -> Dict:
         """ Evaluate the model on a batch, return metrics.
 
@@ -325,14 +369,13 @@ class RetrieverTrainer(AbsEmbedderTrainer):
         Returns:
             Dict: The metrics.
         """
-        with torch.no_grad():
-            self.model.eval()
-            k = max(self.config.cutoffs) if self.config.cutoffs is not None else None
-            model = self.accelerator.unwrap_model(self.model)
-            outputs = model.eval_step(batch, k=k, *args, **kwargs)
-            outputs = self.accelerator.gather_for_metrics(outputs)
-            metrics: dict = self.compute_metrics(outputs)
-            return metrics
+        self.model.eval()
+        k = max(self.config.cutoffs) if self.config.cutoffs is not None else None
+        model = self.accelerator.unwrap_model(self.model)
+        outputs = model.eval_step(batch, k=k, *args, **kwargs)
+        outputs = self.accelerator.gather_for_metrics(outputs)
+        metrics = RetrieverTrainer.compute_metrics(self.config.metrics, self.model_type, self.config.cutoffs, outputs)
+        return metrics
     
 
     @torch.no_grad()
@@ -369,28 +412,6 @@ class RetrieverTrainer(AbsEmbedderTrainer):
                 out[metric] = func(pred, target)
                 out[metric] = out[metric].item() if isinstance(out[metric], torch.Tensor) else out[metric]
             return out
-            
-
-    @torch.no_grad()
-    def compute_metrics(self, output: Tuple):
-        """ Compute the metrics given the output of the model.
-
-        Args:
-            output (Tuple): The output of the model.
-
-        Returns:
-            Dict: The computed metrics.
-        """
-        metrics: list = get_eval_metrics(self.config.metrics, self.model_type)
-        cutoffs = self.config.cutoffs
-        output_dict = {}
-        if self.model_type == "retriever":
-            for metric, func in metrics:
-                for cutoff in cutoffs:
-                    output_dict[f"{metric}@{cutoff}"] = func(*output, cutoff)
-        else:
-            output_dict = (output[0].cpu(), output[1].cpu())    # (pred, target)
-        return output_dict
 
 
     def log_dict(self, d: Dict):
@@ -461,19 +482,21 @@ class RetrieverTrainer(AbsEmbedderTrainer):
             # save the trainer configurations
             with open(os.path.join(checkpoint_dir, 'trainer_config.json'), 'w') as fp:
                 json.dump(self.config.to_dict(), fp, indent=4)
-
+            # print("self.state:\n",self.state)
+            # print("help(self.state):\n",help(self.state))
             # save the trainer state
-            with open(os.path.join(checkpoint_dir, 'trainer_state.json'), 'w') as fp:
-                json.dump(self.state, fp, indent=4)
+            # with open(os.path.join(checkpoint_dir, 'trainer_state.json'), 'w') as fp:
+            #     json.dump(self.state, fp, indent=4)
+            self.state.save_to_json(os.path.join(checkpoint_dir, 'trainer_state.json'))
             self.log_info(f"Saved the model and trainer state to {checkpoint_dir}.")
 
 
-    @property
-    def state(self):
-        state_dict = {
-            "global_step": self.global_step,
-        }
-        return state_dict
+    # @property
+    # def state(self):
+    #     state_dict = {
+    #         "global_step": self.global_step,
+    #     }
+    #     return state_dict
 
 
     def _check_checkpoint_dir(self):
@@ -484,10 +507,10 @@ class RetrieverTrainer(AbsEmbedderTrainer):
             raise ValueError("Checkpoint directory must be specified.")
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
-        else:
-            # check if the checkpoint_dir is empty
-            if len(os.listdir(checkpoint_dir)) > 0:
-                raise ValueError(f"Checkpoint directory `{checkpoint_dir}` is not empty.")
+        # else:
+        #     # check if the checkpoint_dir is empty
+        #     if len(os.listdir(checkpoint_dir)) > 0:
+        #         raise ValueError(f"Checkpoint directory `{checkpoint_dir}` is not empty.")
 
     def gradient_clipping(self, clip_norm):
         if (clip_norm is not None) and (clip_norm > 0):
@@ -509,12 +532,291 @@ class RetrieverTrainer(AbsEmbedderTrainer):
         else:
             raise ValueError(f"Unknown initialization method: {method}")
 
-    def compute_loss(self, model, batch, return_outputs=False,*args, **kwargs):
-        outputs = model(batch=batch, cal_loss=True,*args, **kwargs)
-        loss = outputs['loss']
 
-        return (loss, outputs) if return_outputs else loss
-    
-    # TODO
-    def save_model(self, output_dir = None, state_dict=None):
-        return self.save_state(output_dir)
+__all__ = [
+    "metric_dict",
+    "get_retriever_metrics",
+    "get_ranker_metrics",
+    "get_global_metrics",
+    "get_eval_metrics"
+]
+
+
+def recall(pred, target, k_or_thres):
+    r"""Calculating recall.
+
+    Recall value is defined as below:
+
+    .. math::
+        Recall= \frac{TP}{TP+FN}
+
+    Args:
+        pred(torch.BoolTensor): [B, num_items] or [B]. The prediction result of the model with bool type values.
+            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
+
+        target(torch.FloatTensor): [B, num_target] or [B]. The ground truth.
+
+    Returns:
+        torch.FloatTensor: a 0-dimensional tensor.
+    """
+    if pred.dim() > 1:
+        k = k_or_thres
+        count = (target > 0).sum(-1)
+        output = pred[:, :k].sum(dim=-1).float() / count
+        return output.mean()
+    else:
+        thres = k_or_thres
+        return M.recall(pred, target, task='binary', threshold=thres)
+
+
+def precision(pred, target, k_or_thres):
+    r"""Calculate the precision.
+
+    Precision are defined as:
+
+    .. math::
+        Precision = \frac{TP}{TP+FP}
+
+    Args:
+        pred(torch.BoolTensor): [B, num_items] or [B]. The prediction result of the model with bool type values.
+            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
+
+        target(torch.FloatTensor): [B, num_target] or [B]. The ground truth.
+
+    Returns:
+        torch.FloatTensor: a 0-dimensional tensor.
+    """
+    if pred.dim() > 1:
+        k = k_or_thres
+        output = pred[:, :k].sum(dim=-1).float() / k
+        return output.mean()
+    else:
+        thres = k_or_thres
+        return M.precision(pred, target, task='binary', threshold=thres)
+
+
+def f1(pred, target, k_or_thres):
+    r"""Calculate the F1.
+
+    Args:
+        pred(torch.BoolTensor): [B, num_items] or [B]. The prediction result of the model with bool type values.
+            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
+
+        target(torch.FloatTensor): [B, num_target] or [B]. The ground truth.
+
+    Returns:
+        torch.FloatTensor: a 0-dimensional tensor.
+    """
+    if pred.dim() > 1:
+        k = k_or_thres
+        count = (target > 0).sum(-1)
+        output = 2 * pred[:, :k].sum(dim=-1).float() / (count + k)
+        return output.mean()
+    else:
+        thres = k_or_thres
+        return M.f1_score(pred, target, task='binary', threshold=thres)
+
+
+def map(pred, target, k):
+    r"""Calculate the mean Average Precision(mAP).
+
+    Args:
+        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
+            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
+
+        target(torch.FloatTensor): [B, num_target]. The ground truth.
+
+    Returns:
+        torch.FloatTensor: a 0-dimensional tensor.
+    """
+    count = (target > 0).sum(-1)
+    pred = pred[:, :k].float()
+    output = pred.cumsum(dim=-1) / torch.arange(1, k+1).type_as(pred)
+    output = (output * pred).sum(dim=-1) / \
+        torch.minimum(count, k*torch.ones_like(count))
+    return output.mean()
+
+
+def _dcg(pred, k):
+    k = min(k, pred.size(1))
+    denom = torch.log2(torch.arange(k).type_as(pred) + 2.0).view(1, -1)
+    return (pred[:, :k] / denom).sum(dim=-1)
+
+
+def ndcg(pred, target, k):
+    r"""Calculate the Normalized Discounted Cumulative Gain(NDCG).
+
+    Args:
+        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
+            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
+
+        target(torch.FloatTensor): [B, num_target]. The ground truth.
+
+    Returns:
+        torch.FloatTensor: a 0-dimensional tensor.
+    """
+    pred_dcg = _dcg(pred.float(), k)
+    #TODO replace target>0 with target
+    ideal_dcg = _dcg(torch.sort((target > 0).float(), descending=True)[0], k)
+    all_irrelevant = torch.all(target <= sys.float_info.epsilon, dim=-1)
+    pred_dcg[all_irrelevant] = 0
+    pred_dcg[~all_irrelevant] /= ideal_dcg[~all_irrelevant]
+    return pred_dcg.mean()
+
+
+def mrr(pred, target, k):
+    r"""Calculate the Mean Reciprocal Rank(MRR).
+
+    Args:
+        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
+            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
+
+        target(torch.FloatTensor): [B, num_target]. The ground truth.
+
+    Returns:
+        torch.FloatTensor: a 0-dimensional tensor.
+    """
+    row, col = torch.nonzero(pred[:, :k], as_tuple=True)
+    row_uniq, counts = torch.unique_consecutive(row, return_counts=True)
+    idx = torch.zeros_like(counts)
+    idx[1:] = counts.cumsum(dim=-1)[:-1]
+    first = col.new_zeros(pred.size(0)).scatter_(0, row_uniq, col[idx]+1)
+    output = 1.0 / first
+    output[first == 0] = 0
+    return output.mean()
+
+
+def hits(pred, target, k):
+    r"""Calculate the Hits.
+
+    Args:
+        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
+            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
+
+        target(torch.FloatTensor): [B, num_target]. The ground truth.
+
+    Returns:
+        torch.FloatTensor: a 0-dimensional tensor.
+    """
+    return torch.any(pred[:, :k] > 0, dim=-1).float().mean()
+
+
+def logloss(pred, target):
+    r"""Calculate the log loss (log cross entropy).
+
+    Args:
+        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
+            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
+
+        target(torch.FloatTensor): [B, num_target]. The ground truth.
+
+    Returns:
+        torch.FloatTensor: a 0-dimensional tensor.
+    """
+    if pred.dim() == target.dim():
+        return F.binary_cross_entropy_with_logits(pred, target.float())
+    else:
+        return F.cross_entropy(pred, target)
+
+
+def auc(pred, target):
+    r"""Calculate the global AUC.
+
+    Args:
+        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
+            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
+
+        target(torch.FloatTensor): [B, num_target]. The ground truth.
+
+    Returns:
+        torch.FloatTensor: a 0-dimensional tensor.
+    """
+    target = target.type(torch.long)
+    return M.auroc(pred, target, task='binary')
+
+
+def accuracy(pred, target, thres=0.5):
+    r"""Calculate the accuracy.
+
+    Args:
+        pred(torch.BoolTensor): [Batch_size]. The prediction result of the model with bool type values.
+            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
+
+        target(torch.FloatTensor): [Batch_size]. The ground truth.
+
+        thres(float): Predictions below the thres will be marked as 0, otherwise 1.
+
+    Returns:
+        torch.FloatTensor: a 0-dimensional tensor.
+    """
+    return M.accuracy(pred, target, task='binary', threshold=thres)
+
+
+def mse(pred, target):
+    """Calculate Meas Square Error"""
+    return M.mean_squared_error(pred, target)
+
+
+def mae(pred, target):
+    """Calculate Mean Absolute Error."""
+    return M.mean_absolute_error(pred, target)
+
+
+metric_dict = {
+    'ndcg': ndcg,
+    'precision': precision,
+    'recall': recall,
+    'map': map,
+    'hit': hits,
+    'mrr': mrr,
+    'f1': f1,
+    'mse': mse,
+    'mae': mae,
+    'auc': auc,
+    'logloss': logloss,
+    'accuracy': accuracy
+}
+
+
+def get_retriever_metrics(metric):
+    if not isinstance(metric, list):
+        metric = [metric]
+    topk_metrics = {'ndcg', 'precision', 'recall', 'map', 'mrr', 'hit', 'f1'}
+    rank_m = [(m, metric_dict[m])
+              for m in metric if m in topk_metrics and m in metric_dict]
+    return rank_m
+
+
+def get_ranker_metrics(metric):
+    if not isinstance(metric, list):
+        metric = [metric]
+    pred_metrics = {'mae', 'mse', 'auc', 'logloss', 'accuracy',
+                    'precision', 'recall', 'f1'}
+    pred_m = [(m, metric_dict[m]) for m in metric if m in pred_metrics and m in metric_dict]
+    return pred_m
+
+
+def get_global_metrics(metric):
+    if (not isinstance(metric, list)) and (not isinstance(metric, dict)):
+        metric = [metric]
+    global_metrics = {"auc"}
+    global_m = [(m, metric_dict[m]) for m in metric if m in global_metrics and m in metric_dict]
+    return global_m
+
+
+def get_eval_metrics(metric_names: Union[List[str], str], model_type: str) -> List[Tuple[str, Callable]]:
+    r""" Get metrics with cutoff for evaluation.
+
+    Args:
+        metrics_names(Union[List[str], str]): names of metrics which requires cutoff. Such as ["ndcg", "recall"].
+        model_type(str): type of model, such as "ranker" or "retriever".
+
+    Returns:
+        List[str, Callable[[torch.tensor, torch.tensor], float]]: list of metrics and functions.
+    """
+    metric_names = metric_names if isinstance(metric_names, list) else [metric_names]
+    if model_type == "retriever":
+        metrics = get_retriever_metrics(metric_names)
+    else:
+        metrics = get_ranker_metrics(metric_names)
+    return metrics
