@@ -24,16 +24,16 @@ Evaluation 部分：
 1. Training
     - Text Retrieval
         - modeling.py:
-            - forward 函数: 改成一个通用的形式，放到 abc/training/embedder/AbsModeling.py 里面 (参数由原来 data_collator 返回的字典改为一个元组 -> 需要对应修改 data_collator 的 `__call__` 函数)
-            - loss functions: 放到 modules/loss.py 里面实现 (包括 InfoNCE 损失和两个蒸馏损失，一个 loss_function，一个 distill_loss_function)
-            - compute_score & compute_loss 函数的实现：把原来 forward 函数里面的代码实现到这两个函数里面
-            - 抽象 init_modules 到 abc/training/embedder/AbsModeling.py 里面，包括 loss_function 和 score_function
-            - `__init__` 函数中的来自 model_args 的所有的参数都放到一个变量中，变量类型是 AbsModelArguments
-            - forward 函数的返回值 (compute_loss 函数的返回值) 要是 EmbedderOutput 类型 (对应的 compute_loss 函数要同时返回 scores 和 loss)
+            - forward 函数: 改成一个通用的形式，放到 abc/training/embedder/AbsModeling.py 里面 (参数由原来 data_collator 返回的字典改为一个元组 -> 需要对应修改 data_collator 的 `__call__` 函数) - DONE
+            - loss functions: 放到 modules/loss.py 里面实现 (包括 InfoNCE 损失和两个蒸馏损失，一个 loss_function，一个 distill_loss_function) - DONE
+            - compute_score & compute_loss 函数的实现：把原来 forward 函数里面的代码实现到这两个函数里面 - DONE
+            - 抽象 init_modules 到 abc/training/embedder/AbsModeling.py 里面，包括 loss_function 和 score_function - DONE
+            - `__init__` 函数中的来自 model_args 的所有的参数都放到一个变量中，变量类型是 AbsModelArguments - DONE
+            - forward 函数的返回值 (compute_loss 函数的返回值) 要是 EmbedderOutput 类型 (对应的 compute_loss 函数要同时返回 scores 和 loss)  DONE
         - datasets.py
-            - 把两个 data_collator 的返回值由字典改成元组，即传给 model.forward 函数的 batch 参数
-            - abc/training/embedder/AbsDataset.py 中的 AbsEmbedderCollator 不再需要继承自 DataCollatorWithPadding，text retrieval 的子类中需要继承
-            - Callback 类挪到同级目录下的新建 callback.py 中，抽象类中的 AbsCallback 删掉
+            - 把两个 data_collator 的返回值由字典改成元组，即传给 model.forward 函数的 batch 参数 - DONE
+            - abc/training/embedder/AbsDataset.py 中的 AbsEmbedderCollator 不再需要继承自 DataCollatorWithPadding，text retrieval 的子类中需要继承 - DONE
+            - Callback 类挪到同级目录下的新建 callback.py 中，抽象类中的 AbsCallback 删掉 - DONE
     - Recommendation
         - arguments.py
             - TrainingArguments: 参考 HF 的 TrainingArguments，删掉/重命名已有的参数，保留推荐独有的参数
