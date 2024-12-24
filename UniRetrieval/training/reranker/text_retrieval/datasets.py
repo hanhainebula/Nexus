@@ -3,15 +3,12 @@ import math
 import random
 import logging
 import datasets
-import numpy as np
 import torch.distributed as dist
 from dataclasses import dataclass
-from torch.utils.data import Dataset
 from transformers import (
     PreTrainedTokenizer, 
     DataCollatorWithPadding,
-    BatchEncoding,
-    DataCollatorForSeq2Seq
+    BatchEncoding
 )
 from typing import List
 
@@ -177,7 +174,7 @@ class AbsTextRerankerTrainDataset(AbsRerankerTrainDataset):
         return batch_data, teacher_scores
 
 @dataclass
-class AbsTextRerankerCollator(AbsRerankerCollator):
+class AbsTextRerankerCollator(AbsRerankerCollator, DataCollatorWithPadding):
     """
     The abstract reranker collator.
     """
@@ -203,7 +200,8 @@ class AbsTextRerankerCollator(AbsRerankerCollator):
             return_tensors=self.return_tensors,
         )
 
-        return {
-            "pair": collated,
-            "teacher_scores": teacher_scores,
-        }
+        # return {
+        #     "pair": collated,
+        #     "teacher_scores": teacher_scores,
+        # }
+        return collated, teacher_scores

@@ -7,12 +7,7 @@ import numpy as np
 import torch.distributed as dist
 from dataclasses import dataclass
 from torch.utils.data import Dataset
-from transformers import (
-    PreTrainedTokenizer, 
-    DataCollatorWithPadding,
-    BatchEncoding,
-    DataCollatorForSeq2Seq
-)
+
 from typing import List
 
 from UniRetrieval.abc.training.dataset import AbsDataset

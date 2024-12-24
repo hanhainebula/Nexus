@@ -29,15 +29,31 @@ class AbsRerankerModel(AbsReranker, nn.Module):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.init_modules()
 
-    def forward(self,*args, **kwargs):
-        """The computation performed at every call.
-        """
+    def init_modules(self):
+        self.loss=self.get_loss_function()
+        self.score=self.get_score_function()
+        
+    @abstractmethod
+    def get_loss_function(self):
+        pass
+    
+    @abstractmethod
+    def get_score_function(self):
         pass
 
+
+    def forward(self, batch, *args, **kwargs):
+        """The computation performed at every call.
+        """
+        return self.compute_loss(batch, *args, **kwargs)
+
+    @abstractmethod
     def compute_score(self, *args, **kwargs):
         return super().compute_score(*args, **kwargs)
 
+    @abstractmethod
     def compute_loss(self, *args, **kwargs):
         """Compute the loss.
         """

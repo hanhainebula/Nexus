@@ -6,6 +6,8 @@ import torch
 from dataclasses import dataclass
 # from UniRetrieval.training.text_retrieval.abc.reranker import AbsRerankerModel
 from UniRetrieval.abc.training.reranker import AbsRerankerModel, RerankerOutput
+from UniRetrieval.modules.loss import CrossEntropyLoss, KL_Div_Loss
+from .arguments import AbsTextRerankerModelArguments
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,6 @@ class CrossEncoderModel(AbsRerankerModel):
         super().__init__(*args, **kwargs)
         self.model = base_model
         self.tokenizer = tokenizer
-        self.cross_entropy = nn.CrossEntropyLoss(reduction='mean')
 
         if self.model.config.pad_token_id is None:
             self.model.config.pad_token_id = self.tokenizer.pad_token_id
@@ -43,6 +44,19 @@ class CrossEncoderModel(AbsRerankerModel):
 
         self.yes_loc = self.tokenizer('Yes', add_special_tokens=False)['input_ids'][-1]
 
+    def init_modules(self):
+        super().init_modules()
+        self.distill_loss=self.get_distill_loss
+    
+    def get_loss_function(self):
+        return CrossEntropyLoss()
+    
+    def get_score_function(self):
+        return self.compute_score
+
+    def get_distill_loss(self):
+        return KL_Div_Loss()
+    
     def gradient_checkpointing_enable(self, **kwargs):
         """
         Activates gradient checkpointing for the current model.
@@ -66,8 +80,8 @@ class CrossEncoderModel(AbsRerankerModel):
             torch.Tensor: The logits output from the model.
         """
         return self.model(**features, return_dict=True).logits
-    
-    def forward(self, pair: Union[Dict[str, Tensor], List[Dict[str, Tensor]]] = None, teacher_scores: Optional[Tensor] = None):
+
+    def compute_loss(self, batch, *args, **kwargs):
         """The computation performed at every call.
 
         Args:
@@ -77,6 +91,9 @@ class CrossEncoderModel(AbsRerankerModel):
         Returns:
             TextRerankerOutput: Output of reranker model.
         """
+        pair=batch[0]
+        teacher_scores=batch[1]
+        
         ranker_logits = self.compute_score(pair) # (batch_size * num, dim)
         if teacher_scores is not None:
             teacher_scores = torch.Tensor(teacher_scores)
@@ -86,11 +103,11 @@ class CrossEncoderModel(AbsRerankerModel):
         if self.training:
             grouped_logits = ranker_logits.view(self.train_batch_size, -1)
             target = torch.zeros(self.train_batch_size, device=grouped_logits.device, dtype=torch.long)
-            loss = self.compute_loss(grouped_logits, target)
+            loss = self.loss_function(grouped_logits, target)
             if teacher_scores is not None:
                 teacher_targets = teacher_targets.to(grouped_logits.device)
                 # print(teacher_targets, torch.mean(torch.sum(torch.log_softmax(grouped_logits, dim=-1) * teacher_targets, dim=-1)))
-                loss += - torch.mean(torch.sum(torch.log_softmax(grouped_logits, dim=-1) * teacher_targets, dim=-1))
+                loss += self.distill_loss(grouped_logits, teacher_targets)
         else:
             loss = None
 
@@ -99,19 +116,7 @@ class CrossEncoderModel(AbsRerankerModel):
             loss=loss,
             scores=ranker_logits,
         )
-
-    def compute_loss(self, scores, target):
-        """Compute the loss.
-
-        Args:
-            scores (torch.Tensor): Computed scores.
-            target (torch.Tensor): The target value.
-
-        Returns:
-            torch.Tensor: The computed loss.
-        """
-        return self.cross_entropy(scores, target)
-
+        
     def save(self, output_dir: str):
         """Save the model.
 
