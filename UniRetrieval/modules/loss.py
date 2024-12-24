@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from torch import nn, Tensor
 
 
 class FullScoreLoss(torch.nn.Module):
@@ -95,6 +96,41 @@ class WeightedBPRLoss(PairwiseLoss):
         weight = F.softmax(neg_score - log_neg_prob, -1)
         return -torch.mean((loss * weight).sum(-1))
 
+class CrossEntropyLoss(nn.CrossEntropyLoss()):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    def forward(self, input: Tensor, target: Tensor) -> Tensor:
+        return F.cross_entropy(
+            input,
+            target,
+            weight=self.weight,
+            ignore_index=self.ignore_index,
+            reduction=self.reduction,
+            label_smoothing=self.label_smoothing,
+        )
+    
+class KL_Div_Loss(nn.Module):
+    def forward(self, student_scores, teacher_targets, *args, **kwargs):
+        return - torch.mean(
+                torch.sum(torch.log_softmax(student_scores, dim=-1) * teacher_targets, dim=-1)
+            )
+        
+class m3_KDLoss(nn.Module):
+    def forward(self, student_scores, teacher_targets, group_size):
+        labels = torch.arange(student_scores.size(0), device=student_scores.device, dtype=torch.long)
+        labels = labels * group_size
+
+        loss = 0
+        mask = torch.zeros_like(student_scores)
+        for i in range(group_size):
+            temp_target = labels + i
+            temp_scores = student_scores + mask
+            temp_loss = F.cross_entropy(temp_scores, temp_target, reduction="none")  # B
+            loss += torch.mean(teacher_targets[:, i] * temp_loss)
+            mask = torch.scatter(mask, dim=-1, index=temp_target.unsqueeze(-1),
+                                value=torch.finfo(student_scores.dtype).min)
+        return loss
 
 class BinaryCrossEntropyLoss(PairwiseLoss):
     def __init__(self, dns=False):

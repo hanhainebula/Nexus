@@ -24,6 +24,21 @@ class CosineScorer(InnerProductScorer):
             keepdim=(query.dim()!=items.dim() or query.size(0)!=items.size(0)))
         return output
 
+class IP_text_retrieval(torch.nn.Module):
+    def forward(self, q_reps, p_reps):
+        """Computes the similarity between query and passage representations using inner product.
+
+        Args:
+            q_reps (torch.Tensor): Query representations.
+            p_reps (torch.Tensor): Passage representations.
+
+        Returns:
+            torch.Tensor: The computed similarity matrix.
+        """
+        if len(p_reps.size()) == 2:
+            return torch.matmul(q_reps, p_reps.transpose(0, 1))
+        return torch.matmul(q_reps, p_reps.transpose(-2, -1))
+
 
 class EuclideanScorer(InnerProductScorer):
     def forward(self, query, items):
