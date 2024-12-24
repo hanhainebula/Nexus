@@ -1,12 +1,14 @@
 from tqdm import tqdm, trange
-from typing import cast, Any, List, Union, Optional
-
+from typing import cast, Any, List, Union, Optional, Tuple, Type
+import onnx
+import onnxruntime as ort
+import tensorrt as trt
+import pandas as pd
 import torch
 import numpy as np
 from transformers import AutoModel, AutoTokenizer
-
-from UniRetrieval.abc.inference import AbsEmbedder
-
+from dataclasses import dataclass, field
+from UniRetrieval.abc.inference import AbsEmbedder, InferenceEngine, AbsInferenceArguments
 
 class BaseEmbedder(AbsEmbedder):
     """
@@ -371,26 +373,236 @@ class BaseEmbedder(AbsEmbedder):
         else:
             raise NotImplementedError(f"pooling method {self.pooling_method} not implemented")
         
+        
+@dataclass
+class SessionParams():
+    name: str=field(
+        default='query',
+        metadata={
+            'help':'Name of Session Inputs/Outputs'
+        }
+    )
 
+
+class NormalSession():
+    """
+    A class used to represent a Normal Session for text retrieval.
+    Attributes
+    ----------
+    model : object
+        The model used for encoding queries and corpus.
+    Methods
+    -------
+    get_inputs():
+        Returns a list of SessionParams representing the input names.
+    get_outputs():
+        Returns a list of SessionParams representing the output names.
+    run(output_names, input_feed, run_options=None):
+        Executes the session with the given inputs and returns the embeddings.
+    """
+    def __init__(self, model):
+        self.model=model
+
+    def get_inputs(self):
+        return [SessionParams(
+            name='sentences'
+        )]
+        
+    def get_outputs(self):
+        return [SessionParams(
+            name='embeddings'
+        )]
+
+    def run(self, output_names, input_feed, run_options=None):
+        sentences=input_feed['sentences']            
+        embeddings = self.model.encode(sentences)
+                    
+        return [embeddings]
+        
+    
+
+
+class BaseEmbedderInferenceEngine(InferenceEngine):
+    def __init__(self, infer_args: AbsInferenceArguments):
+        super().__init__(infer_args)
+        # normal model
+        self.model = None
+        # session
+
+        self.session = self.get_inference_session()
+        
+    def load_model(self, use_fp16=True):
+        self.model = BaseEmbedder(model_name_or_path=self.config["model_name_or_path"],use_fp16=use_fp16, batch_size=self.config['infer_batch_size'], devices=self.config['infer_device'])
+
+    def get_normal_session(self):
+        if not self.model:
+            self.load_model()
+        return NormalSession(self.model)
+
+    def get_onnx_session(self) -> ort.InferenceSession:
+        onnx_model_path = self.config["onnx_model_path"]
+        return ort.InferenceSession(onnx_model_path)
+
+    def get_tensorrt_session(self,max_workspace_size: int=None) -> trt.ICudaEngine:
+        onnx_model_path = self.config["onnx_model_path"]
+        TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+        builder = trt.Builder(TRT_LOGGER)
+        network = builder.create_network(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+        parser = trt.OnnxParser(network, TRT_LOGGER)
+        with open(onnx_model_path, 'rb') as model_file:
+            if not parser.parse(model_file.read()):
+                for error in range(parser.num_errors()):
+                    print(parser.get_error(error))
+                raise RuntimeError("Failed to parse ONNX model")
+
+        config = builder.create_builder_config()
+        if not max_workspace_size:
+            max_workspace_size = self.config['max_workspace_size']
+        config.max_workspace_size = max_workspace_size  # 1 GB
+        engine = builder.build_engine(network, config)
+        return engine   
+
+    @classmethod
+    def convert_to_onnx(model_name_or_path: str = None, onnx_model_path: str = None, opset_version = 11):
+        model = AutoModel.from_pretrained(model_name_or_path)
+        tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+
+        dummy_input = tokenizer("This is a dummy input", return_tensors="pt")
+
+        torch.onnx.export(
+            model,  
+            (dummy_input['input_ids'],),  
+            onnx_model_path,  
+            opset_version=opset_version,  # ONNX opset 版本
+            input_names=['input_ids'],  
+            output_names=['output'],  
+            dynamic_axes={'input_ids': {0: 'batch_size'}, 'output': {0: 'batch_size'}}  
+        )
+        print(f"Model has been converted to ONNX and saved at {onnx_model_path}")
+
+    def inference(
+        self,
+        inputs: Union[List[str], List[Tuple[str, str]], pd.DataFrame, Any],
+        *args,
+        **kwargs
+    ):
+        """
+        Perform inference using the specified session type.
+
+        Args:
+            inputs (Union[List[str], List[Tuple[str, str]], pd.DataFrame, Any]): Input data for inference.
+            session_type (str): The type of session to use ('tensorrt', 'onnx', 'normal').
+            session (Any): The session object to use for inference.
+            *args: Additional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Any: The inference results.
+        """
+        if self.session == None:
+            raise ValueError('Please run get_inference_session first!')
+        
+        session_type=self.config['infer_mode']
+        if session_type == 'tensorrt':
+            return self._inference_tensorrt(inputs, *args, **kwargs)
+        elif session_type == 'onnx':
+            return self._inference_onnx(inputs, *args, **kwargs)
+        elif session_type == 'normal':
+            return self._inference_normal(inputs, *args, **kwargs)
+        else:
+            raise ValueError(f"Unsupported session type: {session_type}")
+
+    def _inference_tensorrt(self, inputs, *args, **kwargs):
+        tokenizer = self.model.tokenizer
+        encoded_inputs = tokenizer(inputs, return_tensors="pt", padding=True, truncation=True)
+        input_ids = encoded_inputs['input_ids'].cuda()
+
+        context = self.session.create_execution_context()
+
+        input_shape = input_ids.shape
+        output_shape = (input_shape[0], self.model.model.config.hidden_size)
+        d_input = torch.device(self.config['infer_device'])
+        d_output = torch.device(self.config['infer_device'])
+        input_buffer = torch.empty(input_shape, dtype=torch.int32, device=d_input)
+        output_buffer = torch.empty(output_shape, dtype=torch.float32, device=d_output)
+
+        input_buffer.copy_(input_ids)
+
+        context.execute_v2([input_buffer.data_ptr(), output_buffer.data_ptr()])
+
+        embeddings = output_buffer.cpu().numpy()
+        return embeddings
+
+    def _inference_onnx(self, inputs, *args, **kwargs):
+        tokenizer = self.model.tokenizer
+        encoded_inputs = tokenizer(inputs, return_tensors="np", padding=True, truncation=True)
+        input_ids = encoded_inputs['input_ids']
+
+        input_feed = {self.session.get_inputs()[0].name: input_ids}
+
+        outputs = self.session.run(None, input_feed)
+        embeddings = outputs[0]
+        return embeddings
+
+    def _inference_normal(self, inputs, *args, **kwargs):
+        input_feed = {self.session.get_inputs()[0].name: inputs}
+
+        outputs = self.session.run([self.session.get_outputs()[0].name], input_feed)
+        embeddings = outputs[0]
+        return embeddings
 
 if __name__=='__main__':
-    import pdb
-    sentences_1 = ["样例数据-1", "样例数据-2"]
-    sentences_2 = ["样例数据-3", "样例数据-4"]
-    # pdb.set_trace()
-    model = BaseEmbedder(model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5', query_instruction_for_retrieval="为这个句子生成表示以用于检索相关文章：", use_fp16=True, devices=['cuda:1','cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
-    embeddings_1 = model.encode(sentences_1)
-    embeddings_2 = model.encode(sentences_2)
-    similarity = embeddings_1 @ embeddings_2.T
-    print(similarity)
+    # import pdb
+    # sentences_1 = ["样例数据-1", "样例数据-2"]
+    # sentences_2 = ["样例数据-3", "样例数据-4"]
+    # # pdb.set_trace()
+    # model = BaseEmbedder(model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5', query_instruction_for_retrieval="为这个句子生成表示以用于检索相关文章：", use_fp16=True, devices=['cuda:1','cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
+    # embeddings_1 = model.encode(sentences_1)
+    # embeddings_2 = model.encode(sentences_2)
+    # similarity = embeddings_1 @ embeddings_2.T
+    # print(similarity)
 
-    # for s2p(short query to long passage) retrieval task, suggest to use encode_queries() which will automatically add the instruction to each query
-    # corpus in retrieval task can still use encode_corpus(), since they don't need instruction
-    queries = ['query_1', 'query_2']
-    passages = ["样例文档-1", "样例文档-2"]
-    q_embeddings = model.encode_query(queries)
-    p_embeddings = model.encode_info(passages)
-    scores = q_embeddings @ p_embeddings.T
-    print(scores)
+    # # for s2p(short query to long passage) retrieval task, suggest to use encode_queries() which will automatically add the instruction to each query
+    # # corpus in retrieval task can still use encode_corpus(), since they don't need instruction
+    # queries = ['query_1', 'query_2']
+    # passages = ["样例文档-1", "样例文档-2"]
+    # q_embeddings = model.encode_query(queries)
+    # p_embeddings = model.encode_info(passages)
+    # scores = q_embeddings @ p_embeddings.T
+    # print(scores)
     
-    del model
+    # del model
+    
+    
+    """
+    below test BaseEmbedderInferenceEngine
+    """
+    # 1. convert model to onnx
+    model_path='/data2/OpenLLMs/bge-base-zh-v1.5'
+    args=AbsInferenceArguments(
+        model_name_or_path=model_path,
+        onnx_model_path='/data2/OpenLLMs/bge-base-zh-v1.5/onnx',
+        infer_mode='normal',
+        infer_device='cuda:0',
+        infer_batch_size=16
+    )
+    
+    BaseEmbedderInferenceEngine.convert_to_onnx(args.model_name_or_path, args.onnx_model_path)
+    
+    
+    s='This is a sentence.'
+    # 2. test normal session
+    inference_engine=BaseEmbedderInferenceEngine(args)
+    print(inference_engine.inference(s))
+    
+    # 3. test onnx session
+    args.infer_mode='onnx'
+    inference_engine_onnx=BaseEmbedderInferenceEngine(args)
+    print(inference_engine_onnx.inference(s))
+    
+    # 4. test tensorrt session
+    args.infer_mode='tensorrt'
+    inference_engine_tensorrt=BaseEmbedderInferenceEngine(args)
+    print(inference_engine_tensorrt.inference(s))
+    
+    
