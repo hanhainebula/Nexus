@@ -5,9 +5,15 @@ from torch import nn, Tensor
 from transformers import AutoModel, AutoTokenizer
 import torch.distributed as dist
 import torch.nn.functional as F
-from UniRetrieval.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
 from dataclasses import dataclass
 from typing import Dict, Optional, List, Union
+
+from UniRetrieval.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
+from UniRetrieval.modules.loss import CrossEntropyLoss, KL_Div_Loss, m3_KDLoss
+from UniRetrieval.modules.score import IP_text_retrieval
+from . import EncoderOnlyEmbedderModelArguments
+from .arguments import BiEncoderOnlyEmbedderModelArguments
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,7 +29,7 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
 
     Args:
         base_model (AutoModel): The base model to train on.
-        tokenizer (AutoTokenizer, optional): The tokenizer to use. Defaults to ``None``.
+            tokenizer (AutoTokenizer, optional): The tokenizer to use. Defaults to ``None``.
         negatives_cross_device (bool, optional): If True, will compute cross devices negative loss. Defaults to ``False``.
         temperature (float, optional): Temperature to control the scale of scores. Defaults to ``1.0``.
         sub_batch_size (int, optional): Sub-batch size during encoding. If negative, will not split to sub-batch.
@@ -37,34 +43,53 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
     def __init__(
         self,
         base_model: AutoModel,
+        model_args: BiEncoderOnlyEmbedderModelArguments,
         tokenizer: AutoTokenizer = None,
-        negatives_cross_device: bool = False,
-        temperature: float = 1.0,
-        sub_batch_size: int = -1,
-        kd_loss_type: str = 'kl_div',
-        sentence_pooling_method: str = 'cls',
-        normalize_embeddings: bool = False,
         *args, **kwargs
     ):
+        # must before super().__init__()
+        self.kd_loss_type = model_args.kd_loss_type
+        
         super().__init__(*args, **kwargs)
+        
         self.model = base_model
         self.tokenizer = tokenizer
-
-        self.temperature = temperature
-        self.negatives_cross_device = negatives_cross_device
+        self.temperature = model_args.temperature
+        self.negatives_cross_device = model_args.negatives_cross_device
         if self.negatives_cross_device:
             if not dist.is_initialized():
                 raise ValueError('Distributed training has not been initialized for representation all gather.')
             self.process_rank = dist.get_rank()
             self.world_size = dist.get_world_size()
 
-        self.sub_batch_size = sub_batch_size
-        self.kd_loss_type = kd_loss_type
+        self.sub_batch_size = model_args.sub_batch_size
+        self.sentence_pooling_method = model_args.sentence_pooling_method
+        self.normalize_embeddings = model_args.normalize_embeddings
 
-        self.sentence_pooling_method = sentence_pooling_method
-        self.normalize_embeddings = normalize_embeddings
-        self.cross_entropy = torch.nn.CrossEntropyLoss(reduction='mean')
+    def init_modules(self):
+        # init loss_function and score_function here
+        super().init_modules()
+        self.distill_loss=self.get_distill_loss(self.kd_loss_type)
 
+    def get_distill_loss(self, kd_loss_type):
+        if kd_loss_type == 'kl_div':
+            # teacher_targets: (batch_size, group_size) / (world_size * batch_size, group_size)
+            # student_scores: (batch_size, group_size) / (world_size * batch_size, group_size)
+            return KL_Div_Loss()
+        elif kd_loss_type == 'm3_kd_loss':
+            # teacher_targets: (batch_size, group_size) / (world_size * batch_size, group_size)
+            # student_scores: (batch_size, batch_size * group_size) / (world_size * batch_size, world_size * batch_size * group_size)
+            return m3_KDLoss()
+        else:
+            raise ValueError(f"Invalid kd_loss_type: {kd_loss_type}")
+        
+
+    def get_loss_function(self):
+        return CrossEntropyLoss()
+    
+    def get_score_function(self):
+        return IP_text_retrieval()
+        
     def encode(self, features):
         """Encode and get the embedding.
 
@@ -153,35 +178,42 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
         Returns:
             torch.Tensor: The computed scores, adjusted by temperature.
         """
-        scores = self._compute_similarity(q_reps, p_reps) / self.temperature
+        scores = self.score_function(q_reps, p_reps) / self.temperature
         scores = scores.view(q_reps.size(0), -1)
         return scores
 
-    def _compute_similarity(self, q_reps, p_reps):
-        """Computes the similarity between query and passage representations using inner product.
+    def compute_loss(self, batch, *args, **kwargs):
+        queries=batch[0]
+        passages=batch[1]
+        teacher_scores=batch[2]
+        no_in_batch_neg_flag=batch[3]
+        q_reps = self.encode(queries) # (batch_size, dim)
+        p_reps = self.encode(passages) # (batch_size * group_size, dim)
 
-        Args:
-            q_reps (torch.Tensor): Query representations.
-            p_reps (torch.Tensor): Passage representations.
+        if self.training:
+            if teacher_scores is not None:
+                teacher_scores = torch.tensor(teacher_scores, device=q_reps.device)
+                teacher_scores = teacher_scores.view(q_reps.size(0), -1).detach()   # (batch_size, group_size)
+                teacher_targets = F.softmax(teacher_scores, dim=-1)  # (batch_size, group_size)
+            else:
+                teacher_targets = None
 
-        Returns:
-            torch.Tensor: The computed similarity matrix.
-        """
-        if len(p_reps.size()) == 2:
-            return torch.matmul(q_reps, p_reps.transpose(0, 1))
-        return torch.matmul(q_reps, p_reps.transpose(-2, -1))
+            if no_in_batch_neg_flag:
+                compute_loss_func = self._compute_no_in_batch_neg_loss
+            else:
+                if self.negatives_cross_device:
+                    compute_loss_func = self._compute_cross_device_neg_loss
+                else:
+                    compute_loss_func = self._compute_in_batch_neg_loss
 
-    def compute_loss(self, scores, target):
-        """Compute the loss using cross entropy.
+            scores, loss = compute_loss_func(q_reps, p_reps, teacher_targets=teacher_targets)
+        else:
+            loss = None
 
-        Args:
-            scores (torch.Tensor): Computed score.
-            target (torch.Tensor): The target value.
-
-        Returns:
-            torch.Tensor: The computed cross entropy loss.
-        """
-        return self.cross_entropy(scores, target)
+        return TextEmbedderOutput(
+            loss=loss,
+            scores=scores
+        )
 
     def gradient_checkpointing_enable(self, **kwargs):
         """
@@ -258,15 +290,15 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
 
         if teacher_targets is not None:
             # compute kd loss
-            loss = self.distill_loss(self.kd_loss_type, teacher_targets, local_scores, group_size=group_size)
+            loss = self.distill_loss(teacher_targets, local_scores, group_size=group_size)
 
             # add normal loss if needed
             if self.kd_loss_type == "kl_div":
                 local_targets = torch.zeros(local_scores.size(0), device=local_scores.device, dtype=torch.long) # (batch_size)
-                loss += self.compute_loss(local_scores, local_targets)
+                loss += self.loss_function(local_scores, local_targets)
         else:
             local_targets = torch.zeros(local_scores.size(0), device=local_scores.device, dtype=torch.long) # (batch_size)
-            loss = self.compute_loss(local_scores, local_targets)
+            loss = self.loss_function(local_scores, local_targets)
 
         return local_scores, loss
 
@@ -286,19 +318,19 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
             if self.kd_loss_type == "kl_div":
                 student_scores = self.get_local_score(q_reps, p_reps, scores) # (batch_size, group_size)
 
-                loss = self.distill_loss(self.kd_loss_type, teacher_targets, student_scores, group_size)
+                loss = self.distill_loss(teacher_targets, student_scores, group_size)
 
                 idxs = torch.arange(q_reps.size(0), device=q_reps.device, dtype=torch.long)
                 targets = idxs * (p_reps.size(0) // q_reps.size(0)) # (batch_size)
-                loss += self.compute_loss(scores, targets)
+                loss += self.loss_function(scores, targets)
             elif self.kd_loss_type == "m3_kd_loss":
-                loss = self.distill_loss(self.kd_loss_type, teacher_targets, scores, group_size)
+                loss = self.distill_loss(teacher_targets, scores, group_size)
             else:
                 raise ValueError(f"Invalid kd_loss_type: {self.kd_loss_type}")
         else:
             idxs = torch.arange(q_reps.size(0), device=q_reps.device, dtype=torch.long)
             targets = idxs * group_size # (batch_size)
-            loss = self.compute_loss(scores, targets)
+            loss = self.loss_function(scores, targets)
 
         return scores, loss
 
@@ -324,110 +356,23 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
                     q_reps.size(0)*self.process_rank : q_reps.size(0)*(self.process_rank+1)
                 ]   # (batch_size, group_size)
 
-                loss = self.distill_loss(self.kd_loss_type, teacher_targets, student_scores, group_size)
+                loss = self.distill_loss(teacher_targets, student_scores, group_size)
 
                 cross_idxs = torch.arange(cross_q_reps.size(0), device=cross_q_reps.device, dtype=torch.long)
                 cross_targets = cross_idxs * group_size # (world_size * batch_size)
-                loss += self.compute_loss(cross_scores, cross_targets)
+                loss += self.loss_function(cross_scores, cross_targets)
             elif self.kd_loss_type == "m3_kd_loss":
                 cross_teacher_targets = self._dist_gather_tensor(teacher_targets)   # (world_size * batch_size, group_size)
 
-                loss = self.distill_loss(self.kd_loss_type, cross_teacher_targets, cross_scores, group_size)
+                loss = self.distill_loss(cross_teacher_targets, cross_scores, group_size)
             else:
                 raise ValueError(f"Invalid kd_loss_type: {self.kd_loss_type}")
         else:
             cross_idxs = torch.arange(cross_q_reps.size(0), device=cross_q_reps.device, dtype=torch.long)
             cross_targets = cross_idxs * group_size # (world_size * batch_size)
-            loss = self.compute_loss(cross_scores, cross_targets)
+            loss = self.loss_function(cross_scores, cross_targets)
 
         return cross_scores, loss
-
-
-    def forward(
-        self, 
-        queries: Union[Dict[str, Tensor], List[Dict[str, Tensor]]] = None, 
-        passages: Union[Dict[str, Tensor], List[Dict[str, Tensor]]] = None,
-        teacher_scores: Union[None, List[float]] = None,
-        no_in_batch_neg_flag: bool = False,
-    ):
-        """The computation performed at every call.
-
-        Args:
-            queries (Union[Dict[str, Tensor], List[Dict[str, Tensor]]], optional): Input queries. Defaults to ``None``.
-            passages (Union[Dict[str, Tensor], List[Dict[str, Tensor]]], optional): Input passages. Defaults to ``None``.
-            teacher_scores (Union[None, List[float]], optional): Teacher scores for distillation. Defaults to ``None``.
-            no_in_batch_neg_flag (bool, optional): If True, use no in-batch negatives and no cross-device negatives. Defaults to ``False``.
-
-        Returns:
-            TextEmbedderOutput: Output of the forward call of model.
-        """
-        q_reps = self.encode(queries) # (batch_size, dim)
-        p_reps = self.encode(passages) # (batch_size * group_size, dim)
-
-        if self.training:
-            if teacher_scores is not None:
-                teacher_scores = torch.tensor(teacher_scores, device=q_reps.device)
-                teacher_scores = teacher_scores.view(q_reps.size(0), -1).detach()   # (batch_size, group_size)
-                teacher_targets = F.softmax(teacher_scores, dim=-1)  # (batch_size, group_size)
-            else:
-                teacher_targets = None
-
-            if no_in_batch_neg_flag:
-                compute_loss_func = self._compute_no_in_batch_neg_loss
-            else:
-                if self.negatives_cross_device:
-                    compute_loss_func = self._compute_cross_device_neg_loss
-                else:
-                    compute_loss_func = self._compute_in_batch_neg_loss
-
-            scores, loss = compute_loss_func(q_reps, p_reps, teacher_targets=teacher_targets)
-        else:
-            loss = None
-
-        return TextEmbedderOutput(
-            loss=loss,
-        )
-
-    @staticmethod
-    def distill_loss(kd_loss_type, teacher_targets, student_scores, group_size=None):
-        """Compute the distillation loss.
-
-        Args:
-            kd_loss_type (str): Type of knowledge distillation loss, supports "kl_div" and "m3_kd_loss".
-            teacher_targets (torch.Tensor): Targets from the teacher model.
-            student_scores (torch.Tensor): Score of student model.
-            group_size (int, optional): Number of groups for . Defaults to ``None``.
-
-        Raises:
-            ValueError: Invalid kd_loss_type
-
-        Returns:
-            torch.Tensor: A scalar of computed distillation loss.
-        """
-        if kd_loss_type == 'kl_div':
-            # teacher_targets: (batch_size, group_size) / (world_size * batch_size, group_size)
-            # student_scores: (batch_size, group_size) / (world_size * batch_size, group_size)
-            return - torch.mean(
-                torch.sum(torch.log_softmax(student_scores, dim=-1) * teacher_targets, dim=-1)
-            )
-        elif kd_loss_type == 'm3_kd_loss':
-            # teacher_targets: (batch_size, group_size) / (world_size * batch_size, group_size)
-            # student_scores: (batch_size, batch_size * group_size) / (world_size * batch_size, world_size * batch_size * group_size)
-            labels = torch.arange(student_scores.size(0), device=student_scores.device, dtype=torch.long)
-            labels = labels * group_size
-
-            loss = 0
-            mask = torch.zeros_like(student_scores)
-            for i in range(group_size):
-                temp_target = labels + i
-                temp_scores = student_scores + mask
-                temp_loss = F.cross_entropy(temp_scores, temp_target, reduction="none")  # B
-                loss += torch.mean(teacher_targets[:, i] * temp_loss)
-                mask = torch.scatter(mask, dim=-1, index=temp_target.unsqueeze(-1),
-                                    value=torch.finfo(student_scores.dtype).min)
-            return loss
-        else:
-            raise ValueError(f"Invalid kd_loss_type: {kd_loss_type}")
 
     def _dist_gather_tensor(self, t: Optional[torch.Tensor]):
         """Gather a tensor from all processes in a distributed setting.

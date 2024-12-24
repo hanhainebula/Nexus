@@ -34,9 +34,22 @@ class AbsEmbedderModel(AbsEmbedder, nn.Module):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.init_modules()
+
+    def init_modules(self):
+        self.loss_function=self.get_loss_function()
+        self.score_function=self.get_score_function()
+        
+    @abstractmethod
+    def get_loss_function(self):
+        pass
+    
+    @abstractmethod
+    def get_score_function(self):
+        pass
 
     @abstractmethod
-    def compute_loss(self, scores, target):
+    def compute_loss(self, batch, *args, **kwargs):
         """Abstract method compute the loss.
 
         Args:
@@ -60,7 +73,7 @@ class AbsEmbedderModel(AbsEmbedder, nn.Module):
         """
         pass
 
-    def forward(self, *args, **kwargs):
+    def forward(self, batch, *args, **kwargs):
         """The computation performed at every call.
 
         Args:
@@ -69,4 +82,4 @@ class AbsEmbedderModel(AbsEmbedder, nn.Module):
         Returns:
             EmbedderOutput: Output of the forward call of model.
         """
-        pass
+        return self.compute_loss(batch,*args, **kwargs)

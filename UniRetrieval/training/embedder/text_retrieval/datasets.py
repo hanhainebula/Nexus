@@ -10,13 +10,10 @@ from torch.utils.data import Dataset
 from transformers import (
     PreTrainedTokenizer, 
     DataCollatorWithPadding,
-    TrainerCallback,
-    TrainerState,
-    TrainerControl
 )
 
-from .arguments import AbsTextEmbedderDataArguments, AbsTextEmbedderTrainingArguments
-from UniRetrieval.abc.training.embedder import AbsEmbedderTrainDataset, AbsEmbedderCollator, AbsCallback
+from .arguments import AbsTextEmbedderDataArguments
+from UniRetrieval.abc.training.embedder import AbsEmbedderTrainDataset, AbsEmbedderCollator
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +148,7 @@ class AbsTextEmbedderTrainDataset(AbsEmbedderTrainDataset):
         return query, passages, teacher_scores
 
 @dataclass
-class AbsTextEmbedderCollator(AbsEmbedderCollator):
+class AbsTextEmbedderCollator(AbsEmbedderCollator, DataCollatorWithPadding):
     """
     The abstract embedder collator.
     """
@@ -234,12 +231,13 @@ class AbsTextEmbedderCollator(AbsEmbedderCollator):
                     pad_to_multiple_of=self.pad_to_multiple_of,
                     return_tensors=self.return_tensors
                 ))
-        return {
-            "queries": q_collated,
-            "passages": d_collated,
-            "teacher_scores": teacher_scores,
-            "no_in_batch_neg_flag": False
-        }
+        # return {
+        #     "queries": q_collated,
+        #     "passages": d_collated,
+        #     "teacher_scores": teacher_scores,
+        #     "no_in_batch_neg_flag": False
+        # }
+        return q_collated, d_collated, teacher_scores, False
 
 
 class AbsEmbedderSameDatasetTrainDataset(AbsTextEmbedderTrainDataset):
@@ -589,29 +587,11 @@ class AbsEmbedderSameDatasetCollator(DataCollatorWithPadding):
         if isinstance(teacher_scores, list) and len(teacher_scores) == 0:
             teacher_scores = None
 
-        return {
-            "queries": q_collated,
-            "passages": d_collated,
-            "teacher_scores": teacher_scores,
-            "no_in_batch_neg_flag": no_in_batch_neg_flag
-        }
+        # return {
+        #     "queries": q_collated,
+        #     "passages": d_collated,
+        #     "teacher_scores": teacher_scores,
+        #     "no_in_batch_neg_flag": no_in_batch_neg_flag
+        # }
+        return q_collated, d_collated, teacher_scores, no_in_batch_neg_flag
 
-
-class EmbedderTrainerCallbackForDataRefresh(AbsCallback,TrainerCallback):
-    """
-    Callback class to inspect the state of the training loop and take decision.
-    """
-    def __init__(self, train_dataset: AbsEmbedderSameDatasetTrainDataset):
-        self.train_dataset = train_dataset
-
-    def on_epoch_end(
-        self,
-        args: AbsTextEmbedderTrainingArguments,
-        state: TrainerState,
-        control: TrainerControl,
-        **kwargs
-    ):
-        """
-        Event called at the end of an epoch.
-        """
-        self.train_dataset.refresh_epoch()

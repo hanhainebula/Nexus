@@ -1,16 +1,17 @@
 import logging
 import os
-from typing import Tuple
 from transformers import (
     AutoModel, AutoConfig,
-    AutoTokenizer, PreTrainedTokenizer
+    AutoTokenizer
 )
-from transformers import set_seed, PreTrainedTokenizer
+from transformers import set_seed
 from UniRetrieval.abc.training.embedder import AbsEmbedderRunner
-from .arguments import AbsTextEmbedderModelArguments, AbsTextEmbedderDataArguments, AbsTextEmbedderTrainingArguments
-from .datasets import AbsTextEmbedderTrainDataset, AbsTextEmbedderCollator, AbsEmbedderSameDatasetTrainDataset, AbsEmbedderSameDatasetCollator, EmbedderTrainerCallbackForDataRefresh
+from . import EncoderOnlyEmbedderModelArguments, EncoderOnlyEmbedderDataArguments, EncoderOnlyEmbedderTrainingArguments
+from .datasets import AbsTextEmbedderTrainDataset, AbsTextEmbedderCollator, AbsEmbedderSameDatasetTrainDataset, AbsEmbedderSameDatasetCollator
+from .callback import EmbedderTrainerCallbackForDataRefresh
 from .modeling import BiEncoderOnlyEmbedderModel
 from .trainer import EncoderOnlyEmbedderTrainer
+from . arguments import BiEncoderOnlyEmbedderModelArguments
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +24,21 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
     # TODO 这里args都又包装了一层
     def __init__(
         self,
-        model_args: AbsTextEmbedderModelArguments,
-        data_args: AbsTextEmbedderDataArguments,
-        training_args: AbsTextEmbedderTrainingArguments
+        model_args: EncoderOnlyEmbedderModelArguments,
+        data_args: EncoderOnlyEmbedderDataArguments,
+        training_args: EncoderOnlyEmbedderTrainingArguments
     ):
         self.model_args = model_args
         self.data_args = data_args
         self.training_args = training_args
+        self.encoder_only_model_args=BiEncoderOnlyEmbedderModelArguments(
+            negatives_cross_device=self.training_args.negatives_cross_device,
+            temperature=self.training_args.temperature,
+            sub_batch_size=self.training_args.sub_batch_size,
+            kd_loss_type=self.training_args.kd_loss_type,
+            sentence_pooling_method=self.training_args.sentence_pooling_method,
+            normalize_embeddings=self.training_args.normalize_embeddings
+        )
 
         if (
             os.path.exists(training_args.output_dir)
@@ -101,12 +110,7 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         model = BiEncoderOnlyEmbedderModel(
             base_model,
             tokenizer=tokenizer,
-            negatives_cross_device=self.training_args.negatives_cross_device,
-            temperature=self.training_args.temperature,
-            sub_batch_size=self.training_args.sub_batch_size,
-            kd_loss_type=self.training_args.kd_loss_type,
-            sentence_pooling_method=self.training_args.sentence_pooling_method,
-            normalize_embeddings=self.training_args.normalize_embeddings
+            model_args=self.train_datasetencoder_only_model_args
         )
 
         if self.training_args.gradient_checkpointing:
