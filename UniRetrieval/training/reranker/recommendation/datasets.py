@@ -17,12 +17,12 @@ from copy import deepcopy
 import re
 import fsspec
 
-from UniRetrieval.abc.training.embedder import AbsCallback, CallbackOutput
+from UniRetrieval.abc.training.embedder import CallbackOutput
 from UniRetrieval.training.embedder.recommendation.arguments import REQUIRED_DATA_CONFIG, DEFAULT_CONFIG
 
 
 # callback添加在了datasets里面
-class Callback(AbsCallback):
+class Callback:
     def __init__(self):
         pass
 

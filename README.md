@@ -36,28 +36,28 @@ Evaluation 部分：
             - Callback 类挪到同级目录下的新建 callback.py 中，抽象类中的 AbsCallback 删掉 - DONE
     - Recommendation
         - arguments.py
-            - TrainingArguments: 参考 HF 的 TrainingArguments，删掉/重命名已有的参数，保留推荐独有的参数
+            - TrainingArguments: 参考 HF 的 TrainingArguments，删掉/重命名已有的参数，保留推荐独有的参数 - Done
             - Statistics: 改成继承 AbsArguments - DONE
             - ModelArguments: 新增 data_config 参数，是 DataAttr4Model 类型 - DONE
-            - RetrieverArguments -> ModelArguments
+            - RetrieverArguments -> ModelArguments - Done
             - DataArguments: 待检查，需要根据 RecStudio4Industry 的数据格式来修改，必要时可以添加 add_argument(self, name, value) 方法
-            - 删去 178 行往后的冗余代码，需要 check，需要调用时从最外层的 modules 里面调用
+            - 删去 178 行往后的冗余代码，需要 check，需要调用时从最外层的 modules 里面调用 - Done
         - datasets.py
             - 把 DailyDataset 中的 `__iter__` 方法牵涉到的操作挪到 DataCollator 中
             - 删除冗余的 DataAttr4Model 和 Statistics (arguments.py 中已有)
             - 删除一些冗余的 read_* 代码，比如 read_json 和 read_yaml
             - EarlyStopCallback 等 callback 类也挪到同级目录下的 callback.py 中，考虑删除掉一些不必要的 Callback，不再返回设定的 CallbackOutput，而是在 trainer 中 `__init__` 时设置一个 stop_training 的 flag，每个训练 batch 开始时检查 flag
         - modeling.py:
-            - init_modules 方法根据 abc 中的代码进行修改，只保留推荐自己的 modules (保留 query_enoder, item_encoder, negative_sampler)
+            - init_modules 方法根据 abc 中的代码进行修改，只保留推荐自己的 modules (保留 query_enoder, item_encoder, negative_sampler) - Done
             - forward 函数需要进行修改，删掉 cal_loss 这个参数，拆开对应的功能；RetrieverModelOutput 需要对应修改下来传入 scores 和 loss
             - eval_step 待定，后续可以拉到 evaluation 里面； predict 函数待定
         - trainer.py
             - 和 train 相关的函数，需要参考 HF 的 Trainer，把一些不必要的代码删掉
-            - 和负采样相关的代码，需要 check 下是否需要再进行实现 (是否需要添加 callback)
+            - 和负采样相关的代码，需要 check 下是否需要再进行实现 (是否需要添加 callback) - 好像是需要的
             - 和 evaluation 相关的代码，可以先扔到 evaluation 里面
-            - 删掉 modules/metrics.py 里面已经有的代码 (536行往后)
-            - get_train_loader 这个函数需要改成 get_train_dataloader 和 HF Trainer 名称保持一致，同时传入 data_collator
-            - train 的接口传入的 train_dataset 是 DailyDataset 类型的
+            - 删掉 modules/metrics.py 里面已经有的代码 (536行往后) - Done
+            - get_train_loader 这个函数需要改成 get_train_dataloader 和 HF Trainer 名称保持一致，同时传入 data_collator - collator还没搞
+            - train 的接口传入的 train_dataset 是 DailyDataset 类型的 - Done
             - 在 trainer 中 `__init__` 时设置一个 stop_training 的 flag，每个训练 batch 开始时检查 flag
         - runner.py
             - 实现 load_dataset 方法，返回 DailyDataset 类型

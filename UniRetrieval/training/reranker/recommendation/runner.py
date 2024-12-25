@@ -7,7 +7,7 @@ from transformers import (
 )
 from transformers import set_seed, PreTrainedTokenizer
 from UniRetrieval.abc.training.embedder import AbsEmbedderRunner
-from .arguments import RetrieverArguments, TrainingArguments, ModelArguments
+from .arguments import TrainingArguments, ModelArguments
 # TODO datasets部分暂未实现
 # from .datasets import 
 from .modeling import MLPRetriever

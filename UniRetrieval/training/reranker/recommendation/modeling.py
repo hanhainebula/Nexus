@@ -11,7 +11,7 @@ import torch
 from UniRetrieval.abc.training.reranker import AbsRerankerModel, RerankerOutput
 from UniRetrieval.training.reranker.recommendation.arguments import DataAttr4Model, ModelArguments
 from UniRetrieval.modules import MLPModule, LambdaModule, MultiFeatEmbedding, AverageAggregator
-from UniRetrieval.training.reranker.recommendation.arguments import get_model_cls, get_modules, split_batch
+from UniRetrieval.modules.arguments import get_model_cls, get_modules, split_batch
 
 
 @dataclass
@@ -32,15 +32,15 @@ class BaseRanker(AbsRerankerModel):
             *args, **kwargs
         ):
         # from BaseModel
-        super(BaseRanker, self).__init__(*args, **kwargs)
+        
         self.data_config: DataAttr4Model = data_config
         self.model_config: ModelArguments = self.load_config(model_config)
-        
-
         self.num_seq_feat = len(data_config.seq_features)
         self.num_context_feat = len(data_config.context_features)
         self.num_item_feat = len(data_config.item_features)
         self.num_feat = self.num_seq_feat + self.num_context_feat + self.num_item_feat
+        super(BaseRanker, self).__init__(*args, **kwargs)
+        
         self.model_type = "ranker"
         self.num_items: int = self.data_config.num_items
         self.fiid: str = self.data_config.fiid  # item id field
@@ -51,11 +51,12 @@ class BaseRanker(AbsRerankerModel):
         
         
     def init_modules(self):
+        super().init_modules()
         self.embedding_layer = self.get_embedding_layer()
         self.sequence_encoder = self.get_sequence_encoder()
         self.feature_interaction_layer = self.get_feature_interaction_layer()
         self.prediction_layer = self.get_prediction_layer()
-        self.loss_function = self.get_loss_function()
+
 
     def get_embedding_layer(self):
         emb = MultiFeatEmbedding(
@@ -81,7 +82,6 @@ class BaseRanker(AbsRerankerModel):
     def get_loss_function(self):
         # BCELoss is not good for autocast in distributed training, reminded by pytorch
         return get_modules("loss", "BCEWithLogitLoss")(reduction='mean')
-    
 
 
     def compute_score(self, batch, *args, **kwargs) -> RankerModelOutput:
@@ -99,7 +99,10 @@ class BaseRanker(AbsRerankerModel):
         score = self.prediction_layer(interacted_emb)   # [B], sigmoid
         if len(score.shape) == 2 and score.size(-1) == 1:
             score = score.squeeze(-1)   # [B, 1] -> [B]
-        return RankerModelOutput(score, [context_emb, item_emb, seq_emb])
+        return RankerModelOutput(score=score, embedding=[context_emb, item_emb, seq_emb])
+    
+    def get_score_function(self):
+        return self.compute_score
     
     def sampling(self, query, num_neg, *args, **kwargs):
         return self.negative_sampler(query, num_neg)
@@ -116,7 +119,8 @@ class BaseRanker(AbsRerankerModel):
         output = self.forward(batch, *args, **kwargs)
         output_dict = output.to_dict()
         output_dict['label'] = label
-        loss = self.loss_function(**output_dict)
+        loss = self.loss(**output_dict)
+        
         if isinstance(loss, dict):
             return loss
         else:
@@ -124,7 +128,7 @@ class BaseRanker(AbsRerankerModel):
         
     @torch.no_grad()
     def eval_step(self, batch, *args, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
-        output = self.score(batch, *args, **kwargs)
+        output = self.compute_score(batch, *args, **kwargs)
         score = output.score
         # check if the last layer of the model is a sigmoid function
         # get the last layer of the model
