@@ -20,6 +20,12 @@ class AbsInferenceArguments(AbsArguments):
             'help':'Path to onnx model'
         }
     )
+    trt_model_path: str= field(
+        default=None,
+        metadata={
+            'help':'Path to trt model'
+        }
+    )
     output_topk: int = field(
         default=10,
         metadata={"help": "Number of top-k results to output."}
