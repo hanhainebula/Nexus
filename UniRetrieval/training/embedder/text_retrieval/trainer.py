@@ -62,8 +62,10 @@ class EncoderOnlyEmbedderTrainer(AbsEmbedderTrainer):
             Union[torch.Tensor, tuple(torch.Tensor, EmbedderOutput)]: The computed loss. If ``return_outputs`` is ``True``, 
                 also returns the model's outputs in a tuple ``(loss, outputs)``.
         """
-
-        outputs = model(**inputs)
+        inputs_dict={
+            'batch':inputs
+        }
+        outputs = model(**inputs_dict)
         loss = outputs.loss
 
         return (loss, outputs) if return_outputs else loss

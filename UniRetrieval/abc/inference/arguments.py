@@ -14,6 +14,18 @@ class AbsInferenceArguments(AbsArguments):
         default=None,
         metadata={"help": "Name or path to the model."}
     )
+    onnx_model_path: str= field(
+        default=None,
+        metadata={
+            'help':'Path to onnx model'
+        }
+    )
+    trt_model_path: str= field(
+        default=None,
+        metadata={
+            'help':'Path to trt model'
+        }
+    )
     output_topk: int = field(
         default=10,
         metadata={"help": "Number of top-k results to output."}
@@ -29,4 +41,10 @@ class AbsInferenceArguments(AbsArguments):
     infer_batch_size: int = field(
         default=1,
         metadata={"help": "Batch size for inference."}
+    )
+    max_workspace_size: int = field(
+        default=1 << 30,
+        metadata={
+            'help':'Max workspace size for tesorrt session, default = 1 GB'
+        }
     )

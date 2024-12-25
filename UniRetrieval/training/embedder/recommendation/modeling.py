@@ -9,7 +9,9 @@ import torch
 from UniRetrieval.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
 from UniRetrieval.training.embedder.recommendation.arguments import DataAttr4Model, ModelArguments
 from UniRetrieval.training.embedder.recommendation.datasets import ItemDataset
-from UniRetrieval.modules import QueryEncoder, ItemEncoder, UniformSampler
+from UniRetrieval.modules.query_encoder import QueryEncoder
+from UniRetrieval.modules.item_encoder import ItemEncoder
+from UniRetrieval.modules.sampler import UniformSampler
 from UniRetrieval.modules.score import InnerProductScorer
 from UniRetrieval.modules.loss import BPRLoss
 

@@ -32,8 +32,8 @@ class AbsRerankerModel(AbsReranker, nn.Module):
         self.init_modules()
 
     def init_modules(self):
-        self.loss=self.get_loss_function()
-        self.score=self.get_score_function()
+        self.loss_function=self.get_loss_function()
+        self.score_function=self.get_score_function()
         
     @abstractmethod
     def get_loss_function(self):
