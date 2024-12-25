@@ -7,13 +7,14 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from accelerate import Accelerator
 
-from UniRetrieval.training.embedder.recommendation.arguments import get_logger
+from UniRetrieval.modules.arguments import get_logger
 # TODO eval部分暂未移植
 # from rs4industry.eval import get_eval_metrics
 from .arguments import TrainingArguments
 from .datasets import Callback, EarlyStopCallback, CheckpointCallback
 from UniRetrieval.abc.training.embedder import AbsEmbedderTrainer
-
+from UniRetrieval.modules.metrics import get_eval_metrics
+from UniRetrieval.training.embedder.recommendation.datasets import DailyDataset
 import sys
 from typing import *
 
@@ -35,7 +36,7 @@ class RetrieverTrainer(AbsEmbedderTrainer):
             print(model)
         model.to(self.accelerator.device)
         optimizer = self.get_optimizer(
-            self.config.optimizer,
+            self.config.optim,
             model.parameters(),
             lr=self.config.learning_rate,
             weight_decay=self.config.weight_decay    
@@ -64,8 +65,8 @@ class RetrieverTrainer(AbsEmbedderTrainer):
     def save_model(self, output_dir = None, state_dict=None):
         return self.save_state(output_dir)
 
-    def train(self, train_dataset, eval_dataset=None, *args, **kwargs):
-        train_loader = self.get_train_loader(train_dataset)
+    def train(self, train_dataset: DailyDataset, eval_dataset=None, *args, **kwargs):
+        train_loader = self.get_train_dataloader(train_dataset)
         train_loader = self.accelerator.prepare(train_loader)
 
         if train_dataset.item_feat_dataset is not None:
@@ -86,7 +87,7 @@ class RetrieverTrainer(AbsEmbedderTrainer):
         
         stop_training = False
         try:
-            for epoch in range(self.config.epochs):
+            for epoch in range(int(self.config.num_train_epochs)):
                 epoch_total_loss = 0.0
                 epoch_total_bs = 0
                 self.model.train()
@@ -129,7 +130,7 @@ class RetrieverTrainer(AbsEmbedderTrainer):
                     epoch_total_bs += batch_size
                     if (self.global_step % self.config.logging_steps == 0):
                         mean_total_loss = epoch_total_loss / epoch_total_bs
-                        self.log_info(f"Epoch {epoch}/{self.config.epochs-1} Step {self.global_step}: Loss {loss:.5f}, Mean Loss {mean_total_loss:.5f}")
+                        self.log_info(f"Epoch {epoch}/{self.config.num_train_epochs-1} Step {self.global_step}: Loss {loss:.5f}, Mean Loss {mean_total_loss:.5f}")
                         if (len(loss_dict) > 1):
                             self.log_info(f"\tloss info: ", ', '.join([f'{k}={v:.5f}' for k, v in loss_dict.items()]))
 
@@ -153,7 +154,7 @@ class RetrieverTrainer(AbsEmbedderTrainer):
 
                 # print loss info at the end of each epoch
                 mean_total_loss = epoch_total_loss / epoch_total_bs
-                self.log_info(f"Epoch {epoch}/{self.config.epochs} Step {self.global_step}: Loss {loss:.5f}, Mean Loss {mean_total_loss:.5f}")
+                self.log_info(f"Epoch {epoch}/{self.config.num_train_epochs} Step {self.global_step}: Loss {loss:.5f}, Mean Loss {mean_total_loss:.5f}")
                 if len(loss_dict) > 1:
                     self.log_info(f"\tloss info: ", ', '.join([f'{k}={v:.5f}' for k, v in loss_dict.items()]))
                 
@@ -175,7 +176,7 @@ class RetrieverTrainer(AbsEmbedderTrainer):
         self.log_info(f"[Finished] Stop training at {self.global_step} steps")
 
         for callback in self.callbacks:
-            callback_output = callback.on_train_end(checkpoint_dir=self.config.checkpoint_dir, *args, **kwargs)
+            callback_output = callback.on_train_end(checkpoint_dir=self.config.output_dir, *args, **kwargs)
             if callback_output.save_checkpoint is not None:
                 self.save_state(callback_output.save_checkpoint)
 
@@ -190,7 +191,7 @@ class RetrieverTrainer(AbsEmbedderTrainer):
                 else:
                     callback.on_eval_end(epoch, self.global_step, *args, **kwargs)
         
-        self.save_state(self.config.checkpoint_dir)
+        self.save_state(self.config.output_dir)
 
     def load_config(self, config: Union[Dict, str]) -> TrainingArguments:
         if config is None:
@@ -215,18 +216,18 @@ class RetrieverTrainer(AbsEmbedderTrainer):
                 patience=self.config.earlystop_patience,
                 maximum="max" in self.config.earlystop_metric_mode,
                 save=self.config.checkpoint_best_ckpt,
-                checkpoint_dir=self.config.checkpoint_dir,
+                checkpoint_dir=self.config.output_dir,
                 is_main_process=self.accelerator.is_main_process
             ))
         if self.config.checkpoint_steps is not None:
             callbacks.append(CheckpointCallback(
                 step_interval=self.config.checkpoint_steps,
-                checkpoint_dir=self.config.checkpoint_dir,
+                checkpoint_dir=self.config.output_dir,
                 is_main_process=self.accelerator.is_main_process
             ))
         return callbacks
         
-    def get_train_loader(self, train_dataset: Optional[Union[Dataset, str]]=None):
+    def get_train_dataloader(self, train_dataset: Optional[Union[Dataset, str]]=None):
         """
         Returns the evaluation [`~torch.utils.data.DataLoader`].
 
@@ -502,7 +503,7 @@ class RetrieverTrainer(AbsEmbedderTrainer):
     def _check_checkpoint_dir(self):
         if not self.train_mode:
             return
-        checkpoint_dir = self.config.checkpoint_dir
+        checkpoint_dir = self.config.output_dir
         if checkpoint_dir is None:
             raise ValueError("Checkpoint directory must be specified.")
         if not os.path.exists(checkpoint_dir):
@@ -532,291 +533,3 @@ class RetrieverTrainer(AbsEmbedderTrainer):
         else:
             raise ValueError(f"Unknown initialization method: {method}")
 
-
-__all__ = [
-    "metric_dict",
-    "get_retriever_metrics",
-    "get_ranker_metrics",
-    "get_global_metrics",
-    "get_eval_metrics"
-]
-
-
-def recall(pred, target, k_or_thres):
-    r"""Calculating recall.
-
-    Recall value is defined as below:
-
-    .. math::
-        Recall= \frac{TP}{TP+FN}
-
-    Args:
-        pred(torch.BoolTensor): [B, num_items] or [B]. The prediction result of the model with bool type values.
-            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
-
-        target(torch.FloatTensor): [B, num_target] or [B]. The ground truth.
-
-    Returns:
-        torch.FloatTensor: a 0-dimensional tensor.
-    """
-    if pred.dim() > 1:
-        k = k_or_thres
-        count = (target > 0).sum(-1)
-        output = pred[:, :k].sum(dim=-1).float() / count
-        return output.mean()
-    else:
-        thres = k_or_thres
-        return M.recall(pred, target, task='binary', threshold=thres)
-
-
-def precision(pred, target, k_or_thres):
-    r"""Calculate the precision.
-
-    Precision are defined as:
-
-    .. math::
-        Precision = \frac{TP}{TP+FP}
-
-    Args:
-        pred(torch.BoolTensor): [B, num_items] or [B]. The prediction result of the model with bool type values.
-            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
-
-        target(torch.FloatTensor): [B, num_target] or [B]. The ground truth.
-
-    Returns:
-        torch.FloatTensor: a 0-dimensional tensor.
-    """
-    if pred.dim() > 1:
-        k = k_or_thres
-        output = pred[:, :k].sum(dim=-1).float() / k
-        return output.mean()
-    else:
-        thres = k_or_thres
-        return M.precision(pred, target, task='binary', threshold=thres)
-
-
-def f1(pred, target, k_or_thres):
-    r"""Calculate the F1.
-
-    Args:
-        pred(torch.BoolTensor): [B, num_items] or [B]. The prediction result of the model with bool type values.
-            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
-
-        target(torch.FloatTensor): [B, num_target] or [B]. The ground truth.
-
-    Returns:
-        torch.FloatTensor: a 0-dimensional tensor.
-    """
-    if pred.dim() > 1:
-        k = k_or_thres
-        count = (target > 0).sum(-1)
-        output = 2 * pred[:, :k].sum(dim=-1).float() / (count + k)
-        return output.mean()
-    else:
-        thres = k_or_thres
-        return M.f1_score(pred, target, task='binary', threshold=thres)
-
-
-def map(pred, target, k):
-    r"""Calculate the mean Average Precision(mAP).
-
-    Args:
-        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
-            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
-
-        target(torch.FloatTensor): [B, num_target]. The ground truth.
-
-    Returns:
-        torch.FloatTensor: a 0-dimensional tensor.
-    """
-    count = (target > 0).sum(-1)
-    pred = pred[:, :k].float()
-    output = pred.cumsum(dim=-1) / torch.arange(1, k+1).type_as(pred)
-    output = (output * pred).sum(dim=-1) / \
-        torch.minimum(count, k*torch.ones_like(count))
-    return output.mean()
-
-
-def _dcg(pred, k):
-    k = min(k, pred.size(1))
-    denom = torch.log2(torch.arange(k).type_as(pred) + 2.0).view(1, -1)
-    return (pred[:, :k] / denom).sum(dim=-1)
-
-
-def ndcg(pred, target, k):
-    r"""Calculate the Normalized Discounted Cumulative Gain(NDCG).
-
-    Args:
-        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
-            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
-
-        target(torch.FloatTensor): [B, num_target]. The ground truth.
-
-    Returns:
-        torch.FloatTensor: a 0-dimensional tensor.
-    """
-    pred_dcg = _dcg(pred.float(), k)
-    #TODO replace target>0 with target
-    ideal_dcg = _dcg(torch.sort((target > 0).float(), descending=True)[0], k)
-    all_irrelevant = torch.all(target <= sys.float_info.epsilon, dim=-1)
-    pred_dcg[all_irrelevant] = 0
-    pred_dcg[~all_irrelevant] /= ideal_dcg[~all_irrelevant]
-    return pred_dcg.mean()
-
-
-def mrr(pred, target, k):
-    r"""Calculate the Mean Reciprocal Rank(MRR).
-
-    Args:
-        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
-            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
-
-        target(torch.FloatTensor): [B, num_target]. The ground truth.
-
-    Returns:
-        torch.FloatTensor: a 0-dimensional tensor.
-    """
-    row, col = torch.nonzero(pred[:, :k], as_tuple=True)
-    row_uniq, counts = torch.unique_consecutive(row, return_counts=True)
-    idx = torch.zeros_like(counts)
-    idx[1:] = counts.cumsum(dim=-1)[:-1]
-    first = col.new_zeros(pred.size(0)).scatter_(0, row_uniq, col[idx]+1)
-    output = 1.0 / first
-    output[first == 0] = 0
-    return output.mean()
-
-
-def hits(pred, target, k):
-    r"""Calculate the Hits.
-
-    Args:
-        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
-            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
-
-        target(torch.FloatTensor): [B, num_target]. The ground truth.
-
-    Returns:
-        torch.FloatTensor: a 0-dimensional tensor.
-    """
-    return torch.any(pred[:, :k] > 0, dim=-1).float().mean()
-
-
-def logloss(pred, target):
-    r"""Calculate the log loss (log cross entropy).
-
-    Args:
-        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
-            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
-
-        target(torch.FloatTensor): [B, num_target]. The ground truth.
-
-    Returns:
-        torch.FloatTensor: a 0-dimensional tensor.
-    """
-    if pred.dim() == target.dim():
-        return F.binary_cross_entropy_with_logits(pred, target.float())
-    else:
-        return F.cross_entropy(pred, target)
-
-
-def auc(pred, target):
-    r"""Calculate the global AUC.
-
-    Args:
-        pred(torch.BoolTensor): [B, num_items]. The prediction result of the model with bool type values.
-            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
-
-        target(torch.FloatTensor): [B, num_target]. The ground truth.
-
-    Returns:
-        torch.FloatTensor: a 0-dimensional tensor.
-    """
-    target = target.type(torch.long)
-    return M.auroc(pred, target, task='binary')
-
-
-def accuracy(pred, target, thres=0.5):
-    r"""Calculate the accuracy.
-
-    Args:
-        pred(torch.BoolTensor): [Batch_size]. The prediction result of the model with bool type values.
-            If the value in the j-th column is `True`, the j-th highest item predicted by model is right.
-
-        target(torch.FloatTensor): [Batch_size]. The ground truth.
-
-        thres(float): Predictions below the thres will be marked as 0, otherwise 1.
-
-    Returns:
-        torch.FloatTensor: a 0-dimensional tensor.
-    """
-    return M.accuracy(pred, target, task='binary', threshold=thres)
-
-
-def mse(pred, target):
-    """Calculate Meas Square Error"""
-    return M.mean_squared_error(pred, target)
-
-
-def mae(pred, target):
-    """Calculate Mean Absolute Error."""
-    return M.mean_absolute_error(pred, target)
-
-
-metric_dict = {
-    'ndcg': ndcg,
-    'precision': precision,
-    'recall': recall,
-    'map': map,
-    'hit': hits,
-    'mrr': mrr,
-    'f1': f1,
-    'mse': mse,
-    'mae': mae,
-    'auc': auc,
-    'logloss': logloss,
-    'accuracy': accuracy
-}
-
-
-def get_retriever_metrics(metric):
-    if not isinstance(metric, list):
-        metric = [metric]
-    topk_metrics = {'ndcg', 'precision', 'recall', 'map', 'mrr', 'hit', 'f1'}
-    rank_m = [(m, metric_dict[m])
-              for m in metric if m in topk_metrics and m in metric_dict]
-    return rank_m
-
-
-def get_ranker_metrics(metric):
-    if not isinstance(metric, list):
-        metric = [metric]
-    pred_metrics = {'mae', 'mse', 'auc', 'logloss', 'accuracy',
-                    'precision', 'recall', 'f1'}
-    pred_m = [(m, metric_dict[m]) for m in metric if m in pred_metrics and m in metric_dict]
-    return pred_m
-
-
-def get_global_metrics(metric):
-    if (not isinstance(metric, list)) and (not isinstance(metric, dict)):
-        metric = [metric]
-    global_metrics = {"auc"}
-    global_m = [(m, metric_dict[m]) for m in metric if m in global_metrics and m in metric_dict]
-    return global_m
-
-
-def get_eval_metrics(metric_names: Union[List[str], str], model_type: str) -> List[Tuple[str, Callable]]:
-    r""" Get metrics with cutoff for evaluation.
-
-    Args:
-        metrics_names(Union[List[str], str]): names of metrics which requires cutoff. Such as ["ndcg", "recall"].
-        model_type(str): type of model, such as "ranker" or "retriever".
-
-    Returns:
-        List[str, Callable[[torch.tensor, torch.tensor], float]]: list of metrics and functions.
-    """
-    metric_names = metric_names if isinstance(metric_names, list) else [metric_names]
-    if model_type == "retriever":
-        metrics = get_retriever_metrics(metric_names)
-    else:
-        metrics = get_ranker_metrics(metric_names)
-    return metrics

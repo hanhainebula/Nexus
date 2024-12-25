@@ -25,9 +25,15 @@ class AbsArguments:
     @classmethod
     def from_dict(cls, _dict: dict):
         for _field in fields(cls):
+            # TODO: 待检查：默认值不一定都存在config文件中
             if _field.name not in _dict:
-                raise ValueError(f"{_field.name} is missing in the input dictionary.")
-            if issubclass(_field.type, AbsArguments):
+                # raise ValueError(f"{_field.name} is missing in the input dictionary.")
+                continue
+            # print("_field:\n",_field)
+            # print("_field.type:\n",_field.type)
+            # TODO: 待检查：之前处理union类型会报错：TypeError: issubclass() arg 1 must be a class
+            # if issubclass(_field.type, AbsArguments):
+            if isinstance(_field, AbsArguments):
                 _dict[_field.name] = _field.type.from_dict(_dict[_field.name])
             else:
                 _dict[_field.name] = _field.type(_dict[_field.name])

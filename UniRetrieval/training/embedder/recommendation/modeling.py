@@ -2,10 +2,8 @@ from dataclasses import dataclass
 import os
 import json
 from typing import Dict, Union, Tuple
-from tqdm import tqdm
 import faiss
 import faiss.contrib.torch_utils
-from typing import OrderedDict
 import torch
 
 from UniRetrieval.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
@@ -15,7 +13,7 @@ from UniRetrieval.modules import QueryEncoder, ItemEncoder, UniformSampler
 from UniRetrieval.modules.score import InnerProductScorer
 from UniRetrieval.modules.loss import BPRLoss
 
-from UniRetrieval.training.embedder.recommendation.arguments import get_model_cls
+from UniRetrieval.modules.arguments import get_model_cls
 
 
 @dataclass
@@ -43,11 +41,10 @@ class BaseRetriever(AbsEmbedderModel):
             *args, **kwargs
         ):
         # from BaseModel
-        super(BaseRetriever, self).__init__(*args, **kwargs)
         self.data_config: DataAttr4Model = data_config
         self.model_config: ModelArguments = self.load_config(model_config)
+        super(BaseRetriever, self).__init__(*args, **kwargs)
         self.model_type = 'retriever'
-        # self.loggers = get_logger(training_config)
         self.init_modules()
 
         self.num_items: int = self.data_config.num_items
@@ -57,12 +54,10 @@ class BaseRetriever(AbsEmbedderModel):
         self.item_ids = None
 
     def init_modules(self):
-        # super().init_modules()
+        super().init_modules()
         self.item_encoder = self.get_item_encoder()
         self.query_encoder = self.get_query_encoder()
-        self.score_function = self.get_score_function()
         self.negative_sampler = self.get_negative_sampler()
-        self.loss_function = self.get_loss_function()
 
     def get_query_encoder(self):
         raise NotImplementedError
@@ -282,7 +277,7 @@ class BaseRetriever(AbsEmbedderModel):
 
 class MLPRetriever(BaseRetriever):
     def __init__(self, retriever_data_config, retriever_model_config, *args, **kwargs):
-        super().__init__(retriever_data_config, retriever_model_config, *args, **kwargs)
+        super().__init__(data_config=retriever_data_config, model_config=retriever_model_config, *args, **kwargs)
 
     def get_item_encoder(self):
         return ItemEncoder(self.data_config, self.model_config)
