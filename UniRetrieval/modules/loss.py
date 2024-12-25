@@ -96,7 +96,7 @@ class WeightedBPRLoss(PairwiseLoss):
         weight = F.softmax(neg_score - log_neg_prob, -1)
         return -torch.mean((loss * weight).sum(-1))
 
-class CrossEntropyLoss(nn.CrossEntropyLoss()):
+class CrossEntropyLoss(nn.CrossEntropyLoss):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     

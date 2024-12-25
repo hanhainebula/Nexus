@@ -1,10 +1,17 @@
 import torch
 from typing import OrderedDict
-from UniRetrieval.training.embedder.recommendation.arguments import get_seq_data
-from . import AverageAggregator, MLPModule, MultiFeatEmbedding
+from .aggregate import AverageAggregator
+from .layer import MLPModule
+from .embedding import MultiFeatEmbedding
 
 
 __all__ = ["BaseQueryEncoderWithSeq"]
+
+def get_seq_data(d: dict):
+    if "seq" in d:
+        return d['seq']
+    else:
+        return {}
 
 class BaseQueryEncoderWithSeq(torch.nn.Module):
     def __init__(self, context_embedding, item_encoder, *args, **kwargs):

@@ -110,7 +110,7 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         model = BiEncoderOnlyEmbedderModel(
             base_model,
             tokenizer=tokenizer,
-            model_args=self.train_datasetencoder_only_model_args
+            model_args=self.encoder_only_model_args
         )
 
         if self.training_args.gradient_checkpointing:

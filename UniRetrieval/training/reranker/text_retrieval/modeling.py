@@ -46,7 +46,7 @@ class CrossEncoderModel(AbsRerankerModel):
 
     def init_modules(self):
         super().init_modules()
-        self.distill_loss=self.get_distill_loss
+        self.distill_loss=self.get_distill_loss()
     
     def get_loss_function(self):
         return CrossEntropyLoss()
@@ -94,7 +94,7 @@ class CrossEncoderModel(AbsRerankerModel):
         pair=batch[0]
         teacher_scores=batch[1]
         
-        ranker_logits = self.compute_score(pair) # (batch_size * num, dim)
+        ranker_logits = self.score_function(pair) # (batch_size * num, dim)
         if teacher_scores is not None:
             teacher_scores = torch.Tensor(teacher_scores)
             teacher_targets = teacher_scores.view(self.train_batch_size, -1)

@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from UniRetrieval.abc.training.embedder import AbsCallback, CallbackOutput
+from UniRetrieval.abc.training.embedder import CallbackOutput
 import os
 import json
 import torch
@@ -55,7 +55,7 @@ class ItemDataset(Dataset):
 
 
 # callback添加在了datasets里面
-class Callback(AbsCallback):
+class Callback():
     def __init__(self):
         pass
 
