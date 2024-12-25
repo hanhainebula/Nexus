@@ -1,8 +1,8 @@
 {
-    "epochs": 1,
+    "num_train_epochs": 1,
     "train_batch_size": 1024,
     "eval_batch_size": 4096,
-    "checkpoint_dir": "/data1/home/recstudio/haoran/UniRetrieval/recommender_results",
+    "output_dir": "/data1/home/recstudio/haoran/UniRetrieval/recommender_results",
     "checkpoint_steps": 3000,
     "evaluation_strategy": "epoch",
     "eval_interval": 1,

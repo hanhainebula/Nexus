@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
+from UniRetrieval.abc.training.embedder import AbsEmbedderTrainDataset, AbsEmbedderCollator
 
 from UniRetrieval.abc.training.embedder import CallbackOutput
 import os
@@ -737,6 +738,12 @@ class DailyDataIterator(object):
         p.join()
 
 
+@dataclass
+class DataCollator(AbsEmbedderCollator):
+    def __call__(self, features):
+        
+        return 
+
 
 class DailyDataset(IterableDataset):
     def __init__(self, daily_iterator: DailyDataIterator, attrs, shuffle=False, preload=False, seed=42, **kwargs):
@@ -814,8 +821,7 @@ def get_datasets(config: Union[dict, str]):
     test_data = DailyDataset(test_data_iterator, shuffle=False, attrs=cp.attrs, preload=False)
     return (train_data, test_data), cp.attrs
 
-class DataCollator():
-    pass
+
 
 # test
 if __name__ == '__main__':
