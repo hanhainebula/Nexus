@@ -9,7 +9,7 @@ from accelerate import Accelerator
 
 from UniRetrieval.modules.arguments import get_logger
 from .arguments import TrainingArguments
-from .datasets import Callback, EarlyStopCallback, CheckpointCallback
+from .callback import Callback, EarlyStopCallback, CheckpointCallback
 from UniRetrieval.abc.training.reranker import AbsRerankerTrainer
 from UniRetrieval.modules.metrics import get_eval_metrics
 

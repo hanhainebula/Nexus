@@ -11,15 +11,11 @@ from UniRetrieval.modules.arguments import get_logger
 # TODO eval部分暂未移植
 # from rs4industry.eval import get_eval_metrics
 from .arguments import TrainingArguments
-from .datasets import Callback, EarlyStopCallback, CheckpointCallback
+from .callback import Callback, EarlyStopCallback, CheckpointCallback
 from UniRetrieval.abc.training.embedder import AbsEmbedderTrainer
 from UniRetrieval.modules.metrics import get_eval_metrics
 from UniRetrieval.training.embedder.recommendation.datasets import DailyDataset
-import sys
 from typing import *
-
-import torch.nn.functional as F
-import torchmetrics.functional as M
 
 # copied from rec studio Trainer
 # TODO 添加datacollator逻辑?
@@ -58,7 +54,6 @@ class RetrieverTrainer(AbsEmbedderTrainer):
     def compute_loss(self, model, batch, return_outputs=False,*args, **kwargs):
         outputs = model(batch=batch, cal_loss=True,*args, **kwargs)
         loss = outputs['loss']
-
         return (loss, outputs) if return_outputs else loss
     
     # TODO
@@ -112,7 +107,6 @@ class RetrieverTrainer(AbsEmbedderTrainer):
                     batch_size = batch[list(batch.keys())[0]].shape[0]
                     loss_dict = self._train_batch(batch, item_loader=item_loader, *args, **kwargs)
                     loss = loss_dict['loss']
-
                     self.accelerator.backward(loss)
 
                     # gradient accumulation and gradient clipping by norm
