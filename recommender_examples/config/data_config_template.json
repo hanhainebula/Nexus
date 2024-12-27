@@ -6,6 +6,7 @@
     "context_features": ["user_id", "device_id", "age", "gender", "province"],
     "item_features": ["video_id", "author_id", " category_level_two", "upload_type", "category_level_one"],
     "labels": ["like"],
+    "item_batch_size": 4096,
     "filter_settings": {
         "like": ["==1"]
     },

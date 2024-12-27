@@ -9,67 +9,32 @@ from typing import Dict, Tuple
 import torch
 from accelerate import Accelerator
 from loguru import logger as loguru_logger
+from UniRetrieval.modules.arguments import DataAttr4Model, Statistics
 import importlib
 
 @dataclass
 class TrainingArguments(AbsEmbedderTrainingArguments):
     train_batch_size: int = 512
-    item_batch_size: int = 2048 # only used for retriever training
-    evaluation_strategy: str = "epoch"  # epoch or step
-    eval_interval: int = 1    # interval between evaluations, epochs or steps
-    eval_batch_size: int = 256
+
     cutoffs: list = field(default_factory=lambda : [1, 5, 10])
     metrics: list = field(default_factory=lambda : ["ndcg", "recall"])
-    earlystop_strategy: str = "epoch"   # epoch or step
-    earlystop_patience: int = 5     # number of epochs or steps
-    earlystop_metric: str = "ndcg@5"
-    earlystop_metric_mode: str = "max"
+    
     checkpoint_best_ckpt: bool = True   # if true, save best model in earystop callback
     checkpoint_steps: int = 1000    # if none, save model per epoch; else save model by steps
-    
-    
-    
-# TODO 检查该类是否冗余
-class Statistics(AbsArguments):
-    @classmethod
-    def from_dict(cls, _dict: dict):
-        stat = cls()
-        for k, v in _dict.items():
-            setattr(stat, k.strip(), v)
-        return stat
 
-
-@dataclass
-class DataAttr4Model(AbsArguments):
-    """
-    Data attributes for a dataset. Serve for models
-    """
-    fiid: str
-    flabels: List[str]
-    features: List[str]
-    context_features: List[str]
-    item_features: List[str]
-    seq_features: List[str]
-    num_items: int  # number of candidate items instead of maximum id of items
-    stats: Statistics
-
-
-# TODO 添加了DataAttr4Model
 @dataclass
 class ModelArguments(AbsEmbedderModelArguments):
     # model_name: str = None
     # embedding_dim: int = 10
     data_config: DataAttr4Model = None
     embedding_dim: int = 10
-    mlp_layers: list[int] = field(default_factory=list)
+    mlp_layers: int = field(default=None, metadata={"nargs": "+"})
     num_neg: int = 50
     activation: str = "relu"
     dropout: float = 0.3
     batch_norm: bool = True
     model_name_or_path: str = ''
     
-
-# TODO 待检查
 
 REQUIRED_DATA_CONFIG = [
     "name",
@@ -101,11 +66,12 @@ class DataArguments(AbsEmbedderDataArguments):
     name: str=None
     type: str=None
     url: str=None
-    labels: List[str]=None
-    stats: Dict[str, Any]=None
+    labels: str = field(default=None, metadata={"nargs": "+"})
+    stats: Statistics=None
     item_col: str=None
-    context_features: List[str]=None
-    item_features: List[str]=None
+    context_features: str = field(default=None, metadata={"nargs": "+"})
+    item_features: str = field(default=None, metadata={"nargs": "+"})
+    item_batch_size: int = 2048 # only used for retriever training
 
     # Optional fields with default values
     train_settings: Dict[str, datetime] = field(default=None,metadata={"required_keys": ["start_date", "end_date"]})
@@ -116,7 +82,7 @@ class DataArguments(AbsEmbedderDataArguments):
     post_process: Optional[Dict[str, Any]] = None
     filter_settings: Optional[Dict[str, Any]] = None
     item_info: Optional[Dict[str, Any]] = None
-    seq_features: List[str] = field(default_factory=list)
+    seq_features: str = field(default=None, metadata={"nargs": "+"})
 
 
     def __post_init__(self):

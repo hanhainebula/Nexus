@@ -1,160 +1,19 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
-
-import os
-import json
+from UniRetrieval.abc.training.reranker import AbsRerankerCollator
 import torch
 from dataclasses import dataclass
+
 from typing import List, Union
 from datetime import datetime
 import pandas as pd
 import torch
-from torch.utils.data import IterableDataset, Dataset
+from torch.utils.data import IterableDataset
 from multiprocessing import Process, Queue, Pool
 from accelerate import Accelerator
 import pandas as pd
-from torch.utils.data import IterableDataset, Dataset
-from copy import deepcopy
-import re
-import fsspec
 
-from UniRetrieval.training.embedder.recommendation.arguments import REQUIRED_DATA_CONFIG, DEFAULT_CONFIG
-from UniRetrieval.modules.dataset import detect_file_type, read_json, nested_dict_update, extract_timestamp, process_conditions, df_to_tensor_dict
-
-
-class BaseClient(object):
-    def __init__(self, url: str):
-        self.url = url
-
-    def load_file(self, path=None, **kwargs):
-        if not path:
-            path = self.url
-        else:
-            path = os.path.join(self.url, path)
-        filetype = detect_file_type(path)
-        if filetype == "parquet":
-            df = pd.read_parquet(path, **kwargs)
-        elif filetype == "csv":
-            df = pd.read_csv(path, **kwargs)
-        elif filetype == "feather":
-            df = pd.read_feather(path, **kwargs)
-        elif filetype == "pkl":
-            df = pd.read_pickle(path, **kwargs)
-        else:
-            raise ValueError(f"Unsupported file type: {filetype}")
-        return df
-    
-    def list_dir(self) -> list[str]:
-        """List all files and directories in the given directory."""
-        return os.listdir(self.url)
-    
-class HDFSClient(BaseClient):
-    def __init__(self, url: str):
-        self._check_hdfs_connection(url)
-        super(HDFSClient, self).__init__(url)
-        
-    @staticmethod
-    def _check_hdfs_connection(hdfs_url: str) -> bool:
-        """Check that we can connect to the HDFS filesystem at url"""
-        if not isinstance(hdfs_url, str):
-            raise TypeError(f"Expected `url` to be a string, got {type(hdfs_url)}")
-        if not hdfs_url.startswith("hdfs://"):
-            raise ValueError(f"Expected `url` to start with 'hdfs://', got {hdfs_url}")
-        try:
-            fs = fsspec.filesystem('hdfs', fs_kwargs={'hdfs_connect': hdfs_url})
-        except ImportError:
-            raise ImportError("`fsspec` is not installed")
-        except Exception as e:
-            print(e)
-            raise ValueError(f"Could not connect to {hdfs_url}")
-        return True
-    
-    def list_dir(self) -> list[str]:
-        """List all files and directories in the given directory."""
-        fs = fsspec.filesystem('hdfs')
-        return [os.path.basename(file) for file in fs.ls(self.url)]
-    
-CLIENT_MAP = {
-    'file': BaseClient,
-    'hdfs': HDFSClient
-}
-
-def get_client(client_type: str, url: str):
-    if client_type in CLIENT_MAP.keys():
-        return CLIENT_MAP[client_type](url=url)
-    else:
-        raise ValueError(f"Unknown client type: {client_type}")
-
-class Statistics(object):
-    @staticmethod
-    def from_dict(d: dict):
-        stat = Statistics()
-        for k, v in d.items():
-            setattr(stat, k.strip(), v)
-        return stat
-
-    def add_argument(self, name, value):
-        setattr(self, name, value)
-
-@dataclass
-class DataAttr4Model:
-    """
-    Data attributes for a dataset. Serve for models
-    """
-    fiid: str
-    flabels: List[str]
-    features: List[str]
-    context_features: List[str]
-    item_features: List[str]
-    seq_features: List[str]
-    num_items: int  # number of candidate items instead of maximum id of items
-    stats: Statistics
-
-    @staticmethod
-    def from_dict(d: dict):
-        if "stats" in d:
-            d["stats"] = Statistics.from_dict(d["stats"])
-        attr = DataAttr4Model(**d)
-        return attr
-
-    def to_dict(self):
-        d = self.__dict__
-        for k, v in d.items():
-            if type(v) == Statistics:
-                d[k] = v.__dict__
-        return d
-
-
-
-class ItemDataset(Dataset):
-    def __init__(self, item_feat_df: torch.Tensor):
-        super().__init__()
-        self.item_feat_df = item_feat_df
-        self.item_ids = item_feat_df.index.to_numpy()
-        self.item_id_2_offset = pd.DataFrame.from_dict(
-            {item_id: i for i, item_id in enumerate(self.item_ids)},
-            orient="index",
-            columns=["offset"]
-        )
-        self.item_id_col = self.item_feat_df.index.name
-
-    def __getitem__(self, index):
-        feat_dict = self.item_feat_df.loc[self.item_ids[index]].to_dict()
-        if self.item_id_col is not None:
-            feat_dict.update({self.item_id_col: self.item_ids[index]})
-        return feat_dict
-    
-    def __len__(self):
-        return len(self.item_ids)
-    
-
-    def get_item_feat(self, item_ids: torch.LongTensor):
-        # TODO: efficiency issue due to item_ids may be in GPU and the first dimension is batch size
-        item_ids_list = item_ids.view(-1).tolist()
-        item_ids_list = self.item_ids[item_ids_list]
-        feats = self.item_feat_df.loc[item_ids_list].to_dict("list")
-        feats = {k: torch.tensor(v).reshape(*item_ids.shape).to(item_ids.device) for k,v in feats.items()}
-        return feats
-
+from UniRetrieval.training.reranker.recommendation.arguments import REQUIRED_DATA_CONFIG, DEFAULT_CONFIG, DataAttr4Model, Statistics
+from UniRetrieval.modules.dataset import get_client, read_json, nested_dict_update, extract_timestamp, process_conditions, df_to_tensor_dict
 
 class ConfigProcessor(object):
     """
@@ -224,8 +83,8 @@ class ConfigProcessor(object):
         for key in REQUIRED_DATA_CONFIG:
             if key not in valid_keys:
                 missing_keys.append(key)
-        # TODO: confirm this assert, it using key out of the loop
         assert key in valid_keys, f"Missing required keys: {missing_keys}"
+
 
     def _get_date_range(self, mode: str):
         """Get start and end date from config
@@ -236,6 +95,7 @@ class ConfigProcessor(object):
         start_date: datetime = datetime.strptime(self.config[f'{mode}_settings']['start_date'], date_format)
         end_date: datetime = datetime.strptime(self.config[f'{mode}_settings']['end_date'], date_format)
         return start_date, end_date
+
 
     def _get_valid_filenames(self, start_date: datetime, end_date: datetime) -> List[str]:
         """Get all used filenames among given date range in the dataset"""
@@ -332,24 +192,6 @@ class DailyDataIterator(object):
         if self.config['user_sequential_info'].get('use_cols', None) is not None:
             data = data[self.config['user_sequential_info']['use_cols']]
         return data
-
-    def load_item_file(self):
-        """Load all item data"""
-        if self.config['item_info'] is None:
-            return None
-        data = self.item_data_client.load_file()
-        if isinstance(data, pd.DataFrame):
-            pass
-        elif isinstance(data, dict):
-            data = pd.DataFrame.from_dict(data, orient='index', columns=self.config['item_info']['columns'])
-            # data.set_index(self.config['item_info']['key'], inplace=True)
-        else:
-            raise ValueError("Item data must be DataFrame or Dict")
-        # data = {k: torch.tensor(list(v), dtype=torch.int64) for k, v in data.items()}
-        if self.config['item_info'].get('use_cols', None) is not None:
-            data = data[self.config['item_info']['use_cols']]
-        # data.set_index(self.config['item_info']['key'], inplace=True)
-        return data
         
     
     def post_process(self, df):
@@ -409,6 +251,21 @@ class DailyDataIterator(object):
         p.join()
 
 
+DATA_KEYS = [
+    'request_id', 
+    'user_id', 
+    'device_id', 
+    'age', 
+    'gender', 
+    'province', 
+    'video_id', 
+    'author_id', 
+    'category_level_two', 
+    'upload_type', 
+    'category_level_one', 
+    'like', 
+    'seq'
+]
 
 class DailyDataset(IterableDataset):
     def __init__(self, daily_iterator: DailyDataIterator, attrs, shuffle=False, preload=False, seed=42, **kwargs):
@@ -423,11 +280,7 @@ class DailyDataset(IterableDataset):
         self.shuffle = shuffle
         self.preload = preload
         self.preload_ratio = 0.8
-        self.seq_index_col = daily_iterator.seq_index_col
-        item_data = daily_iterator.load_item_file()
-        self.item_feat_dataset = ItemDataset(item_data) if item_data is not None else None
-        self.attrs.num_items = len(self.item_feat_dataset) if item_data is not None else None
-
+        self.seq_index_col = daily_iterator.seq_index_col        
 
     def __iter__(self):
         self.seed += 1
@@ -447,35 +300,61 @@ class DailyDataset(IterableDataset):
                 if self.preload and i == preload_index:
                     # preload the next-day logs
                     queue, p = self.daily_iterator.preload_start()
-                    # p = Process(target=self.daily_iterator.preload)
-                    # p.start()
                 if self.preload and (i == num_samples-1):
                     # wait for the preload process
                     self.daily_iterator.preload_end(queue, p)
-                    # p.join()
 
                 data_dict = {k: v[i] for k, v in tensor_dict.items()}
                 if seq_df is not None:
                     seq_data_dict = seq_df.loc[data_dict[self.seq_index_col].item()].to_dict()
                     data_dict['seq'] = seq_data_dict
-                yield data_dict
-
-    def get_item_feat(self, item_ids: torch.Tensor):
-        """
-        Return item features by item_ids
-
-        Args:
-            item_ids (torch.Tensor): [B x N] or [N]
-
-        Returns:
-            torch.Tensor: [B x N x F] or [N x F]
-        """
-        return self.item_feat_dataset.get_item_feat(item_ids)
-    
-    def get_item_loader(self, batch_size, num_workers=0, shuffle=False):
-        return DataLoader(self, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle)
-
-
+                    # data_dict.update(seq_data_dict)
+                
+                yield (data_dict,)
+                    
+                    
+@dataclass
+class AbsRecommenderRerankerCollator(AbsRerankerCollator):
+    """
+    The abstract reranker collator.
+    """    
+    def __call__(self, features):
+        features = [f[0] for f in features]
+        all_dicts = {}
+        
+        for k, v in features[0].items():
+            if isinstance(v, dict):
+                all_dicts[k] = {}
+                for _k in v.keys():
+                    all_dicts[k][_k] = []
+            else:
+                all_dicts[k] = []
+                
+        for data_dict in features:
+            for k, v in data_dict.items():
+                if isinstance(v, dict):
+                    for _k, _v in v.items():
+                        if not isinstance(_v, torch.Tensor):
+                            all_dicts[k][_k].append(torch.tensor(_v))
+                        else:
+                            all_dicts[k][_k].append(_v)
+                else:
+                    if not isinstance(v, torch.Tensor):
+                        all_dicts[k].append(torch.tensor(v))
+                    else:
+                        all_dicts[k].append(v)
+                
+        for k, v in features[0].items():
+            if isinstance(v, dict):
+                for _k, _v in v.items():
+                    all_dicts[k][_k] = torch.stack(all_dicts[k][_k], dim=0)
+            else:
+                all_dicts[k] = torch.stack(all_dicts[k], dim=0)
+              
+        
+        return all_dicts
+        # return features
+        
 def get_datasets(config: Union[dict, str]):
     cp = ConfigProcessor(config)
 
@@ -485,43 +364,6 @@ def get_datasets(config: Union[dict, str]):
     train_data = DailyDataset(train_data_iterator, shuffle=True, attrs=cp.attrs, preload=False)
     test_data = DailyDataset(test_data_iterator, shuffle=False, attrs=cp.attrs, preload=False)
     return (train_data, test_data), cp.attrs
-
-class DataCollator():
-    pass
-
-# test
-if __name__ == '__main__':
-    config = "./examples/data/recflow.json"
-    cp = ConfigProcessor(config)
-    print(cp.train_start_date, cp.train_end_date)
-    print(cp.test_start_date, cp.test_end_date)
-    print(cp.train_files)
-
-    train_data_iterator = DailyDataIterator(cp.config, cp.train_files)
-    test_data_iterator = DailyDataIterator(cp.config, cp.test_files)
-    print(len(train_data_iterator), len(test_data_iterator))
-
-    train_data = DailyDataset(train_data_iterator, shuffle=False, attrs=cp.attrs, preload=False)
-    test_data = DailyDataset(test_data_iterator, shuffle=False, attrs=cp.attrs, preload=False)
-
-    for i, data in enumerate(train_data):
-        print({k: v.shape for k, v in data.items()})
-        if i > 3:
-            break
-
-    # data_iter = iter(train_data)
-    # sample = next(data_iter)
-    # sample = next(data_iter)
-
-    from torch.utils.data import DataLoader
-    train_loader = DataLoader(train_data, batch_size=32, num_workers=0)
-    test_loader = DataLoader(test_data, batch_size=32, num_workers=0)
-
-    for i, batch in enumerate(train_loader):
-        print({k: v.shape for k, v in batch.items()})
-        # if i > 3:
-        #     break
-        
 
 
 

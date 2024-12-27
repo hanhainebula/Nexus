@@ -1,13 +1,77 @@
 import json
-import torch
-
 from datetime import datetime
 import torch
 from typing import List
-from UniRetrieval.training.embedder.recommendation.arguments import REQUIRED_DATA_CONFIG, DEFAULT_CONFIG
 from copy import deepcopy
 import re
+import os 
+import fsspec
+import pandas as pd
 
+class BaseClient(object):
+    def __init__(self, url: str):
+        self.url = url
+
+    def load_file(self, path=None, **kwargs):
+        if not path:
+            path = self.url
+        else:
+            path = os.path.join(self.url, path)
+        filetype = detect_file_type(path)
+        if filetype == "parquet":
+            df = pd.read_parquet(path, **kwargs)
+        elif filetype == "csv":
+            df = pd.read_csv(path, **kwargs)
+        elif filetype == "feather":
+            df = pd.read_feather(path, **kwargs)
+        elif filetype == "pkl":
+            df = pd.read_pickle(path, **kwargs)
+        else:
+            raise ValueError(f"Unsupported file type: {filetype}")
+        return df
+    
+    def list_dir(self) -> list[str]:
+        """List all files and directories in the given directory."""
+        return os.listdir(self.url)
+    
+class HDFSClient(BaseClient):
+    def __init__(self, url: str):
+        self._check_hdfs_connection(url)
+        super(HDFSClient, self).__init__(url)
+        
+    @staticmethod
+    def _check_hdfs_connection(hdfs_url: str) -> bool:
+        """Check that we can connect to the HDFS filesystem at url"""
+        if not isinstance(hdfs_url, str):
+            raise TypeError(f"Expected `url` to be a string, got {type(hdfs_url)}")
+        if not hdfs_url.startswith("hdfs://"):
+            raise ValueError(f"Expected `url` to start with 'hdfs://', got {hdfs_url}")
+        try:
+            fs = fsspec.filesystem('hdfs', fs_kwargs={'hdfs_connect': hdfs_url})
+        except ImportError:
+            raise ImportError("`fsspec` is not installed")
+        except Exception as e:
+            print(e)
+            raise ValueError(f"Could not connect to {hdfs_url}")
+        return True
+    
+    def list_dir(self) -> list[str]:
+        """List all files and directories in the given directory."""
+        fs = fsspec.filesystem('hdfs')
+        return [os.path.basename(file) for file in fs.ls(self.url)]
+    
+CLIENT_MAP = {
+    'file': BaseClient,
+    'hdfs': HDFSClient
+}
+
+def get_client(client_type: str, url: str):
+    if client_type in CLIENT_MAP.keys():
+        return CLIENT_MAP[client_type](url=url)
+    else:
+        raise ValueError(f"Unknown client type: {client_type}")
+    
+    
 
 def read_json(filepath: str):
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -119,3 +183,5 @@ def detect_file_type(path: str) -> str:
         return "pkl"
     else:
         raise ValueError(f"Unsupported file type: {file_extension}")
+    
+    

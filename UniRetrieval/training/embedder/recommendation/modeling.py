@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 import os
 import json
-from typing import Dict, Union, Tuple
-import faiss
-import faiss.contrib.torch_utils
+from typing import Dict, Union
 import torch
+from torch.utils.data import DataLoader
 
 from UniRetrieval.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
 from UniRetrieval.training.embedder.recommendation.arguments import DataAttr4Model, ModelArguments
@@ -14,7 +13,6 @@ from UniRetrieval.modules.item_encoder import ItemEncoder
 from UniRetrieval.modules.sampler import UniformSampler
 from UniRetrieval.modules.score import InnerProductScorer
 from UniRetrieval.modules.loss import BPRLoss
-
 from UniRetrieval.modules.arguments import get_model_cls
 
 
@@ -34,12 +32,12 @@ class RetrieverModelOutput(EmbedderOutput):
         return {k: v for k, v in self.__dict__.items()}
 
 
-# TODO 实现data_config合并到model_config中
 class BaseRetriever(AbsEmbedderModel):
     def __init__(
             self, 
             data_config: DataAttr4Model,
             model_config: Union[Dict, str],
+            item_loader: DataLoader,
             *args, **kwargs
         ):
         # from BaseModel
@@ -48,6 +46,8 @@ class BaseRetriever(AbsEmbedderModel):
         super(BaseRetriever, self).__init__(*args, **kwargs)
         self.model_type = 'retriever'
         self.init_modules()
+        
+        self.item_loader: DataLoader = item_loader
 
         self.num_items: int = self.data_config.num_items
         self.fiid: str = self.data_config.fiid  # item id field
@@ -80,10 +80,10 @@ class BaseRetriever(AbsEmbedderModel):
             self, 
             batch,
             inference=False,
-            item_loader=None,
             *args, 
             **kwargs
-        ):
+        ) -> RetrieverModelOutput:
+        item_loader = self.item_loader
         pos_item_id = batch[self.fiid]
         query_vec = self.query_encoder(batch)
         pos_item_vec = self.item_encoder(batch)
@@ -146,40 +146,6 @@ class BaseRetriever(AbsEmbedderModel):
         else:
             return {'loss': loss}
         
-    @torch.no_grad()
-    def eval_step(self, batch, k, item_vectors, *args, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
-        with torch.no_grad():
-            query_vec = self.query_encoder(batch)
-            pos_vec = self.item_encoder(batch)
-            pos_scores = self.score_function(query_vec, pos_vec)
-            # TODO: use faiss to reduce memory usage
-            res = faiss.StandardGpuResources()
-            if self.score_function.__class__.__name__ == 'InnerProductScorer':
-                index_flat = faiss.IndexFlatIP(item_vectors.shape[-1])
-            elif self.score_function.__class__.__name__ == 'EuclideanScorer':
-                index_flat = faiss.IndexFlatL2(item_vectors.shape[-1])
-            elif self.score_function.__class__.__name__ == 'CosineScorer':
-                item_vectors = torch.nn.functional.normalize(item_vectors, p=2, dim=-1)
-                pos_vec = torch.nn.functional.normalize(pos_vec, p=2, dim=-1)
-                index_flat = faiss.IndexFlatIP(item_vectors.shape[-1])
-            else:
-                raise NotImplementedError(f"Not supported scorer {self.score_function.__class__.__name__}.")
-            gpu_index = next(self.parameters()).device.index
-            index_flat = faiss.index_cpu_to_gpu(res, gpu_index, index_flat)
-            index_flat.add(item_vectors)
-
-            topk_scores, topk_indices = index_flat.search(query_vec, k)
-
-            # we usually do not mask history in industrial settings
-            if pos_scores.dim() < topk_scores.dim():
-                pos_scores = pos_scores.unsqueeze(-1)
-            all_scores = torch.cat([pos_scores, topk_scores], dim=-1) # [B, N + 1]
-            # sort and get the index of the first item
-            _, indice = torch.sort(all_scores, dim=-1, descending=True, stable=True)
-            pred = indice[:, :k] == 0
-            target = torch.ones_like(batch[self.fiid], dtype=torch.bool).view(-1, 1)   # [B, 1]
-            return pred, target
-
     @torch.no_grad()
     def encode_query(self, context_input: dict) -> torch.Tensor:
         """ Encode context input, output vectors.
@@ -277,9 +243,10 @@ class BaseRetriever(AbsEmbedderModel):
         return super().encode_info(*args, **kwargs)
 
 
+# 已经改过了，把代码放在modules里了
 class MLPRetriever(BaseRetriever):
-    def __init__(self, retriever_data_config, retriever_model_config, *args, **kwargs):
-        super().__init__(data_config=retriever_data_config, model_config=retriever_model_config, *args, **kwargs)
+    def __init__(self, retriever_data_config, retriever_model_config, item_loader, *args, **kwargs):
+        super().__init__(data_config=retriever_data_config, model_config=retriever_model_config, item_loader=item_loader, *args, **kwargs)
 
     def get_item_encoder(self):
         return ItemEncoder(self.data_config, self.model_config)

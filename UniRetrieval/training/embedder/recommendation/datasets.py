@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 from UniRetrieval.abc.training.embedder import AbsEmbedderTrainDataset, AbsEmbedderCollator
-
+from torch.utils.data import DataLoader
 import os
 import torch
 from dataclasses import dataclass
@@ -14,10 +14,8 @@ from multiprocessing import Process, Queue, Pool
 from accelerate import Accelerator
 import pandas as pd
 
-
-from UniRetrieval.training.embedder.recommendation.arguments import REQUIRED_DATA_CONFIG, DEFAULT_CONFIG
-from UniRetrieval.modules.dataset import detect_file_type, read_json, nested_dict_update, extract_timestamp, process_conditions, df_to_tensor_dict
-import fsspec
+from UniRetrieval.training.embedder.recommendation.arguments import REQUIRED_DATA_CONFIG, DEFAULT_CONFIG, DataAttr4Model, Statistics
+from UniRetrieval.modules.dataset import get_client, read_json, nested_dict_update, extract_timestamp, process_conditions, df_to_tensor_dict
 
 
 class ItemDataset(Dataset):
@@ -50,107 +48,6 @@ class ItemDataset(Dataset):
         return feats
 
 
-class BaseClient(object):
-    def __init__(self, url: str):
-        self.url = url
-
-    def load_file(self, path=None, **kwargs):
-        if not path:
-            path = self.url
-        else:
-            path = os.path.join(self.url, path)
-        filetype = detect_file_type(path)
-        if filetype == "parquet":
-            df = pd.read_parquet(path, **kwargs)
-        elif filetype == "csv":
-            df = pd.read_csv(path, **kwargs)
-        elif filetype == "feather":
-            df = pd.read_feather(path, **kwargs)
-        elif filetype == "pkl":
-            df = pd.read_pickle(path, **kwargs)
-        else:
-            raise ValueError(f"Unsupported file type: {filetype}")
-        return df
-    
-    def list_dir(self) -> list[str]:
-        """List all files and directories in the given directory."""
-        return os.listdir(self.url)
-    
-class HDFSClient(BaseClient):
-    def __init__(self, url: str):
-        self._check_hdfs_connection(url)
-        super(HDFSClient, self).__init__(url)
-        
-    @staticmethod
-    def _check_hdfs_connection(hdfs_url: str) -> bool:
-        """Check that we can connect to the HDFS filesystem at url"""
-        if not isinstance(hdfs_url, str):
-            raise TypeError(f"Expected `url` to be a string, got {type(hdfs_url)}")
-        if not hdfs_url.startswith("hdfs://"):
-            raise ValueError(f"Expected `url` to start with 'hdfs://', got {hdfs_url}")
-        try:
-            fs = fsspec.filesystem('hdfs', fs_kwargs={'hdfs_connect': hdfs_url})
-        except ImportError:
-            raise ImportError("`fsspec` is not installed")
-        except Exception as e:
-            print(e)
-            raise ValueError(f"Could not connect to {hdfs_url}")
-        return True
-    
-    def list_dir(self) -> list[str]:
-        """List all files and directories in the given directory."""
-        fs = fsspec.filesystem('hdfs')
-        return [os.path.basename(file) for file in fs.ls(self.url)]
-    
-CLIENT_MAP = {
-    'file': BaseClient,
-    'hdfs': HDFSClient
-}
-
-def get_client(client_type: str, url: str):
-    if client_type in CLIENT_MAP.keys():
-        return CLIENT_MAP[client_type](url=url)
-    else:
-        raise ValueError(f"Unknown client type: {client_type}")
-
-class Statistics(object):
-    @staticmethod
-    def from_dict(d: dict):
-        stat = Statistics()
-        for k, v in d.items():
-            setattr(stat, k.strip(), v)
-        return stat
-
-    def add_argument(self, name, value):
-        setattr(self, name, value)
-
-@dataclass
-class DataAttr4Model:
-    """
-    Data attributes for a dataset. Serve for models
-    """
-    fiid: str
-    flabels: List[str]
-    features: List[str]
-    context_features: List[str]
-    item_features: List[str]
-    seq_features: List[str]
-    num_items: int  # number of candidate items instead of maximum id of items
-    stats: Statistics
-
-    @staticmethod
-    def from_dict(d: dict):
-        if "stats" in d:
-            d["stats"] = Statistics.from_dict(d["stats"])
-        attr = DataAttr4Model(**d)
-        return attr
-
-    def to_dict(self):
-        d = self.__dict__
-        for k, v in d.items():
-            if type(v) == Statistics:
-                d[k] = v.__dict__
-        return d
 
 
 class ConfigProcessor(object):
@@ -408,12 +305,21 @@ class DailyDataIterator(object):
         p.join()
 
 
-@dataclass
-class DataCollator(AbsEmbedderCollator):
-    def __call__(self, features):
-        
-        return 
-
+DATA_KEYS = [
+    'request_id', 
+    'user_id', 
+    'device_id', 
+    'age', 
+    'gender', 
+    'province', 
+    'video_id', 
+    'author_id', 
+    'category_level_two', 
+    'upload_type', 
+    'category_level_one', 
+    'like', 
+    'seq'
+]
 
 class DailyDataset(IterableDataset):
     def __init__(self, daily_iterator: DailyDataIterator, attrs, shuffle=False, preload=False, seed=42, **kwargs):
@@ -432,6 +338,21 @@ class DailyDataset(IterableDataset):
         item_data = daily_iterator.load_item_file()
         self.item_feat_dataset = ItemDataset(item_data) if item_data is not None else None
         self.attrs.num_items = len(self.item_feat_dataset) if item_data is not None else None
+        
+
+    def get_item_loader(self, item_batch_size):
+        """
+        Returns the evaluation [`~torch.utils.data.DataLoader`].
+
+        Subclass and override this method if you want to inject some custom behavior.
+
+        Args:
+            train_dataset (`str` or `torch.utils.data.Dataset`, *optional*):
+                If a `str`, will use `self.train_dataset[train_dataset]` as the evaluation dataset. If a `Dataset`, will override `self.train_dataset` and must implement `__len__`. If it is a [`~datasets.Dataset`], columns not accepted by the `model.forward()` method are automatically removed.
+        """
+        loader = DataLoader(self.item_feat_dataset, batch_size=item_batch_size)
+        return loader
+
 
     def __iter__(self):
         self.seed += 1
@@ -451,83 +372,64 @@ class DailyDataset(IterableDataset):
                 if self.preload and i == preload_index:
                     # preload the next-day logs
                     queue, p = self.daily_iterator.preload_start()
-                    # p = Process(target=self.daily_iterator.preload)
-                    # p.start()
                 if self.preload and (i == num_samples-1):
                     # wait for the preload process
                     self.daily_iterator.preload_end(queue, p)
-                    # p.join()
 
                 data_dict = {k: v[i] for k, v in tensor_dict.items()}
                 if seq_df is not None:
                     seq_data_dict = seq_df.loc[data_dict[self.seq_index_col].item()].to_dict()
                     data_dict['seq'] = seq_data_dict
-                yield data_dict
-
-# class DailyDataset(AbsEmbedderTrainDataset):
-#     def __init__(self, daily_iterator: DailyDataIterator, attrs, shuffle=False, preload=False, seed=42, **kwargs):
-#         accelerator = Accelerator()
-#         self.rank = accelerator.process_index
-#         self.num_processes = accelerator.num_processes
-#         self.seed = seed
-#         self.daily_iterator = daily_iterator
-#         self.config = daily_iterator.config
-#         self.attrs = attrs
-#         self.shuffle = shuffle
-#         self.preload = preload
-#         self.preload_ratio = 0.8
-#         self.seq_index_col = daily_iterator.seq_index_col
-#         item_data = daily_iterator.load_item_file()
-#         self.item_feat_dataset = ItemDataset(item_data) if item_data is not None else None
-#         self.attrs.num_items = len(self.item_feat_dataset) if item_data is not None else None
-
-#     def __iter__(self):
-#         self.seed += 1
-#         worker_info = torch.utils.data.get_worker_info()
-#         if worker_info is not None:
-#             raise NotImplementedError("Not support `num_workers`>0 now.")
-#         for log_df, seq_df in self.daily_iterator:
-#             if self.shuffle:
-#                 log_df = log_df.sample(frac=1).reset_index(drop=True)
-#             tensor_dict = df_to_tensor_dict(log_df)
-#             num_samples = log_df.shape[0]
-            
-#             if self.preload:
-#                 # `preload_index` controls when to preload
-#                 preload_index = int(self.preload_ratio * num_samples)
-#             for i in range(num_samples):
-#                 if self.preload and i == preload_index:
-#                     # preload the next-day logs
-#                     queue, p = self.daily_iterator.preload_start()
-#                     # p = Process(target=self.daily_iterator.preload)
-#                     # p.start()
-#                 if self.preload and (i == num_samples-1):
-#                     # wait for the preload process
-#                     self.daily_iterator.preload_end(queue, p)
-#                     # p.join()
-
-#                 data_dict = {k: v[i] for k, v in tensor_dict.items()}
-#                 if seq_df is not None:
-#                     seq_data_dict = seq_df.loc[data_dict[self.seq_index_col].item()].to_dict()
-#                     data_dict['seq'] = seq_data_dict
-#                 yield data_dict
-
-#     def get_item_feat(self, item_ids: torch.Tensor):
-#         """
-#         Return item features by item_ids
-
-#         Args:
-#             item_ids (torch.Tensor): [B x N] or [N]
-
-#         Returns:
-#             torch.Tensor: [B x N x F] or [N x F]
-#         """
-#         return self.item_feat_dataset.get_item_feat(item_ids)
-    
-#     def get_item_loader(self, batch_size, num_workers=0, shuffle=False):
-#         return DataLoader(self, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle)
-
-
+                    # data_dict.update(seq_data_dict)
+                
+                yield (data_dict,)
+                    
+                    
+@dataclass
+class AbsRecommenderEmbedderCollator(AbsEmbedderCollator):
+    """
+    The abstract embedder collator.
+    """    
+    def __call__(self, features):
+        features = [f[0] for f in features]
+        # print('features:', features)
+        # print('len(features):', len(features))
+        all_dicts = {}
+        keys = list(features[0].keys())
+        
+        for k, v in features[0].items():
+            if isinstance(v, dict):
+                all_dicts[k] = {}
+                for _k in v.keys():
+                    all_dicts[k][_k] = []
+            else:
+                all_dicts[k] = []
+                
+        for data_dict in features:
+            for k, v in data_dict.items():
+                if isinstance(v, dict):
+                    for _k, _v in v.items():
+                        if not isinstance(_v, torch.Tensor):
+                            all_dicts[k][_k].append(torch.tensor(_v))
+                        else:
+                            all_dicts[k][_k].append(_v)
+                else:
+                    if not isinstance(v, torch.Tensor):
+                        all_dicts[k].append(torch.tensor(v))
+                    else:
+                        all_dicts[k].append(v)
+                
+        for k, v in features[0].items():
+            if isinstance(v, dict):
+                for _k, _v in v.items():
+                    all_dicts[k][_k] = torch.stack(all_dicts[k][_k], dim=0)
+            else:
+                all_dicts[k] = torch.stack(all_dicts[k], dim=0)
+              
+        
+        return all_dicts
+        # return features
+        
 def get_datasets(config: Union[dict, str]):
     cp = ConfigProcessor(config)
 
@@ -559,12 +461,6 @@ if __name__ == '__main__':
         print({k: v.shape for k, v in data.items()})
         if i > 3:
             break
-
-    # data_iter = iter(train_data)
-    # sample = next(data_iter)
-    # sample = next(data_iter)
-
-    from torch.utils.data import DataLoader
     train_loader = DataLoader(train_data, batch_size=32, num_workers=0)
     test_loader = DataLoader(test_data, batch_size=32, num_workers=0)
 

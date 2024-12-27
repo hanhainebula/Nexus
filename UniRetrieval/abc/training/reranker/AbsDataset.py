@@ -1,17 +1,6 @@
-import os
-import math
-import random
 import logging
-import datasets
-import numpy as np
-import torch.distributed as dist
 from dataclasses import dataclass
-from torch.utils.data import Dataset
-
-from typing import List
-
 from UniRetrieval.abc.training.dataset import AbsDataset
-from .AbsArguments import AbsRerankerDataArguments, AbsRerankerTrainingArguments
 
 logger = logging.getLogger(__name__)
 
