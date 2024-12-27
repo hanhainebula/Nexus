@@ -2,8 +2,6 @@ from dataclasses import dataclass
 import os
 import json
 from typing import Dict, Union, Tuple
-from tqdm import tqdm
-import faiss
 import faiss.contrib.torch_utils
 from typing import OrderedDict
 import torch
@@ -23,7 +21,6 @@ class RankerModelOutput(RerankerOutput):
         return {k: v for k, v in self.__dict__.items()}
 
 
-# TODO 实现data_config合并到model_config中
 class BaseRanker(AbsRerankerModel):
     def __init__(
             self, 
@@ -44,8 +41,6 @@ class BaseRanker(AbsRerankerModel):
         self.model_type = "ranker"
         self.num_items: int = self.data_config.num_items
         self.fiid: str = self.data_config.fiid  # item id field
-        # label fields, base ranker only support one label
-        # if need multiple labels, use MultiTaskRanker instead
         self.flabel: str = self.data_config.flabels[0]
         self.init_modules()
         
@@ -84,7 +79,12 @@ class BaseRanker(AbsRerankerModel):
         return get_modules("loss", "BCEWithLogitLoss")(reduction='mean')
 
 
-    def compute_score(self, batch, *args, **kwargs) -> RankerModelOutput:
+    def compute_score(
+            self, 
+            batch, 
+            *args, 
+            **kwargs
+        ) -> RankerModelOutput:
         context_feat, seq_feat, item_feat = split_batch(batch, self.data_config)
         all_embs = []
         if len(seq_feat) > 0:
@@ -119,7 +119,7 @@ class BaseRanker(AbsRerankerModel):
         output = self.forward(batch, *args, **kwargs)
         output_dict = output.to_dict()
         output_dict['label'] = label
-        loss = self.loss(**output_dict)
+        loss = self.loss_function(**output_dict)
         
         if isinstance(loss, dict):
             return loss
@@ -267,9 +267,6 @@ class MLPRanker(BaseRanker):
             last_activation=False,
             last_bn=False
         )
-        # BCELoss is not good for autocast in distributed training, reminded by pytorch
-        # sigmoid = torch.nn.Sigmoid()
-        # return torch.nn.Sequential(pred_mlp, sigmoid)
         return pred_mlp
     
     

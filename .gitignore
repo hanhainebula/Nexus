@@ -1,2 +1,6 @@
 __pycache__/
 */__pycache__/
+*old.py
+*old.json
+recommender_results/
+*/recommender_results/
