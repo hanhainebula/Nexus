@@ -48,3 +48,9 @@ class AbsInferenceArguments(AbsArguments):
             'help':'Max workspace size for tesorrt session, default = 1 GB'
         }
     )
+    normalize: bool = field(
+        default=True,
+        metadata={
+            'help':'normalize embeddings'
+        }
+    )

@@ -1,12 +1,20 @@
+import os
 import torch
+import math
 import numpy as np
+import pandas as pd
 from tqdm import tqdm, trange
 from typing import Any, List, Union, Tuple, Optional,Dict, Literal
-import math
+from dataclasses import field, dataclass
+import pdb
+import tensorrt as trt
+import pycuda.driver as cuda
+import pycuda.autoinit
+import onnx
+import onnxruntime as ort
+
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-from UniRetrieval.abc.inference import AbsReranker
-
+from UniRetrieval.abc.inference import AbsReranker, InferenceEngine, AbsInferenceArguments
 
 def sigmoid(x):
     return float(1 / (1 + np.exp(-x)))
@@ -150,7 +158,7 @@ class BaseReranker(AbsReranker):
         """
         if isinstance(sentence_pairs[0], str):
             sentence_pairs = [sentence_pairs]
-        sentence_pairs = self.get_detailed_inputs(sentence_pairs)
+        sentence_pairs = self.get_detailed_inputs(sentence_pairs) # list[list[str]]
 
         if isinstance(sentence_pairs, str) or len(self.target_devices) == 1:
             return self.compute_score_single_gpu(
@@ -320,12 +328,314 @@ class BaseReranker(AbsReranker):
         scores = np.concatenate([result[1] for result in results_list])
         return scores
 
+@dataclass
+class SessionParams():
+    name: str=field(
+        default='query',
+        metadata={
+            'help':'Name of Session Inputs/Outputs'
+        }
+    )
+
+
+class NormalSession():
+    """
+    A class used to represent a Normal Session for text retrieval.
+    Attributes
+    ----------
+    model : object
+        The model used for encoding queries and corpus.
+    Methods
+    -------
+    get_inputs():
+        Returns a list of SessionParams representing the input names.
+    get_outputs():
+        Returns a list of SessionParams representing the output names.
+    run(output_names, input_feed, run_options=None):
+        Executes the session with the given inputs and returns the embeddings.
+    """
+    def __init__(self, model):
+        self.model=model
+
+    def get_inputs(self):
+        return [SessionParams(
+            name='sentence_pairs'
+        )]
+        
+    def get_outputs(self):
+        return [SessionParams(
+            name='score'
+        )]
+
+    def run(self, output_names, input_feed, run_options=None):
+        sentence_pairs=input_feed['sentence_pairs']            
+        score = self.model.compute_score(sentence_pairs)
+                    
+        return [score]
+        
+    
+
+
+class BaseRerankerInferenceEngine(InferenceEngine):
+    def __init__(self, infer_args: AbsInferenceArguments):
+        super().__init__(infer_args)
+        # normal model
+        self.load_model()
+        # session
+        self.session = self.get_inference_session()
+        self.device = self.config['infer_device']
+        
+    def load_model(self, use_fp16=False):
+        self.model = BaseReranker(model_name_or_path=self.config["model_name_or_path"],use_fp16=use_fp16, batch_size=self.config['infer_batch_size'], devices=self.config['infer_device'])
+
+    def get_normal_session(self):
+        if not self.model:
+            self.load_model()
+        return NormalSession(self.model)
+
+    def get_onnx_session(self) -> ort.InferenceSession:
+        providers = ['CPUExecutionProvider'] if self.config['infer_device']=='cpu' else ['CUDAExecutionProvider']
+        onnx_model_path = self.config["onnx_model_path"]
+        return ort.InferenceSession(onnx_model_path, providers=providers)
+
+    def get_tensorrt_session(self) -> trt.ICudaEngine:
+        device=self.config['infer_device']
+        if not isinstance(device, int):
+            device=0
+        cuda.Device(device).make_context()
+        engine_file_path=self.config['trt_model_path']
+        TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+        with open(engine_file_path, 'rb') as f, trt.Runtime(TRT_LOGGER) as runtime:
+            return runtime.deserialize_cuda_engine(f.read())
+
+
+    @classmethod
+    def convert_to_onnx(cls, model_name_or_path: str = None, onnx_model_path: str = None, opset_version = 14, use_fp16=False):
+        # model = AutoModel.from_pretrained(model_name_or_path)
+        # tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+        print(model_name_or_path)
+        os.makedirs(os.path.dirname(onnx_model_path), exist_ok=True)
+        base_model=BaseReranker(model_name_or_path=model_name_or_path, use_fp16=False)
+        model=base_model.model
+        tokenizer=base_model.tokenizer
+
+        queries = "What is the capital of France?"
+        passages = "Paris is the capital and most populous city of France."
+        dummy_input= tokenizer(queries, passages, padding=True , return_tensors='pt', truncation='only_second', max_length=512)
+
+        dummy_input = (torch.LongTensor(dummy_input['input_ids']).view(1, -1), torch.LongTensor(dummy_input['attention_mask']).view(1, -1))
+        print(dummy_input[0].shape)
+        
+        if use_fp16:
+            model = model.half()  # 将模型权重转换为 FP16
+            dummy_input = {key: value.half() for key, value in dummy_input.items()}  
+            
+        torch.onnx.export(
+            model,  
+            dummy_input,  
+            onnx_model_path,  
+            opset_version=opset_version,  # ONNX opset 版本
+            input_names=['input_ids', 'attention_mask'],  
+            output_names=['output'],  
+            dynamic_axes={'input_ids': {0: 'batch_size', 1:'token_length'}, 'output': {0: 'batch_size'}, 'attention_mask': {0: 'batch_size', 1: 'token_length'}}
+              
+        )
+        print(f"Model has been converted to ONNX and saved at {onnx_model_path}")
+
+    def inference(
+        self,
+        inputs: Union[List[str], List[Tuple[str, str]], pd.DataFrame, Any],
+        *args,
+        **kwargs
+    ):
+        """
+        Perform inference using the specified session type.
+
+        Args:
+            inputs (Union[List[str], List[Tuple[str, str]], pd.DataFrame, Any]): Input data for inference.
+            session_type (str): The type of session to use ('tensorrt', 'onnx', 'normal').
+            session (Any): The session object to use for inference.
+            *args: Additional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Any: The inference results.
+        """
+        if self.session == None:
+            raise ValueError('Please run get_inference_session first!')
+        
+        session_type=self.config['infer_mode']
+        if session_type == 'tensorrt':
+            return self._inference_tensorrt(inputs, *args, **kwargs)
+        elif session_type == 'onnx':
+            return self._inference_onnx(inputs, *args, **kwargs)
+        elif session_type == 'normal':
+            return self._inference_normal(inputs, *args, **kwargs)
+        else:
+            raise ValueError(f"Unsupported session type: {session_type}")
+
+    def _inference_tensorrt(self, sentence_pairs, batch_size = 16, normalize = True, *args, **kwargs):
+        if not isinstance(sentence_pairs, list):
+            sentence_pairs=[sentence_pairs]
+
+        self.tokenizer = self.model.tokenizer
+        queries= [s[0] for s in sentence_pairs]
+        passages= [s[1] for s in sentence_pairs]
+                     
+        encoded_inputs=self.tokenizer(queries, passages, padding=True , return_tensors='np', truncation='only_second', max_length=512)
+        inputs={
+            'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
+            'attention_mask':encoded_inputs['attention_mask']
+            }
+        engine=self.session
+        with engine.create_execution_context() as context:
+            stream = cuda.Stream()
+            bindings = [0] * engine.num_io_tensors
+
+            input_memory = []
+            output_buffers = {}
+            for i in range(engine.num_io_tensors):
+                tensor_name = engine.get_tensor_name(i)
+                dtype = trt.nptype(engine.get_tensor_dtype(tensor_name))
+                if engine.get_tensor_mode(tensor_name) == trt.TensorIOMode.INPUT:
+                    if -1 in tuple(engine.get_tensor_shape(tensor_name)):  # dynamic
+                        # context.set_input_shape(tensor_name, tuple(engine.get_tensor_profile_shape(tensor_name, 0)[2]))
+                        context.set_input_shape(tensor_name, tuple(inputs[tensor_name].shape))
+                    input_mem = cuda.mem_alloc(inputs[tensor_name].nbytes)
+                    bindings[i] = int(input_mem)
+                    context.set_tensor_address(tensor_name, int(input_mem))
+                    cuda.memcpy_htod_async(input_mem, inputs[tensor_name], stream)
+                    input_memory.append(input_mem)
+                else:  # output
+                    shape = tuple(context.get_tensor_shape(tensor_name))
+                    output_buffer = np.empty(shape, dtype=dtype)
+                    output_buffer = np.ascontiguousarray(output_buffer)
+                    output_memory = cuda.mem_alloc(output_buffer.nbytes)
+                    bindings[i] = int(output_memory)
+                    context.set_tensor_address(tensor_name, int(output_memory))
+                    output_buffers[tensor_name] = (output_buffer, output_memory)
+
+            context.execute_async_v3(stream_handle=stream.handle)
+            stream.synchronize()
+
+            for tensor_name, (output_buffer, output_memory) in output_buffers.items():
+                cuda.memcpy_dtoh(output_buffer, output_memory)
+        
+        scores=output_buffers['output'][0] # (bs, 1)
+
+        if normalize:
+            scores = [sigmoid(s) for s in scores]
+
+        return scores
+    
+    def _inference_onnx(self, sentence_pairs, batch_size = 16, normalize = True,  *args, **kwargs):
+        self.tokenizer=self.model.tokenizer   
+        if not isinstance(sentence_pairs, list):
+            sentence_pairs=[sentence_pairs]
+        queries= [s[0] for s in sentence_pairs]
+        passages= [s[1] for s in sentence_pairs]
+        encoded_inputs=self.tokenizer(queries, passages, padding=True , return_tensors='np', truncation='only_second', max_length=512)
+        input_feed={
+            'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
+            'attention_mask':encoded_inputs['attention_mask']
+            }
+        print(input_feed)
+        all_scores = self.session.run(None, input_feed)[0]
+
+
+        if normalize:
+            all_scores = [sigmoid(score) for score in all_scores]
+
+        return all_scores
+
+    def _inference_normal(self, inputs, *args, **kwargs):
+        input_feed = {self.session.get_inputs()[0].name: inputs}
+
+        outputs = self.session.run([self.session.get_outputs()[0].name], input_feed)
+        scores = outputs[0]
+        return scores
+
+    def _prepare_inputs(self, sentence_pairs, batch_size,*args, **kwargs):
+        self.tokenizer = self.model.tokenizer
+        if isinstance(sentence_pairs[0], str):
+            sentence_pairs = [sentence_pairs]
+            
+        all_inputs = []
+        
+        for start_index in trange(0, len(sentence_pairs), batch_size, desc="pre tokenize", disable=len(sentence_pairs) < 128):
+            sentences_batch = sentence_pairs[start_index:start_index + batch_size]
+            queries = [s[0] for s in sentences_batch]
+            passages = [s[1] for s in sentences_batch]
+            queries_inputs_batch = self.tokenizer(
+                queries,
+                return_tensors=None,
+                add_special_tokens=False,
+                max_length=512,
+                truncation=True,
+                **kwargs
+            )['input_ids']
+            passages_inputs_batch = self.tokenizer(
+                passages,
+                return_tensors=None,
+                add_special_tokens=False,
+                max_length=512,
+                truncation=True,
+                **kwargs
+            )['input_ids']
+            for q_inp, d_inp in zip(queries_inputs_batch, passages_inputs_batch):
+                item = self.tokenizer.prepare_for_model(
+                    q_inp,
+                    d_inp,
+                    truncation='only_second',
+                    max_length=512,
+                    padding=False,
+                )
+                all_inputs.append(item)
+        # sort by length for less padding
+        length_sorted_idx = np.argsort([-len(x['input_ids']) for x in all_inputs])
+        all_inputs_sorted = [all_inputs[i] for i in length_sorted_idx]
+        return all_inputs_sorted, length_sorted_idx
+
 if __name__=='__main__':
-    from . import FlagReranker
-    model_name_or_path='/data2/OpenLLMs/bge-reranker-base'
-    model=FlagReranker(
-        model_name_or_path,use_fp16=True,devices=['cuda:1','cuda:0'], normalize=True)
+    # from . import FlagReranker
+    # model_name_or_path='/data2/OpenLLMs/bge-reranker-base'
+    # model=FlagReranker(
+    #     model_name_or_path,use_fp16=True,devices=['cuda:1','cuda:0'], normalize=True)
     
-    qa=['what is love?','love is ...']
-    print(model.compute_score(qa),)
+    # qa=['what is love?','love is ...']
+    # print(model.compute_score(qa),)
     
+    model_path='/data2/OpenLLMs/bge-reranker-base'
+    args=AbsInferenceArguments(
+        model_name_or_path=model_path,
+        onnx_model_path='/data2/OpenLLMs/bge-reranker-base/onnx/model.onnx',
+        trt_model_path='/data2/OpenLLMs/bge-reranker-base/trt/model.trt',
+        infer_mode='normal',
+        infer_device='cuda:0',
+        infer_batch_size=16
+    )
+    
+    
+    # 1. test conver_to_onnx
+    # BaseRerankerInferenceEngine.convert_to_onnx(args.model_name_or_path, args.onnx_model_path)
+    
+    s='This is a sentence.'
+    s2='Is this a sentence?'
+    s_pairs=(s, s2)
+    # 2. test normal session
+    # args.infer_mode='normal'
+    # inference_engine=BaseRerankerInferenceEngine(args)
+    # score=inference_engine.inference(s_pairs)
+    # print(score)
+    # # 3. test onnx session
+    
+    # args.infer_mode='onnx'
+    # inference_engine_onnx=BaseRerankerInferenceEngine(args)
+    # score=inference_engine_onnx.inference(s_pairs, normalize=False)
+    # print(score)
+    
+    # 4. test tensorrt session
+    args.infer_mode='tensorrt'
+    inference_engine_tensorrt=BaseRerankerInferenceEngine(args)
+    score=inference_engine_tensorrt.inference(s_pairs, normalize=False)
+    print(score)

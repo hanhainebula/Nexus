@@ -442,42 +442,53 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         return NormalSession(self.model)
 
     def get_onnx_session(self) -> ort.InferenceSession:
+        providers = ['CPUExecutionProvider'] if self.config['infer_device']=='cpu' else ['CUDAExecutionProvider']
         onnx_model_path = self.config["onnx_model_path"]
-        return ort.InferenceSession(onnx_model_path)
+        return ort.InferenceSession(onnx_model_path, providers=providers)
 
     def get_tensorrt_session(self) -> trt.ICudaEngine:
+        device=self.config['infer_device']
+        if not isinstance(device, int):
+            device=0
+        cuda.Device(device).make_context()
         engine_file_path=self.config['trt_model_path']
-        if os.path.exists(engine_file_path):
-        # If a serialized engine exists, use it instead of building an engine.
-            print("Reading engine from file {}".format(engine_file_path))
-            TRT_LOGGER = trt.Logger()
-            with open(engine_file_path, "rb") as f, trt.Runtime(TRT_LOGGER) as runtime:
-                return runtime.deserialize_cuda_engine(f.read())
-        else:
-            return self.build_trt_engine()
+        TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+        with open(engine_file_path, 'rb') as f, trt.Runtime(TRT_LOGGER) as runtime:
+            return runtime.deserialize_cuda_engine(f.read())
 
 
     @classmethod
-    def convert_to_onnx(cls, model_name_or_path: str = None, onnx_model_path: str = None, opset_version = 14):
+    def convert_to_onnx(cls, model_name_or_path: str = None, onnx_model_path: str = None, opset_version = 14, use_fp16=False):
         # model = AutoModel.from_pretrained(model_name_or_path)
         # tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         print(model_name_or_path)
+        os.makedirs(os.path.dirname(onnx_model_path), exist_ok=True)
         # pdb.set_trace()
-        base_model=BaseEmbedder(model_name_or_path=model_name_or_path)
+        base_model=BaseEmbedder(model_name_or_path=model_name_or_path, use_fp16=False)
         model=base_model.model
         tokenizer=base_model.tokenizer
-        dummy_input = tokenizer("This is a dummy input", return_tensors="pt")
+        dummy_input = tokenizer("This is a dummy input", return_tensors="pt", padding=True)
+        dummy_input = (torch.LongTensor(dummy_input['input_ids']).view(1, -1), torch.LongTensor(dummy_input['attention_mask']).view(1, -1), torch.LongTensor(dummy_input['token_type_ids']).view(1, -1))
+        print(dummy_input[0].shape)
+        if use_fp16:
+            model = model.half()  # 将模型权重转换为 FP16
+            dummy_input = {key: value.half() for key, value in dummy_input.items()}  # 将输入数据转换为 FP16
 
         torch.onnx.export(
             model,  
-            (dummy_input['input_ids'],),  
+            dummy_input,  
             onnx_model_path,  
             opset_version=opset_version,  # ONNX opset 版本
-            input_names=['input_ids'],  
+            input_names=['input_ids', 'attention_mask', 'token_type_ids'],  
             output_names=['output'],  
-            dynamic_axes={'input_ids': {0: 'batch_size'}, 'output': {0: 'batch_size'}}  
+            dynamic_axes={'input_ids': {0: 'batch_size', 1: 'token_length'},'token_type_ids': {0: 'batch_size', 1: 'token_length'},'attention_mask': {0: 'batch_size', 1: 'token_length'}, 'output':{0: 'batch_size', 1: 'token_length'}}  
         )
         print(f"Model has been converted to ONNX and saved at {onnx_model_path}")
+
+    @classmethod
+    def convert_to_tensorrt(cls, onnx_model_path: str= None, trt_model_path: str = None):
+        # use trtexec
+        pass
 
     def inference(
         self,
@@ -511,56 +522,79 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         else:
             raise ValueError(f"Unsupported session type: {session_type}")
 
-    def _inference_tensorrt(self, inputs, *args, **kwargs):
-        tokenizer = self.model.tokenizer
-        encoded_inputs = tokenizer(inputs, return_tensors="pt", padding=True, truncation=True)
-        input_ids = encoded_inputs['input_ids'].cuda().cpu().numpy().astype(np.float32) 
-        TRT_LOGGER = trt.Logger()
-        with self.session.create_execution_context() as context:
-            # Allocate buffers
-            input_shape = input_ids.shape
-            input_size = trt.volume(input_shape) * trt.float32.itemsize
-            output_shape=tuple([input_shape[0], input_shape[1], 768])
-            output_size = trt.volume(output_shape) * trt.float32.itemsize
-
-            d_input = cuda.mem_alloc(input_size)
-            d_output = cuda.mem_alloc(output_size)
-
-            bindings = [int(d_input), int(d_output)]
-            input_binding_name = self.session.get_binding_name(0)  # 获取输入绑定名称
-            context.set_input_shape(input_binding_name, input_shape)
-            # Create a stream in which to copy inputs/outputs and run inference.
+    def _inference_tensorrt(self, inputs,normalize=True, *args, **kwargs):
+        # prepaer inputs first
+        if isinstance(inputs, str):
+            inputs=[inputs]
+        tokenizer=self.model.tokenizer        
+        encoded_inputs= tokenizer(inputs, return_tensors="np", padding=True, truncation=True, max_length=512)
+        inputs={
+            'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
+            'attention_mask':encoded_inputs['attention_mask'],
+            'token_type_ids':encoded_inputs['token_type_ids']
+        }
+        engine=self.session
+        with engine.create_execution_context() as context:
             stream = cuda.Stream()
+            bindings = [0] * engine.num_io_tensors
 
-            # Transfer input data to the GPU.
-            cuda.memcpy_htod_async(d_input, input_ids, stream)
+            input_memory = []
+            output_buffers = {}
+            for i in range(engine.num_io_tensors):
+                tensor_name = engine.get_tensor_name(i)
+                dtype = trt.nptype(engine.get_tensor_dtype(tensor_name))
+                if engine.get_tensor_mode(tensor_name) == trt.TensorIOMode.INPUT:
+                    if -1 in tuple(engine.get_tensor_shape(tensor_name)):  # dynamic
+                        # context.set_input_shape(tensor_name, tuple(engine.get_tensor_profile_shape(tensor_name, 0)[2]))
+                        context.set_input_shape(tensor_name, tuple(inputs[tensor_name].shape))
+                    input_mem = cuda.mem_alloc(inputs[tensor_name].nbytes)
+                    bindings[i] = int(input_mem)
+                    context.set_tensor_address(tensor_name, int(input_mem))
+                    cuda.memcpy_htod_async(input_mem, inputs[tensor_name], stream)
+                    input_memory.append(input_mem)
+                else:  # output
+                    shape = tuple(context.get_tensor_shape(tensor_name))
+                    output_buffer = np.empty(shape, dtype=dtype)
+                    output_buffer = np.ascontiguousarray(output_buffer)
+                    output_memory = cuda.mem_alloc(output_buffer.nbytes)
+                    bindings[i] = int(output_memory)
+                    context.set_tensor_address(tensor_name, int(output_memory))
+                    output_buffers[tensor_name] = (output_buffer, output_memory)
 
-            # Run inference.
             context.execute_async_v3(stream_handle=stream.handle)
-
-            # Transfer predictions back from the GPU.
-            output_data = np.empty(output_shape, dtype=np.float32)
-            cuda.memcpy_dtoh_async(output_data, d_output, stream)
-
-            # Synchronize the stream
             stream.synchronize()
 
-            return output_data
+            for tensor_name, (output_buffer, output_memory) in output_buffers.items():
+                cuda.memcpy_dtoh(output_buffer, output_memory)
+        
+        output=output_buffers['output'][0]
+        cls_output=output[:, 0, :]
+        if normalize:
+            cls_output= cls_output / np.linalg.norm(cls_output, axis = -1, keepdims = True)
+        
+        return cls_output
 
-    def _inference_onnx(self, inputs, *args, **kwargs):
+    def _inference_onnx(self, inputs, normalize=True,*args, **kwargs):
+        if isinstance(inputs, str):
+            inputs=[inputs]
+            
         tokenizer = self.model.tokenizer
-        encoded_inputs = tokenizer(inputs, return_tensors="np", padding=True, truncation=True)
-        input_ids = encoded_inputs['input_ids']
-
-        input_feed = {self.session.get_inputs()[0].name: input_ids}
+        encoded_inputs = tokenizer(inputs, return_tensors="np", padding=True,  truncation=True, max_length=512)
+        # input_ids = encoded_inputs['input_ids']
+        input_feed={
+            'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
+            'attention_mask':encoded_inputs['attention_mask'],
+            'token_type_ids':encoded_inputs['token_type_ids']
+        }
 
         outputs = self.session.run(None, input_feed)
         embeddings = outputs[0] # (1, 9, 768)
+        print(embeddings.shape)
         cls_emb=embeddings[:, 0, :]
         cls_emb=cls_emb.squeeze()
         
-        if kwargs.get('normalize', False) == True:
-            norm = np.linalg.norm(cls_emb)
+        if normalize == True:
+            norm = np.linalg.norm(cls_emb, axis=-1, keepdims=True)
             normalized_cls_emb = cls_emb / norm
             return normalized_cls_emb
         
@@ -572,63 +606,13 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         outputs = self.session.run([self.session.get_outputs()[0].name], input_feed)
         embeddings = outputs[0]
         return embeddings
-    
-    def build_trt_engine(self, onnx_model_path: str = None, trt_model_path : str = None):
-        EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-        TRT_LOGGER = trt.Logger()
-        onnx_file_path=self.config['onnx_model_path'] if onnx_model_path==None else onnx_model_path
-        engine_file_path= self.config['trt_model_path'] if trt_model_path == None else trt_model_path
-        """Takes an ONNX file and creates a TensorRT engine to run inference with"""
-        with trt.Builder(TRT_LOGGER) as builder, builder.create_network(
-            EXPLICIT_BATCH
-        ) as network, builder.create_builder_config() as config, trt.OnnxParser(
-            network, TRT_LOGGER
-        ) as parser, trt.Runtime(
-            TRT_LOGGER
-        ) as runtime:
-            config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 32)
-            
-            # Define optimization profile
-            profile = builder.create_optimization_profile()
-            profile.set_shape("input_ids", (1, 9), (1, 9), (1, 9))  # 修改为与输入张量一致的维度
-            config.add_optimization_profile(profile)
-            
-            # Parse model file
-            if not os.path.exists(onnx_file_path):
-                print(
-                    "ONNX file {} not found, please run yolov3_to_onnx.py first to generate it.".format(onnx_file_path)
-                )
-                exit(0)
-            print("Loading ONNX file from path {}...".format(onnx_file_path))
-            with open(onnx_file_path, "rb") as model:
-                print("Beginning ONNX file parsing")
-                if not parser.parse(model.read()):
-                    print("ERROR: Failed to parse the ONNX file.")
-                    for error in range(parser.num_errors()):
-                        print(parser.get_error(error))
-                    return None
-
-            print("Completed parsing of ONNX file")
-            print("Building an engine from file {}; this may take a while...".format(onnx_file_path))
-            plan = builder.build_serialized_network(network, config)
-            if plan is None:
-                print("Failed to build the serialized network!")
-                return None
-            engine = runtime.deserialize_cuda_engine(plan)
-            if engine is None:
-                print("Failed to deserialize the CUDA engine!")
-                return None
-            print("Completed creating Engine")
-            with open(engine_file_path, "wb") as f:
-                f.write(plan)
-            return engine
 
 
 if __name__=='__main__':
     import pdb
     # sentences_1 = ["样例数据-1", "样例数据-2"]
     # sentences_2 = ["样例数据-3", "样例数据-4"]
-    model = BaseEmbedder(model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5', query_instruction_for_retrieval="为这个句子生成表示以用于检索相关文章：", use_fp16=True, devices=['cuda:1','cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
+    model = BaseEmbedder(model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5', use_fp16=True, devices=['cuda:1','cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
     # pdb.set_trace()
     # embeddings_1 = model.encode(sentences_1)
     # embeddings_2 = model.encode(sentences_2)
@@ -649,42 +633,41 @@ if __name__=='__main__':
     """
     below test BaseEmbedderInferenceEngine
     """
-    # 1. convert model to onnx
     model_path='/data2/OpenLLMs/bge-base-zh-v1.5'
     args=AbsInferenceArguments(
         model_name_or_path=model_path,
         onnx_model_path='/data2/OpenLLMs/bge-base-zh-v1.5/onnx/model.onnx',
         trt_model_path='/data2/OpenLLMs/bge-base-zh-v1.5/trt/model.trt',
         infer_mode='tensorrt',
-        infer_device='cuda:0',
+        infer_device=5,
         infer_batch_size=16
     )
-    
-    
-    
-    # print('test convert_to_onnx')
-    # BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
     s='This is a sentence.'
     s2='Is this a sentence?'
-    # # 2. test normal session
+    
+    # 1. convert model to onnx
+    # BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
+    
+    # 2. test normal session
     args.infer_mode='normal'
     inference_engine=BaseEmbedderInferenceEngine(args)
-    s_e=inference_engine.inference(s)
-    s2_e=inference_engine.inference(s2)
-    print(f'test normal: {s_e @ s2_e.T}')
+    s_e_norm=inference_engine.inference(s)
     
-    # 3. test onnx session
-    args.infer_mode='onnx'
-    inference_engine_onnx=BaseEmbedderInferenceEngine(args)
-    s_e=inference_engine_onnx.inference(s, normalize=True)
-    s2_e=inference_engine_onnx.inference(s2, normalize=True)
-    print(f'test onnx: {s_e @ s2_e.T}')
+    # # 3. test onnx session
+    # args.infer_mode = 'onnx'
+    # inference_engine_onnx = BaseEmbedderInferenceEngine(args)
+    # e_onnx = inference_engine_onnx.inference([s,s2], normalize=True)
+    # s_e_onnx=e_onnx[0]
+    # # s2_e_onnx=e_onnx[1]
+    # print(s_e @ s_e_onnx.T)
+    # print(s2_e @ s2_e_onnx.T)
     
     # 4. test tensorrt session
     args.infer_mode='tensorrt'
     inference_engine_tensorrt=BaseEmbedderInferenceEngine(args)
-    s_e=inference_engine_tensorrt.inference(s)
-    s2_e=inference_engine_tensorrt.inference(s2)
+    s_e_trt=inference_engine_tensorrt.inference(s)
+    # s2_e=inference_engine_tensorrt.inference(s2)
     # print(f'test tensorrt: {s_e @ s2_e.T}')
-    print(s_e.shape)
+    pdb.set_trace()
+    print(s_e_norm @ s_e_trt.T)
     
