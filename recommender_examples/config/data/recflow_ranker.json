@@ -4,7 +4,7 @@
     "url": "hdfs://node1:8020/recstudio/recflow/realshow",
     "item_col": "video_id",
     "context_features": ["user_id", "device_id", "age", "gender", "province"],
-    "item_features": ["video_id", "author_id", " category_level_two", "upload_type", "category_level_one"],
+    "item_features": ["video_id", "author_id", "category_level_two", "upload_type", "category_level_one"],
     "labels": ["like"],
     "user_sequential_info": {
         "url": "hdfs://node1:8020/recstudio/recflow/seq_effective_50",
@@ -22,7 +22,7 @@
         "video_id": 82216301,
         "author_id": 33474011,
         "category_level_one": 140,
-        " category_level_two": 784,
+        "category_level_two": 784,
         "upload_type": 40
     },
     "train_settings": {

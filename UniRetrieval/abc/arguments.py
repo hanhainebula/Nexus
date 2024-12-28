@@ -41,7 +41,6 @@ class AbsArguments:
                 if isinstance(_dict[_field.name], list):
                     _dict[_field.name] = [_field.type(x) for x in _dict[_field.name]]
                 else:
-                    
                     _dict[_field.name] = _field.type(_dict[_field.name])
         return cls(**_dict)
 
