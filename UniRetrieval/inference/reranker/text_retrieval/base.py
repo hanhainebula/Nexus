@@ -367,9 +367,9 @@ class NormalSession():
             name='score'
         )]
 
-    def run(self, output_names, input_feed, batch_size=10, run_options=None):
+    def run(self, output_names, input_feed, normalize=True, batch_size=10, run_options=None):
         sentence_pairs=input_feed['sentence_pairs']            
-        score = self.model.compute_score(sentence_pairs, batch_size=batch_size)
+        score = self.model.compute_score(sentence_pairs, normalize=normalize, batch_size=batch_size)
         if not isinstance(score, list):
             score = [score]    
         return score
@@ -562,10 +562,10 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
         return all_scores
 
-    def _inference_normal(self, inputs, batch_size=16, *args, **kwargs):
+    def _inference_normal(self, inputs, normalize=True, batch_size=16, *args, **kwargs):
         input_feed = {self.session.get_inputs()[0].name: inputs}
 
-        outputs = self.session.run([self.session.get_outputs()[0].name], batch_size = batch_size, input_feed=input_feed)
+        outputs = self.session.run([self.session.get_outputs()[0].name], batch_size = batch_size, normalize=normalize,input_feed=input_feed)
         scores = outputs
         return scores
 

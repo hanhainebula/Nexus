@@ -416,11 +416,14 @@ class NormalSession():
             name='embeddings'
         )]
 
-    def run(self, output_names, input_feed, run_options=None):
+    def run(self, output_names, input_feed, batch_size=10, run_options=None):
         sentences=input_feed['sentences']            
-        embeddings = self.model.encode(sentences)
-                    
-        return [embeddings]
+        embeddings = self.model.encode(sentences, batch_size=batch_size)
+        
+        if not isinstance(embeddings, list):
+            embeddings = [embeddings]
+            
+        return embeddings
         
     
 
@@ -450,7 +453,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         device=self.config['infer_device']
         if not isinstance(device, int):
             device=0
-        cuda.Device(device).make_context()
+        # cuda.Device(device).make_context()
         engine_file_path=self.config['trt_model_path']
         TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
         with open(engine_file_path, 'rb') as f, trt.Runtime(TRT_LOGGER) as runtime:
@@ -522,81 +525,91 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         else:
             raise ValueError(f"Unsupported session type: {session_type}")
 
-    def _inference_tensorrt(self, inputs,normalize=True, *args, **kwargs):
+    def _inference_tensorrt(self, inputs, normalize=True, batch_size=10, *args, **kwargs):
         # prepaer inputs first
         if isinstance(inputs, str):
             inputs=[inputs]
+            
         tokenizer=self.model.tokenizer        
-        encoded_inputs= tokenizer(inputs, return_tensors="np", padding=True, truncation=True, max_length=512)
-        inputs={
-            'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
-            'attention_mask':encoded_inputs['attention_mask'],
-            'token_type_ids':encoded_inputs['token_type_ids']
-        }
         engine=self.session
-        with engine.create_execution_context() as context:
-            stream = cuda.Stream()
-            bindings = [0] * engine.num_io_tensors
+        all_outputs=[]
 
-            input_memory = []
-            output_buffers = {}
-            for i in range(engine.num_io_tensors):
-                tensor_name = engine.get_tensor_name(i)
-                dtype = trt.nptype(engine.get_tensor_dtype(tensor_name))
-                if engine.get_tensor_mode(tensor_name) == trt.TensorIOMode.INPUT:
-                    if -1 in tuple(engine.get_tensor_shape(tensor_name)):  # dynamic
-                        # context.set_input_shape(tensor_name, tuple(engine.get_tensor_profile_shape(tensor_name, 0)[2]))
-                        context.set_input_shape(tensor_name, tuple(inputs[tensor_name].shape))
-                    input_mem = cuda.mem_alloc(inputs[tensor_name].nbytes)
-                    bindings[i] = int(input_mem)
-                    context.set_tensor_address(tensor_name, int(input_mem))
-                    cuda.memcpy_htod_async(input_mem, inputs[tensor_name], stream)
-                    input_memory.append(input_mem)
-                else:  # output
-                    shape = tuple(context.get_tensor_shape(tensor_name))
-                    output_buffer = np.empty(shape, dtype=dtype)
-                    output_buffer = np.ascontiguousarray(output_buffer)
-                    output_memory = cuda.mem_alloc(output_buffer.nbytes)
-                    bindings[i] = int(output_memory)
-                    context.set_tensor_address(tensor_name, int(output_memory))
-                    output_buffers[tensor_name] = (output_buffer, output_memory)
+        for i in range(0, len(inputs), batch_size):
+            batch_inputs=inputs[i: i+batch_size]
+            
+            encoded_inputs= tokenizer(batch_inputs, return_tensors="np", padding=True, truncation=True, max_length=512)
+            inputs={
+                'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
+                'attention_mask':encoded_inputs['attention_mask'],
+                'token_type_ids':encoded_inputs['token_type_ids']
+            }
+            with engine.create_execution_context() as context:
+                stream = cuda.Stream()
+                bindings = [0] * engine.num_io_tensors
 
-            context.execute_async_v3(stream_handle=stream.handle)
-            stream.synchronize()
+                input_memory = []
+                output_buffers = {}
+                for i in range(engine.num_io_tensors):
+                    tensor_name = engine.get_tensor_name(i)
+                    dtype = trt.nptype(engine.get_tensor_dtype(tensor_name))
+                    if engine.get_tensor_mode(tensor_name) == trt.TensorIOMode.INPUT:
+                        if -1 in tuple(engine.get_tensor_shape(tensor_name)):  # dynamic
+                            # context.set_input_shape(tensor_name, tuple(engine.get_tensor_profile_shape(tensor_name, 0)[2]))
+                            context.set_input_shape(tensor_name, tuple(inputs[tensor_name].shape))
+                        input_mem = cuda.mem_alloc(inputs[tensor_name].nbytes)
+                        bindings[i] = int(input_mem)
+                        context.set_tensor_address(tensor_name, int(input_mem))
+                        cuda.memcpy_htod_async(input_mem, inputs[tensor_name], stream)
+                        input_memory.append(input_mem)
+                    else:  # output
+                        shape = tuple(context.get_tensor_shape(tensor_name))
+                        output_buffer = np.empty(shape, dtype=dtype)
+                        output_buffer = np.ascontiguousarray(output_buffer)
+                        output_memory = cuda.mem_alloc(output_buffer.nbytes)
+                        bindings[i] = int(output_memory)
+                        context.set_tensor_address(tensor_name, int(output_memory))
+                        output_buffers[tensor_name] = (output_buffer, output_memory)
 
-            for tensor_name, (output_buffer, output_memory) in output_buffers.items():
-                cuda.memcpy_dtoh(output_buffer, output_memory)
-        
-        output=output_buffers['output'][0]
-        cls_output=output[:, 0, :]
+                context.execute_async_v3(stream_handle=stream.handle)
+                stream.synchronize()
+
+                for tensor_name, (output_buffer, output_memory) in output_buffers.items():
+                    cuda.memcpy_dtoh(output_buffer, output_memory)
+            
+            output=output_buffers['output'][0]
+            cls_output=output[:, 0, :].squeeze()
+            all_outputs.extend(cls_output)
+            
         if normalize:
-            cls_output= cls_output / np.linalg.norm(cls_output, axis = -1, keepdims = True)
+            all_outputs= all_outputs / np.linalg.norm(all_outputs, axis = -1, keepdims = True)
         
-        return cls_output
+        return all_outputs
 
-    def _inference_onnx(self, inputs, normalize=True,*args, **kwargs):
+    def _inference_onnx(self, inputs, normalize = True, batch_size = 10, *args, **kwargs):
         if isinstance(inputs, str):
             inputs=[inputs]
             
         tokenizer = self.model.tokenizer
-        encoded_inputs = tokenizer(inputs, return_tensors="np", padding=True,  truncation=True, max_length=512)
-        # input_ids = encoded_inputs['input_ids']
-        input_feed={
-            'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
-            'attention_mask':encoded_inputs['attention_mask'],
-            'token_type_ids':encoded_inputs['token_type_ids']
-        }
+        all_outputs=[]
+        for i in range(0, len(inputs), batch_size):
+            batch_inputs= inputs[i:i+batch_size]
+            encoded_inputs = tokenizer(batch_inputs, return_tensors="np", padding=True,  truncation=True, max_length=512)
+            # input_ids = encoded_inputs['input_ids']
+            input_feed={
+                'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
+                'attention_mask':encoded_inputs['attention_mask'],
+                'token_type_ids':encoded_inputs['token_type_ids']
+            }
 
-        outputs = self.session.run(None, input_feed)
-        embeddings = outputs[0] # (1, 9, 768)
-        print(embeddings.shape)
-        cls_emb=embeddings[:, 0, :]
-        cls_emb=cls_emb.squeeze()
+            outputs = self.session.run(None, input_feed)
+            embeddings = outputs[0] # (1, 9, 768)
+            cls_emb=embeddings[:, 0, :]
+            cls_emb=cls_emb.squeeze()
+            all_outputs.extend(cls_emb)
         
         if normalize == True:
-            norm = np.linalg.norm(cls_emb, axis=-1, keepdims=True)
-            normalized_cls_emb = cls_emb / norm
-            return normalized_cls_emb
+            all_outputs = all_outputs / np.linalg.norm(all_outputs, axis=-1, keepdims=True)
+            return all_outputs
         
         return cls_emb
 
@@ -639,35 +652,41 @@ if __name__=='__main__':
         onnx_model_path='/data2/OpenLLMs/bge-base-zh-v1.5/onnx/model.onnx',
         trt_model_path='/data2/OpenLLMs/bge-base-zh-v1.5/trt/model.trt',
         infer_mode='tensorrt',
-        infer_device=5,
+        infer_device=0,
         infer_batch_size=16
     )
-    s='This is a sentence.'
-    s2='Is this a sentence?'
     
+    sentences = [
+        "The quick brown fox jumps over the lazy dog.",
+        "Artificial intelligence is transforming the world.",
+        "The Eiffel Tower is located in Paris, France.",
+        "Python is a popular programming language.",
+        "The Great Wall of China is one of the Seven Wonders of the World.",
+        "Space exploration has led to many scientific discoveries.",
+        "Climate change is a pressing global issue.",
+        "The Mona Lisa is a famous painting by Leonardo da Vinci.",
+        "Electric cars are becoming more common.",
+        "The human brain is an incredibly complex organ."
+    ]
     # 1. convert model to onnx
     # BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
-    
+    sentences='aaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     # 2. test normal session
     args.infer_mode='normal'
     inference_engine=BaseEmbedderInferenceEngine(args)
-    s_e_norm=inference_engine.inference(s)
+    s_e_norm=inference_engine.inference(sentences, batch_size=10, normalize=True)
     
-    # # 3. test onnx session
-    # args.infer_mode = 'onnx'
-    # inference_engine_onnx = BaseEmbedderInferenceEngine(args)
-    # e_onnx = inference_engine_onnx.inference([s,s2], normalize=True)
-    # s_e_onnx=e_onnx[0]
-    # # s2_e_onnx=e_onnx[1]
-    # print(s_e @ s_e_onnx.T)
-    # print(s2_e @ s2_e_onnx.T)
+    # 3. test onnx session
+    args.infer_mode = 'onnx'
+    inference_engine_onnx = BaseEmbedderInferenceEngine(args)
+    s_e_onnx = inference_engine_onnx.inference(sentences, normalize=True)
+
     
     # 4. test tensorrt session
     args.infer_mode='tensorrt'
     inference_engine_tensorrt=BaseEmbedderInferenceEngine(args)
-    s_e_trt=inference_engine_tensorrt.inference(s)
+    s_e_trt=inference_engine_tensorrt.inference(sentences, normalize=True)
     # s2_e=inference_engine_tensorrt.inference(s2)
     # print(f'test tensorrt: {s_e @ s2_e.T}')
     pdb.set_trace()
-    print(s_e_norm @ s_e_trt.T)
     
