@@ -1,5 +1,6 @@
 import os
 from UniRetrieval.abc.training.embedder import AbsEmbedderTrainer
+import torch
 
 class RetrieverTrainer(AbsEmbedderTrainer):
     def __init__(self, model, train=True, *args, **kwargs):
@@ -26,4 +27,6 @@ class RetrieverTrainer(AbsEmbedderTrainer):
             unwrapped_model = self.accelerator.unwrap_model(self.model)
             unwrapped_model.save(checkpoint_dir)
             print(f"Model saved in {checkpoint_dir}.")
+            
+    
         

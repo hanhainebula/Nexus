@@ -6,6 +6,8 @@ from .modeling import MLPRetriever
 from .trainer import RetrieverTrainer
 from .datasets import AbsRecommenderEmbedderCollator, ConfigProcessor, DailyDataset, DailyDataIterator, DataAttr4Model
 from UniRetrieval.modules.optimizer import get_lr_scheduler, get_optimizer
+from UniRetrieval.training.embedder.recommendation.callback import ItemVectorCallback
+
 
 class RetrieverRunner(AbsEmbedderRunner):
     """
@@ -59,6 +61,7 @@ class RetrieverRunner(AbsEmbedderRunner):
             data_collator=self.data_collator,
             optimizers=[self.optimizer, self.lr_scheduler]
         )
+        trainer.add_callback(ItemVectorCallback(trainer=trainer))
         # if self.data_args.same_dataset_within_batch:
         #     trainer.add_callback(EmbedderTrainerCallbackForDataRefresh(self.train_dataset))
         return trainer

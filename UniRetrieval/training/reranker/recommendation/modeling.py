@@ -164,7 +164,7 @@ class BaseRanker(AbsRerankerModel):
                 # B, N, * -> BxN, *
                 candidates[k] = v.view(-1, *v.shape[2:])
             context_input.update(candidates)    # {key: BxN, *}
-            output = self.score(context_input, *args, **kwargs)
+            output = self.compute_score(context_input, *args, **kwargs)
             scores = output.score.view(batch_size, num_candidates)  # [B, N]
         else:
             # use loop to process each candidate
@@ -173,7 +173,7 @@ class BaseRanker(AbsRerankerModel):
                 candidate = {k: v[:, i] for k, v in candidates.items()}
                 new_batch = dict(**context_input)
                 new_batch.update(candidate)
-                output = self.score(new_batch, *args, **kwargs)
+                output = self.compute_score(new_batch, *args, **kwargs)
                 scores.append(output.score)
             scores = torch.stack(scores, dim=-1)    # [B, N]
         
@@ -201,13 +201,14 @@ class BaseRanker(AbsRerankerModel):
         config_path = os.path.join(checkpoint_dir, "model_config.json")
         with open(config_path, "r", encoding="utf-8") as config_path:
             config_dict = json.load(config_path)
-        data_attr = DataAttr4Model.from_dict(config_dict['data_attr'])
+        data_config = DataAttr4Model.from_dict(config_dict['data_config'])
         model_cls = get_model_cls(config_dict['model_type'], config_dict['model_name'])
-        del config_dict['data_attr'], config_dict['model_type'], config_dict['model_name']
+        del config_dict['data_config'], config_dict['model_type'], config_dict['model_name']
+        
         model_config = ModelArguments.from_dict(config_dict)
         ckpt_path = os.path.join(checkpoint_dir, "model.pt")
         state_dict = torch.load(ckpt_path, weights_only=True)
-        model = model_cls(data_attr, model_config)
+        model = model_cls(data_config, model_config)
         if "item_vectors" in state_dict:
             model.item_vectors = state_dict["item_vectors"]
             del state_dict['item_vectors']
@@ -226,9 +227,10 @@ class BaseRanker(AbsRerankerModel):
     def save_configurations(self, checkpoint_dir: str):
         path = os.path.join(checkpoint_dir, "model_config.json")
         config_dict = self.model_config.to_dict()
+        config_dict['model_name_or_path'] = checkpoint_dir
         config_dict['model_type'] = self.model_type
         config_dict['model_name'] = self.__class__.__name__
-        config_dict['data_attr'] = self.data_config.to_dict()
+        config_dict['data_config'] = self.data_config.to_dict()
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(config_dict, f, ensure_ascii=False, indent=2)
 

@@ -352,6 +352,10 @@ class DailyDataset(IterableDataset):
         """
         loader = DataLoader(self.item_feat_dataset, batch_size=item_batch_size)
         return loader
+    
+    
+    # TODO: 看一下要不要实现
+    # def __len__(self, ):
 
 
     def __iter__(self):

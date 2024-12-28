@@ -43,6 +43,7 @@ class BaseRetriever(AbsEmbedderModel):
         # from BaseModel
         self.data_config: DataAttr4Model = data_config
         self.model_config: ModelArguments = self.load_config(model_config)
+       
         super(BaseRetriever, self).__init__(*args, **kwargs)
         self.model_type = 'retriever'
         self.init_modules()
@@ -207,13 +208,13 @@ class BaseRetriever(AbsEmbedderModel):
         config_path = os.path.join(checkpoint_dir, "model_config.json")
         with open(config_path, "r", encoding="utf-8") as config_path:
             config_dict = json.load(config_path)
-        data_attr = DataAttr4Model.from_dict(config_dict['data_attr'])
+        data_config = DataAttr4Model.from_dict(config_dict['data_config'])
         model_cls = get_model_cls(config_dict['model_type'], config_dict['model_name'])
-        del config_dict['data_attr'], config_dict['model_type'], config_dict['model_name']
+        del config_dict['data_config'], config_dict['model_type'], config_dict['model_name']
         model_config = ModelArguments.from_dict(config_dict)
         ckpt_path = os.path.join(checkpoint_dir, "model.pt")
         state_dict = torch.load(ckpt_path, weights_only=True)
-        model = model_cls(data_attr, model_config)
+        model = model_cls(data_config, model_config)
         if "item_vectors" in state_dict:
             model.item_vectors = state_dict["item_vectors"]
             del state_dict['item_vectors']
@@ -232,9 +233,10 @@ class BaseRetriever(AbsEmbedderModel):
     def save_configurations(self, checkpoint_dir: str):
         path = os.path.join(checkpoint_dir, "model_config.json")
         config_dict = self.model_config.to_dict()
+        config_dict['model_name_or_path'] = checkpoint_dir
         config_dict['model_type'] = self.model_type
         config_dict['model_name'] = self.__class__.__name__
-        config_dict['data_attr'] = self.data_config.to_dict()
+        config_dict['data_config'] = self.data_config.to_dict()
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(config_dict, f, ensure_ascii=False, indent=2)
 
@@ -245,7 +247,7 @@ class BaseRetriever(AbsEmbedderModel):
 
 # 已经改过了，把代码放在modules里了
 class MLPRetriever(BaseRetriever):
-    def __init__(self, retriever_data_config, retriever_model_config, item_loader, *args, **kwargs):
+    def __init__(self, retriever_data_config, retriever_model_config, item_loader=None, *args, **kwargs):
         super().__init__(data_config=retriever_data_config, model_config=retriever_model_config, item_loader=item_loader, *args, **kwargs)
 
     def get_item_encoder(self):

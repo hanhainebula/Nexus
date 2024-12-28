@@ -63,3 +63,12 @@ class InferenceEngine(ABC):
         **kwargs
     ):
         pass
+    
+    def save_output_topk(self, output):
+        output_df = {}
+        output_df['_'.join(self.config['request_features'])] = \
+            self.infer_df.apply(lambda row : '_'.join([str(row[feat]) for feat in self.config['request_features']]),
+                                axis='columns')
+        output_df[self.feature_config['fiid']] = output.tolist()
+        output_df = pd.DataFrame(output_df)
+        output_df.to_feather(self.config['output_save_path'])
