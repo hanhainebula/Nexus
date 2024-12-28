@@ -17,7 +17,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from UniRetrieval.abc.inference import AbsReranker, InferenceEngine, AbsInferenceArguments
 
 def sigmoid(x):
-    return float(1 / (1 + np.exp(-x)))
+    return float(1 / (1 + np.exp(-x.item())))
 
 
 class BaseReranker(AbsReranker):
@@ -367,11 +367,12 @@ class NormalSession():
             name='score'
         )]
 
-    def run(self, output_names, input_feed, run_options=None):
+    def run(self, output_names, input_feed, batch_size=10, run_options=None):
         sentence_pairs=input_feed['sentence_pairs']            
-        score = self.model.compute_score(sentence_pairs)
-                    
-        return [score]
+        score = self.model.compute_score(sentence_pairs, batch_size=batch_size)
+        if not isinstance(score, list):
+            score = [score]    
+        return score
         
     
 
@@ -402,7 +403,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         device=self.config['infer_device']
         if not isinstance(device, int):
             device=0
-        cuda.Device(device).make_context()
+        # cuda.Device(device).make_context()
         engine_file_path=self.config['trt_model_path']
         TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
         with open(engine_file_path, 'rb') as f, trt.Runtime(TRT_LOGGER) as runtime:
@@ -479,54 +480,60 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             sentence_pairs=[sentence_pairs]
 
         self.tokenizer = self.model.tokenizer
+        engine=self.session
         queries= [s[0] for s in sentence_pairs]
         passages= [s[1] for s in sentence_pairs]
+        all_scores=[]
+        for i in trange(0, len(sentence_pairs), batch_size, desc='Batch encoding'):
+            batch_queries=queries[i:i+batch_size]
+            batch_passages=passages[i:i+batch_size]
                      
-        encoded_inputs=self.tokenizer(queries, passages, padding=True , return_tensors='np', truncation='only_second', max_length=512)
-        inputs={
-            'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
-            'attention_mask':encoded_inputs['attention_mask']
-            }
-        engine=self.session
-        with engine.create_execution_context() as context:
-            stream = cuda.Stream()
-            bindings = [0] * engine.num_io_tensors
+            encoded_inputs=self.tokenizer(batch_queries, batch_passages, padding=True , return_tensors='np', truncation='only_second', max_length=512)
+            inputs={
+                'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
+                'attention_mask':encoded_inputs['attention_mask']
+                }
+            with engine.create_execution_context() as context:
+                stream = cuda.Stream()
+                bindings = [0] * engine.num_io_tensors
 
-            input_memory = []
-            output_buffers = {}
-            for i in range(engine.num_io_tensors):
-                tensor_name = engine.get_tensor_name(i)
-                dtype = trt.nptype(engine.get_tensor_dtype(tensor_name))
-                if engine.get_tensor_mode(tensor_name) == trt.TensorIOMode.INPUT:
-                    if -1 in tuple(engine.get_tensor_shape(tensor_name)):  # dynamic
-                        # context.set_input_shape(tensor_name, tuple(engine.get_tensor_profile_shape(tensor_name, 0)[2]))
-                        context.set_input_shape(tensor_name, tuple(inputs[tensor_name].shape))
-                    input_mem = cuda.mem_alloc(inputs[tensor_name].nbytes)
-                    bindings[i] = int(input_mem)
-                    context.set_tensor_address(tensor_name, int(input_mem))
-                    cuda.memcpy_htod_async(input_mem, inputs[tensor_name], stream)
-                    input_memory.append(input_mem)
-                else:  # output
-                    shape = tuple(context.get_tensor_shape(tensor_name))
-                    output_buffer = np.empty(shape, dtype=dtype)
-                    output_buffer = np.ascontiguousarray(output_buffer)
-                    output_memory = cuda.mem_alloc(output_buffer.nbytes)
-                    bindings[i] = int(output_memory)
-                    context.set_tensor_address(tensor_name, int(output_memory))
-                    output_buffers[tensor_name] = (output_buffer, output_memory)
+                input_memory = []
+                output_buffers = {}
+                for i in range(engine.num_io_tensors):
+                    tensor_name = engine.get_tensor_name(i)
+                    dtype = trt.nptype(engine.get_tensor_dtype(tensor_name))
+                    if engine.get_tensor_mode(tensor_name) == trt.TensorIOMode.INPUT:
+                        if -1 in tuple(engine.get_tensor_shape(tensor_name)):  # dynamic
+                            # context.set_input_shape(tensor_name, tuple(engine.get_tensor_profile_shape(tensor_name, 0)[2]))
+                            context.set_input_shape(tensor_name, tuple(inputs[tensor_name].shape))
+                        input_mem = cuda.mem_alloc(inputs[tensor_name].nbytes)
+                        bindings[i] = int(input_mem)
+                        context.set_tensor_address(tensor_name, int(input_mem))
+                        cuda.memcpy_htod_async(input_mem, inputs[tensor_name], stream)
+                        input_memory.append(input_mem)
+                    else:  # output
+                        shape = tuple(context.get_tensor_shape(tensor_name))
+                        output_buffer = np.empty(shape, dtype=dtype)
+                        output_buffer = np.ascontiguousarray(output_buffer)
+                        output_memory = cuda.mem_alloc(output_buffer.nbytes)
+                        bindings[i] = int(output_memory)
+                        context.set_tensor_address(tensor_name, int(output_memory))
+                        output_buffers[tensor_name] = (output_buffer, output_memory)
 
-            context.execute_async_v3(stream_handle=stream.handle)
-            stream.synchronize()
+                context.execute_async_v3(stream_handle=stream.handle)
+                stream.synchronize()
 
-            for tensor_name, (output_buffer, output_memory) in output_buffers.items():
-                cuda.memcpy_dtoh(output_buffer, output_memory)
-        
-        scores=output_buffers['output'][0] # (bs, 1)
-
+                for tensor_name, (output_buffer, output_memory) in output_buffers.items():
+                    cuda.memcpy_dtoh(output_buffer, output_memory)
+            
+            scores=output_buffers['output'][0] # (bs, 1)
+            all_scores.extend(scores)
+            
         if normalize:
-            scores = [sigmoid(s) for s in scores]
+            all_scores = [sigmoid(s) for s in all_scores]
 
-        return scores
+        all_scores = [float(score) for score in all_scores]
+        return all_scores
     
     def _inference_onnx(self, sentence_pairs, batch_size = 16, normalize = True,  *args, **kwargs):
         self.tokenizer=self.model.tokenizer   
@@ -534,67 +541,34 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             sentence_pairs=[sentence_pairs]
         queries= [s[0] for s in sentence_pairs]
         passages= [s[1] for s in sentence_pairs]
-        encoded_inputs=self.tokenizer(queries, passages, padding=True , return_tensors='np', truncation='only_second', max_length=512)
-        input_feed={
-            'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
-            'attention_mask':encoded_inputs['attention_mask']
-            }
-        print(input_feed)
-        all_scores = self.session.run(None, input_feed)[0]
+        
+        all_scores=[]
+        for i in trange(0, len(sentence_pairs), batch_size, desc='Batch encoding'):
+            batch_queries = queries[i:i+batch_size]
+            batch_passages = passages[i:i+batch_size]
+            encoded_inputs=self.tokenizer(batch_queries, batch_passages, padding=True , return_tensors='np', truncation='only_second', max_length=512)
+            input_feed={
+                'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
+                'attention_mask':encoded_inputs['attention_mask']
+                }
+            batch_all_scores = self.session.run(None, input_feed)[0]
+            all_scores.extend(batch_all_scores)
 
-
+        
         if normalize:
-            all_scores = [sigmoid(score) for score in all_scores]
+            all_scores = [sigmoid(score[0]) for score in all_scores]
+
+        all_scores = [float(score) for score in all_scores]
 
         return all_scores
 
-    def _inference_normal(self, inputs, *args, **kwargs):
+    def _inference_normal(self, inputs, batch_size=16, *args, **kwargs):
         input_feed = {self.session.get_inputs()[0].name: inputs}
 
-        outputs = self.session.run([self.session.get_outputs()[0].name], input_feed)
-        scores = outputs[0]
+        outputs = self.session.run([self.session.get_outputs()[0].name], batch_size = batch_size, input_feed=input_feed)
+        scores = outputs
         return scores
 
-    def _prepare_inputs(self, sentence_pairs, batch_size,*args, **kwargs):
-        self.tokenizer = self.model.tokenizer
-        if isinstance(sentence_pairs[0], str):
-            sentence_pairs = [sentence_pairs]
-            
-        all_inputs = []
-        
-        for start_index in trange(0, len(sentence_pairs), batch_size, desc="pre tokenize", disable=len(sentence_pairs) < 128):
-            sentences_batch = sentence_pairs[start_index:start_index + batch_size]
-            queries = [s[0] for s in sentences_batch]
-            passages = [s[1] for s in sentences_batch]
-            queries_inputs_batch = self.tokenizer(
-                queries,
-                return_tensors=None,
-                add_special_tokens=False,
-                max_length=512,
-                truncation=True,
-                **kwargs
-            )['input_ids']
-            passages_inputs_batch = self.tokenizer(
-                passages,
-                return_tensors=None,
-                add_special_tokens=False,
-                max_length=512,
-                truncation=True,
-                **kwargs
-            )['input_ids']
-            for q_inp, d_inp in zip(queries_inputs_batch, passages_inputs_batch):
-                item = self.tokenizer.prepare_for_model(
-                    q_inp,
-                    d_inp,
-                    truncation='only_second',
-                    max_length=512,
-                    padding=False,
-                )
-                all_inputs.append(item)
-        # sort by length for less padding
-        length_sorted_idx = np.argsort([-len(x['input_ids']) for x in all_inputs])
-        all_inputs_sorted = [all_inputs[i] for i in length_sorted_idx]
-        return all_inputs_sorted, length_sorted_idx
 
 if __name__=='__main__':
     # from . import FlagReranker
@@ -619,23 +593,35 @@ if __name__=='__main__':
     # 1. test conver_to_onnx
     # BaseRerankerInferenceEngine.convert_to_onnx(args.model_name_or_path, args.onnx_model_path)
     
-    s='This is a sentence.'
-    s2='Is this a sentence?'
-    s_pairs=(s, s2)
+    qa_pairs = [
+        ("What is the capital of France?", "Paris is the capital and most populous city of France."),
+        ("Who wrote 'Pride and Prejudice'?", "'Pride and Prejudice' was written by Jane Austen."),
+        ("What is the largest planet in our solar system?", "Jupiter is the largest planet in our solar system."),
+        ("Who is the current president of the United States?", "The current president of the United States is Joe Biden."),
+        ("What is the chemical symbol for water?", "The chemical symbol for water is H2O."),
+        ("What is the speed of light?", "The speed of light is approximately 299,792 kilometers per second."),
+        ("Who painted the Mona Lisa?", "The Mona Lisa was painted by Leonardo da Vinci."),
+        ("What is the tallest mountain in the world?", "Mount Everest is the tallest mountain in the world."),
+        ("What is the smallest country in the world?", "Vatican City is the smallest country in the world."),
+        ("Who discovered penicillin?", "Penicillin was discovered by Alexander Fleming.")
+    ]
+    qa_pairs=("What is the capital of France?", "Paris is the capital and most populous city of France.")
     # 2. test normal session
-    # args.infer_mode='normal'
-    # inference_engine=BaseRerankerInferenceEngine(args)
-    # score=inference_engine.inference(s_pairs)
-    # print(score)
-    # # 3. test onnx session
+    args.infer_mode='normal'
+    inference_engine=BaseRerankerInferenceEngine(args)
+    score_normal=inference_engine.inference(qa_pairs, batch_size=5)
+    print(score_normal)
     
-    # args.infer_mode='onnx'
-    # inference_engine_onnx=BaseRerankerInferenceEngine(args)
-    # score=inference_engine_onnx.inference(s_pairs, normalize=False)
-    # print(score)
+    # 3. test onnx session
+    
+    args.infer_mode='onnx'
+    inference_engine_onnx=BaseRerankerInferenceEngine(args)
+    score_onnx=inference_engine_onnx.inference(qa_pairs, normalize=True, batch_size=5)
+    print(score_onnx)
     
     # 4. test tensorrt session
     args.infer_mode='tensorrt'
     inference_engine_tensorrt=BaseRerankerInferenceEngine(args)
-    score=inference_engine_tensorrt.inference(s_pairs, normalize=False)
-    print(score)
+    score_trt=inference_engine_tensorrt.inference(qa_pairs, normalize=True, batch_size=5)
+    print(score_trt)
+    
