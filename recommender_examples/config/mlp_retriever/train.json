@@ -1,10 +1,7 @@
 {
     "num_train_epochs": 1,
-    "train_batch_size": 1024,
-    "eval_batch_size": 100,
-    "item_batch_size": 4096,
-    "evaluation_strategy": "epoch",
-    "eval_interval": 1,
-    "output_dir": "/data1/home/recstudio/haoran/UniRetrieval/recommender_results",
+    "max_steps": 100,
+    "per_device_train_batch_size": 1024,
+    "output_dir": "/data1/home/recstudio/haoran/UniRetrieval/recommender_results/mlp_retriever",
     "checkpoint_steps": 150
 }

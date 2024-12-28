@@ -1,11 +1,9 @@
 {
     "num_train_epochs": 1,
-    "train_batch_size": 1024,
-    "eval_batch_size": 4096,
-    "output_dir": "/data1/home/recstudio/haoran/UniRetrieval/recommender_results",
+    "max_steps": 100,
+    "per_device_train_batch_size": 1024,
+    "output_dir": "/data1/home/recstudio/haoran/UniRetrieval/recommender_results/mlp_ranker",
     "checkpoint_steps": 3000,
-    "evaluation_strategy": "epoch",
-    "eval_interval": 1,
     "metrics": ["auc", "logloss"],
     "earlystop_metric": "auc"
 }

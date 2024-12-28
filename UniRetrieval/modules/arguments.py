@@ -1,12 +1,34 @@
 import json
-from typing import Dict, Any
-from typing import Dict, Tuple
+from typing import Dict, Any, Tuple
 import torch
-from accelerate import Accelerator
-from loguru import logger as loguru_logger
 import importlib
-from UniRetrieval.training.embedder.recommendation.arguments import TrainingArguments, DataAttr4Model
+from dataclasses import dataclass, field
+from UniRetrieval.abc.arguments import AbsArguments
 
+    
+class Statistics(AbsArguments):
+    @classmethod
+    def from_dict(cls, _dict: dict):
+        stat = cls()
+        for k, v in _dict.items():
+            setattr(stat, k.strip(), v)
+        return stat
+
+@dataclass
+class DataAttr4Model(AbsArguments):
+    """
+    Data attributes for a dataset. Serve for models
+    """
+    fiid: str
+    num_items: int  # number of candidate items instead of maximum id of items
+    stats: Statistics
+    flabels: str = field(default=None, metadata={"nargs": "+"})
+    features: str = field(default=None, metadata={"nargs": "+"})
+    context_features: str = field(default=None, metadata={"nargs": "+"})
+    item_features: str = field(default=None, metadata={"nargs": "+"})
+    seq_features: str = field(default=None, metadata={"nargs": "+"})
+    
+    
 def read_json(json_path: str) -> Dict[str, Any]:
     """Helper function to read a JSON file into a dictionary."""
     with open(json_path, 'r') as f:
@@ -57,13 +79,3 @@ def batch_to_device(batch, device) -> Dict:
         elif isinstance(value, dict):
             batch[key] = batch_to_device(value, device)
     return batch
-
-def get_logger(config: TrainingArguments):
-    accelerator = Accelerator()
-    logger = loguru_logger
-    if accelerator.is_local_main_process:
-        if config.logging_dir is not None:
-            logger.add(f"{config.logging_dir}/train.log", level='INFO')
-        elif config.checkpoint_dir is not None:
-            logger.add(f"{config.checkpoint_dir}/train.log", level='INFO')
-    return logger

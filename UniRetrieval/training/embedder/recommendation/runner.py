@@ -1,120 +1,68 @@
 import logging
-import os
 from typing import Tuple
-from transformers import (
-    AutoModel, AutoConfig,
-    AutoTokenizer, PreTrainedTokenizer
-)
-from transformers import set_seed, PreTrainedTokenizer
 from UniRetrieval.abc.training.embedder import AbsEmbedderRunner
-from .arguments import TrainingArguments, ModelArguments
-# TODO datasets部分暂未实现
-# from .datasets import 
+from .arguments import TrainingArguments, ModelArguments, DataArguments
 from .modeling import MLPRetriever
 from .trainer import RetrieverTrainer
+from .datasets import AbsRecommenderEmbedderCollator, ConfigProcessor, DailyDataset, DailyDataIterator, DataAttr4Model
+from UniRetrieval.modules.optimizer import get_lr_scheduler, get_optimizer
 
-logger = logging.getLogger(__name__)
-
-
-# TODO 暂未完成
 class RetrieverRunner(AbsEmbedderRunner):
     """
     Finetune Runner for base embedding models.
     """
-    
-    # TODO 这里args都又包装了一层
     def __init__(
         self,
-        model_args: ModelArguments,
-        # data_args: AbsTextEmbedderDataArguments,
-        data_args,
-        training_args: TrainingArguments
-    ):
-        self.model_args = model_args
-        self.data_args = data_args
-        self.training_args = training_args
-
-        if (
-            os.path.exists(training_args.output_dir)
-            and os.listdir(training_args.output_dir)
-            and training_args.do_train
-            and not training_args.overwrite_output_dir
-        ):
-            raise ValueError(
-                f"Output directory ({training_args.output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
-            )
-
-        # Setup logging
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-            datefmt="%m/%d/%Y %H:%M:%S",
-            level=logging.INFO if training_args.local_rank in [-1, 0] else logging.WARN,
-        )
-        logger.warning(
-            "Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s",
-            training_args.local_rank,
-            training_args.device,
-            training_args.n_gpu,
-            bool(training_args.local_rank != -1),
-            training_args.fp16,
-        )
-        logger.info("Training/evaluation parameters %s", training_args)
-        logger.info("Model parameters %s", model_args)
-        logger.info("Data parameters %s", data_args)
-
-        # Set seed
-        set_seed(training_args.seed)
-
+        model_config_path: str,
+        data_config_path: str,
+        train_config_path: str
+    ):        
+        self.model_config_path = model_config_path
+        self.data_config_path = data_config_path
+        self.train_config_path = train_config_path
+        
+        self.data_args = DataArguments.from_json(self.data_config_path)
+        self.model_args = ModelArguments.from_json(self.model_config_path)
+        self.training_args = TrainingArguments.from_json(self.train_config_path)
+        
+        self.train_dataset, self.cp_attr = self.load_dataset()
         self.model = self.load_model()
-        self.tokenizer=self.model.tokenizer
-        self.train_dataset = self.load_dataset()
         self.data_collator = self.load_data_collator()
         self.trainer = self.load_trainer()
 
+    def load_dataset(self) -> Tuple[DailyDataset, DataAttr4Model]:
+        cp = ConfigProcessor(self.data_config_path)
+        train_data_iterator = DailyDataIterator(cp.config, cp.train_files)
+        train_data = DailyDataset(train_data_iterator, shuffle=True, attrs=cp.attrs, preload=False)
+        return train_data, cp.attrs
     
     def load_model(self) -> MLPRetriever:
-        """Load tokenizer and model.
-
-        Returns:
-            AbsEmbedderModel: Tokenizer and model instances.
-        """
-        model=MLPRetriever(
-            self.data_args,
-            self.model_args,
-            model_type='retriever')
+        item_loader = self.train_dataset.get_item_loader(self.data_args.item_batch_size)
+        model = MLPRetriever(self.cp_attr, self.model_config_path, item_loader=item_loader)
         return model
 
-    def load_trainer(self) -> RetrieverTrainer:
-        """Load the trainer.
+    def load_trainer(self) -> RetrieverTrainer:    
+        
+        self.optimizer = get_optimizer(
+            self.training_args.optim,
+            self.model.parameters(),
+            lr=self.training_args.learning_rate,
+            weight_decay=self.training_args.weight_decay    
+        )
+        self.lr_scheduler = get_lr_scheduler()
+        # self.training_args.dataloader_num_workers = 0   # avoid multi-processing
 
-        Returns:
-            EncoderOnlyEmbedderTrainer: Loaded trainer instance.
-        """
-        # TODO data_collator和tokenizer
-    
         trainer = RetrieverTrainer(
             model=self.model,
             args=self.training_args,
             train_dataset=self.train_dataset,
             data_collator=self.data_collator,
-            tokenizer=self.tokenizer
+            optimizers=[self.optimizer, self.lr_scheduler]
         )
-
+        # if self.data_args.same_dataset_within_batch:
+        #     trainer.add_callback(EmbedderTrainerCallbackForDataRefresh(self.train_dataset))
         return trainer
-    
-    # def load_dataset(self) -> AbsTextEmbedderTrainDataset:
-    #     """Loads the training dataset based on data arguments.
 
-    #     Returns:
-    #         : The loaded dataset instance.
-    #     """
-    #     pass
-
-
-    # def load_data_collator(self) -> AbsTextEmbedderCollator:
-    #     """Loads the appropriate data collator.
-
-    #     Returns:
-    #         : Loaded data collator.
-    #     """
-    #     pass
+    def load_data_collator(self) -> AbsRecommenderEmbedderCollator:
+        collator = AbsRecommenderEmbedderCollator()
+        return collator
