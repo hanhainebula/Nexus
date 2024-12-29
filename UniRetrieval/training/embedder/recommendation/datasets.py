@@ -385,6 +385,7 @@ class DailyDataset(IterableDataset):
                     seq_data_dict = seq_df.loc[data_dict[self.seq_index_col].item()].to_dict()
                     data_dict['seq'] = seq_data_dict
                     # data_dict.update(seq_data_dict)
+                    
                 
                 yield (data_dict,)
                     
@@ -445,33 +446,6 @@ def get_datasets(config: Union[dict, str]):
     return (train_data, test_data), cp.attrs
 
 
-
-# test
-if __name__ == '__main__':
-    config = "./examples/data/recflow.json"
-    cp = ConfigProcessor(config)
-    print(cp.train_start_date, cp.train_end_date)
-    print(cp.test_start_date, cp.test_end_date)
-    print(cp.train_files)
-
-    train_data_iterator = DailyDataIterator(cp.config, cp.train_files)
-    test_data_iterator = DailyDataIterator(cp.config, cp.test_files)
-    print(len(train_data_iterator), len(test_data_iterator))
-
-    train_data = DailyDataset(train_data_iterator, shuffle=False, attrs=cp.attrs, preload=False)
-    test_data = DailyDataset(test_data_iterator, shuffle=False, attrs=cp.attrs, preload=False)
-
-    for i, data in enumerate(train_data):
-        print({k: v.shape for k, v in data.items()})
-        if i > 3:
-            break
-    train_loader = DataLoader(train_data, batch_size=32, num_workers=0)
-    test_loader = DataLoader(test_data, batch_size=32, num_workers=0)
-
-    for i, batch in enumerate(train_loader):
-        print({k: v.shape for k, v in batch.items()})
-        # if i > 3:
-        #     break
         
 
 

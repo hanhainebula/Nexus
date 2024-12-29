@@ -3,7 +3,7 @@ import argparse
 import pandas as pd
 from UniRetrieval.inference.embedder.recommendation import BaseEmbedderInferenceEngine
 import pycuda.driver as cuda
-import pycuda.autoinit
+
 
 
 if __name__ == '__main__':
@@ -14,8 +14,8 @@ if __name__ == '__main__':
 
     
     retriever_inference_engine = BaseEmbedderInferenceEngine(config)
-    if retriever_inference_engine.config['infer_mode'] == 'trt':
-        cuda.Context.pop()
+    # if retriever_inference_engine.config['infer_mode'] == 'trt':
+    #     cuda.Context.pop()
         
     infer_df = pd.read_feather('/data1/home/recstudio/haoran/RecStudio-Industry/inference/inference_data/recflow/recflow_infer_data.feather')
     for batch_idx in range(10):

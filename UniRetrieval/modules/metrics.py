@@ -263,8 +263,7 @@ def get_retriever_metrics(metric):
 def get_ranker_metrics(metric):
     if not isinstance(metric, list):
         metric = [metric]
-    pred_metrics = {'mae', 'mse', 'auc', 'logloss', 'accuracy',
-                    'precision', 'recall', 'f1'}
+    pred_metrics = {'mae', 'mse', 'auc', 'logloss', 'accuracy'}
     pred_m = [(m, metric_dict[m]) for m in metric if m in pred_metrics and m in metric_dict]
     return pred_m
 

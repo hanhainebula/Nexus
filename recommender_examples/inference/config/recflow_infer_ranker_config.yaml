@@ -2,7 +2,7 @@ stage: rank
 model_ckpt_path: /data1/home/recstudio/haoran/UniRetrieval/recommender_results/mlp_ranker
 feature_cache_config_path: /data1/home/recstudio/haoran/UniRetrieval/recommender_examples/inference/feature_insert/feature_cache_configs/recflow_feature_cache_config.yaml
 output_topk: 6
-infer_batch_size: 1
+infer_batch_size: 3
 infer_device: 0
 # infer_mode: ort
 infer_mode: trt

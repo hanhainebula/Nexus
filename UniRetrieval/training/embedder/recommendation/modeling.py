@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 import os
 import json
-from typing import Dict, Union
+from typing import Dict, Union, Tuple
 import torch
 from torch.utils.data import DataLoader
+import faiss
+import faiss.contrib.torch_utils
 
 from UniRetrieval.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
 from UniRetrieval.training.embedder.recommendation.arguments import DataAttr4Model, ModelArguments
@@ -146,6 +148,41 @@ class BaseRetriever(AbsEmbedderModel):
             return loss
         else:
             return {'loss': loss}
+        
+    @torch.no_grad()
+    def eval_step(self, batch, k, item_vectors, *args, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
+        with torch.no_grad():
+            query_vec = self.query_encoder(batch)
+            pos_vec = self.item_encoder(batch)
+            pos_scores = self.score_function(query_vec, pos_vec)
+            # TODO: use faiss to reduce memory usage
+            res = faiss.StandardGpuResources()
+            if self.score_function.__class__.__name__ == 'InnerProductScorer':
+                index_flat = faiss.IndexFlatIP(item_vectors.shape[-1])
+            elif self.score_function.__class__.__name__ == 'EuclideanScorer':
+                index_flat = faiss.IndexFlatL2(item_vectors.shape[-1])
+            elif self.score_function.__class__.__name__ == 'CosineScorer':
+                item_vectors = torch.nn.functional.normalize(item_vectors, p=2, dim=-1)
+                pos_vec = torch.nn.functional.normalize(pos_vec, p=2, dim=-1)
+                index_flat = faiss.IndexFlatIP(item_vectors.shape[-1])
+            else:
+                raise NotImplementedError(f"Not supported scorer {self.score_function.__class__.__name__}.")
+            # gpu_index = next(self.query_encoder.parameters()).device.index
+            gpu_index = 0
+            index_flat = faiss.index_cpu_to_gpu(res, gpu_index, index=index_flat)
+            index_flat.add(item_vectors)
+
+            topk_scores, topk_indices = index_flat.search(query_vec, k)
+
+            # we usually do not mask history in industrial settings
+            if pos_scores.dim() < topk_scores.dim():
+                pos_scores = pos_scores.unsqueeze(-1)
+            all_scores = torch.cat([pos_scores, topk_scores], dim=-1) # [B, N + 1]
+            # sort and get the index of the first item
+            _, indice = torch.sort(all_scores, dim=-1, descending=True, stable=True)
+            pred = indice[:, :k] == 0
+            target = torch.ones_like(batch[self.fiid], dtype=torch.bool).view(-1, 1)   # [B, 1]
+            return pred, target
         
     @torch.no_grad()
     def encode_query(self, context_input: dict) -> torch.Tensor:
