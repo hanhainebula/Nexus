@@ -1,6 +1,5 @@
-from .base import BaseEmbedder, BaseEmbedderInferenceEngine
+from .base import BaseEmbedderInferenceEngine
 
 __all__ = [
-    "BaseEmbedder",
     "BaseEmbedderInferenceEngine"
 ]

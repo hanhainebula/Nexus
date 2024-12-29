@@ -1,0 +1,4 @@
+{
+    "retriever_ckpt_path": "/data1/home/recstudio/haoran/UniRetrieval/recommender_results/mlp_retriever",
+    "ranker_ckpt_path": "/data1/home/recstudio/haoran/UniRetrieval/recommender_results/mlp_ranker"
+}

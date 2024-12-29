@@ -85,3 +85,8 @@ def batch_to_device(batch, device) -> Dict:
         elif isinstance(value, dict):
             batch[key] = batch_to_device(value, device)
     return batch
+
+def log_dict(logger, d: Dict):
+    """Log a dictionary of values."""
+    output_list = [f"{k}={v}" for k, v in d.items()]
+    logger.info(", ".join(output_list))
