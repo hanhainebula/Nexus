@@ -4,7 +4,7 @@
     "url": "hdfs://node1:8020/recstudio/recflow/realshow",
     "item_col": "video_id",
     "context_features": ["user_id", "device_id", "age", "gender", "province"],
-    "item_features": ["video_id", "author_id", " category_level_two", "upload_type", "category_level_one"],
+    "item_features": ["video_id", "author_id", "category_level_two", "upload_type", "category_level_one"],
     "labels": ["like"],
     "item_batch_size": 4096,
     "filter_settings": {
@@ -32,12 +32,12 @@
         "video_id": 82216301,
         "author_id": 33474011,
         "category_level_one": 140,
-        " category_level_two": 784,
+        "category_level_two": 784,
         "upload_type": 40
     },
     "train_settings": {
-        "start_date": "2024-02-07",
-        "end_date": "2024-02-08"
+        "start_date": "2024-02-08",
+        "end_date": "2024-02-09"
     },
     "test_settings": {
         "start_date": "2024-02-08",

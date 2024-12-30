@@ -9,7 +9,7 @@ from typing import Dict, Tuple
 import torch
 from accelerate import Accelerator
 from loguru import logger as loguru_logger
-import importlib
+from UniRetrieval.modules.arguments import DataAttr4Model, Statistics
 
 @dataclass
 class TrainingArguments(AbsRerankerTrainingArguments):
@@ -21,31 +21,6 @@ class TrainingArguments(AbsRerankerTrainingArguments):
     checkpoint_best_ckpt: bool = True   # if true, save best model in earystop callback
     checkpoint_steps: int = 1000    # if none, save model per epoch; else save model by steps
     earlystop_metric: str = "auc"
-    
-    
-class Statistics(AbsArguments):
-    @classmethod
-    def from_dict(cls, _dict: dict):
-        stat = cls()
-        for k, v in _dict.items():
-            setattr(stat, k.strip(), v)
-        return stat
-
-
-@dataclass
-class DataAttr4Model(AbsArguments):
-    """
-    Data attributes for a dataset. Serve for models
-    """
-    fiid: str
-    num_items: int  # number of candidate items instead of maximum id of items
-    stats: Statistics
-    flabels: str = field(default=None, metadata={"nargs": "+"})
-    features: str = field(default=None, metadata={"nargs": "+"})
-    context_features: str = field(default=None, metadata={"nargs": "+"})
-    item_features: str = field(default=None, metadata={"nargs": "+"})
-    seq_features: str = field(default=None, metadata={"nargs": "+"})
-
 
 @dataclass
 class ModelArguments(AbsRerankerModelArguments):

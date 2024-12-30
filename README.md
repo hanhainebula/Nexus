@@ -1,23 +1,27 @@
 # UniRetrieval
 Toolkit for Universal Retrieval, such as text retrieval, item recommendation, image retrieval, etc.
 
+## 2024/12/29
 
-Training 部分：
-- Text Retrieval 部分：已经完成
-- Recommendation 部分：已经完成
-- TODO: 
-    - 两部分的代码的整理，去掉一些冗余的代码，使得整体的代码更加一体化
+1. Text Retrieval
+    - Training 部分已经完成
+    - Inference 加速部分 (onnx, tensorrt) 都已经实现
+    - Evaluation 部分已经完成 (Optional: 加到 Trainer 里面供训练过程中评测使用，决定 early stop)
+2. Recommendation
+    - Training 部分已经完成
+    - Inference 部分 embedder 的 onnx 和 tensorrt 加速都已经完成；reranker 的 onnx 已经完成，tensorrt 遇到一些问题
+    - Evaluation 部分的代码已经完成还在 debug，然后整合到 Trainer 里面实现 early stop
 
-Inference 部分：
-- Text Retrieval 部分：已经完成了基本的代码
-- TODO:
-    - 在 Text Retrieval 部分集成进去 RecStudio4Industry 中用到的加速方法
-    - Recommendation 部分的代码整理
-
-Evaluation 部分：
-- Text Retrieval 部分: 评测框架已经完成
-- TODO:
-    - Recommendation 部分: 评测框架的搭建
+TODO：
+- Recommendation 部分：
+    - reranker 的 tensorrt 加速：bug 解决
+    - Evaluation 部分的代码 debug，然后整合到 Trainer 里面实现 early stop
+- Text Retrieval 部分：
+    - Optional: 把 Evaluation 部分的代码整合到 Trainer 里面实现 early stop
+- Examples 编写，为后续的测试做准备：
+    - Text Retrieval 部分的 examples 编写，每个功能都要有一个 example
+    - Recommendation 部分的 examples 编写，每个功能都要有一个 example
+- 合并代码 & 整理代码
 
 ## 2024/12/23
 
@@ -65,3 +69,23 @@ Evaluation 部分：
         - runner.py
             - 实现 load_dataset 方法，返回 DailyDataset 类型 
             - 实现 load_data_collator 方法，返回实现的 DataCollator 类型
+
+
+## 2024/12/12
+
+Training 部分：
+- Text Retrieval 部分：已经完成
+- Recommendation 部分：已经完成
+- TODO: 
+    - 两部分的代码的整理，去掉一些冗余的代码，使得整体的代码更加一体化
+
+Inference 部分：
+- Text Retrieval 部分：已经完成了基本的代码
+- TODO:
+    - 在 Text Retrieval 部分集成进去 RecStudio4Industry 中用到的加速方法
+    - Recommendation 部分的代码整理
+
+Evaluation 部分：
+- Text Retrieval 部分: 评测框架已经完成
+- TODO:
+    - Recommendation 部分: 评测框架的搭建

@@ -5,14 +5,20 @@ import importlib
 from dataclasses import dataclass, field
 from UniRetrieval.abc.arguments import AbsArguments
 
-    
+
+@dataclass
 class Statistics(AbsArguments):
-    @classmethod
-    def from_dict(cls, _dict: dict):
-        stat = cls()
-        for k, v in _dict.items():
-            setattr(stat, k.strip(), v)
-        return stat
+    request_id: int
+    user_id: int
+    device_id: int
+    age: int
+    gender: int
+    province: int
+    video_id: int
+    author_id: int
+    category_level_one: int
+    category_level_two: int
+    upload_type: int
 
 @dataclass
 class DataAttr4Model(AbsArguments):
@@ -46,13 +52,13 @@ def get_modules(module_type: str, module_name: str):
 
 def get_model_cls(model_type: str, model_name: str):
     assert model_type in ["retriever", "ranker"], f"{model_type} is not a valid model type"
+    model_type = 'embedder' if (model_type == "retriever") else "reranker"
     try:
-        module = importlib.import_module(f"UniRetrieval.modules.{model_type}s")
+        module = importlib.import_module(f"UniRetrieval.training.{model_type}.recommendation.modeling")
         cls = getattr(module, model_name)
         return cls
     except ImportError as e:
-        raise ImportError(f"Could not import {model_name} from UniRetrieval.modules.{model_type}s") from e
-
+        raise ImportError(f"Could not import {model_name} from UniRetrieval.training.{model_type}.recommendation.modeling") from e
 
 def get_seq_data(d: dict):
     if "seq" in d:
@@ -61,13 +67,13 @@ def get_seq_data(d: dict):
         return {}
 
 
-def split_batch(batch: dict, data_attr: DataAttr4Model) -> Tuple[Dict, Dict, Dict]:
+def split_batch(batch: dict, data_config: DataAttr4Model) -> Tuple[Dict, Dict, Dict]:
     context_feat = {}; item_feat = {}
     seq_feat = get_seq_data(batch)
     for k, v in batch.items():
-        if k in data_attr.context_features:
+        if k in data_config.context_features:
             context_feat[k] = v
-        elif k in data_attr.item_features:
+        elif k in data_config.item_features:
             item_feat[k] = v
     return context_feat, seq_feat, item_feat
 
@@ -79,3 +85,8 @@ def batch_to_device(batch, device) -> Dict:
         elif isinstance(value, dict):
             batch[key] = batch_to_device(value, device)
     return batch
+
+def log_dict(logger, d: Dict):
+    """Log a dictionary of values."""
+    output_list = [f"{k}={v}" for k, v in d.items()]
+    logger.info(", ".join(output_list))
