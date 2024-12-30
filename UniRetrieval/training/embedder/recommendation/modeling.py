@@ -238,7 +238,6 @@ class BaseRetriever(AbsEmbedderModel):
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(config_dict, f, ensure_ascii=False, indent=2)
 
-    #TODO to be implemented
     def encode_info(self, *args, **kwargs):
         return super().encode_info(*args, **kwargs)
 
@@ -265,6 +264,5 @@ class MLPRetriever(BaseRetriever):
     def get_negative_sampler(self):
         return UniformSampler(num_items=self.data_config.num_items)
     
-    # TODO to be implemented
     def encode_info(self, *args, **kwargs):
         return super().encode_info(*args, **kwargs)

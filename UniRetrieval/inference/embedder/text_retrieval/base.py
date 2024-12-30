@@ -680,7 +680,6 @@ if __name__=='__main__':
     args.infer_mode = 'onnx'
     inference_engine_onnx = BaseEmbedderInferenceEngine(args)
     s_e_onnx = inference_engine_onnx.inference(sentences, normalize=True)
-
     
     # 4. test tensorrt session
     args.infer_mode='tensorrt'

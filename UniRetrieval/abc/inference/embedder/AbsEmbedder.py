@@ -16,7 +16,6 @@ from transformers import is_torch_npu_available
 logger = logging.getLogger(__name__)
 
 
-# TODO copied from FlagEmbedding, 保留了多线程的函数代码
 class AbsEmbedder(ABC):
     """
     Base class for embedder.

@@ -42,7 +42,6 @@ class AbsRerankerRunner(AbsRunner):
         self.training_args = training_args
 
 
-    # TODO 增加了load_model函数 (继承自AbsRunner)
     @abstractmethod
     def load_model(self, *args, **kwargs) -> AbsRerankerModel:
         pass

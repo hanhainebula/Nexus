@@ -3,7 +3,6 @@ import json
 import logging
 from typing import List, Union, Tuple
 
-# TODO implement AutoModel and AutoReranker
 from FlagEmbedding import FlagAutoModel, FlagAutoReranker
 from .arguments import TextRetrievalEvalArgs, TextRetrievalEvalModelArgs
 from .evaluator import TextRetrievalAbsEvaluator

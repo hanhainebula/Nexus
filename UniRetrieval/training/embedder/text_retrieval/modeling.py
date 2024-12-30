@@ -187,8 +187,8 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
         passages=batch[1]
         teacher_scores=batch[2]
         no_in_batch_neg_flag=batch[3]
-        q_reps = self.encode(queries) # (batch_size, dim)
-        p_reps = self.encode(passages) # (batch_size * group_size, dim)
+        q_reps = self.encode_query(queries) # (batch_size, dim)
+        p_reps = self.encode_info(passages) # (batch_size * group_size, dim)
 
         if self.training:
             if teacher_scores is not None:
@@ -396,7 +396,6 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
 
         return all_tensors
 
-    # TODO 此处考虑是否把encode名字改了
     def encode_query(self, *args, **kwargs):
         return self.encode(*args, **kwargs)
     

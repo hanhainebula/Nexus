@@ -21,7 +21,6 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
     Finetune Runner for base embedding models.
     """
     
-    # TODO 这里args都又包装了一层
     def __init__(
         self,
         model_args: EncoderOnlyEmbedderModelArguments,
@@ -130,7 +129,6 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         Returns:
             EncoderOnlyEmbedderTrainer: Loaded trainer instance.
         """
-        # TODO data_collator和tokenizer
     
         trainer = EncoderOnlyEmbedderTrainer(
             model=self.model,
