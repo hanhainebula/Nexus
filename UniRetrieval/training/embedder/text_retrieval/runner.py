@@ -75,13 +75,14 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         # Set seed
         set_seed(training_args.seed)
 
+        self.loss_function = loss_function
+        self.score_function = score_function
         self.model = model if model is not None else self.load_model()
         self.tokenizer=self.model.tokenizer
         self.train_dataset = dataset if dataset is not None else self.load_dataset()
         self.data_collator = self.load_data_collator()
         self.trainer = trainer if trainer is not None else self.load_trainer()
-        self.loss_function = loss_function
-        self.score_function = score_function
+
 
     
     def load_model(self) -> BiEncoderOnlyEmbedderModel:
