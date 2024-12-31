@@ -395,7 +395,10 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         return NormalSession(self.model)
 
     def get_onnx_session(self) -> ort.InferenceSession:
-        providers = ['CPUExecutionProvider'] if self.config['infer_device']=='cpu' else ['CUDAExecutionProvider']
+        if self.config['infer_device'] == 'cpu':
+            providers = ["CPUExecutionProvider"]
+        elif isinstance(self.config['infer_device'], int):
+            providers = [("CUDAExecutionProvider", {"device_id": self.config['infer_device']})]
         onnx_model_path = self.config["onnx_model_path"]
         return ort.InferenceSession(onnx_model_path, providers=providers)
 
@@ -403,7 +406,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         device=self.config['infer_device']
         if not isinstance(device, int):
             device=0
-        # cuda.Device(device).make_context()
+        cuda.Device(device).make_context()
         engine_file_path=self.config['trt_model_path']
         TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
         with open(engine_file_path, 'rb') as f, trt.Runtime(TRT_LOGGER) as runtime:
@@ -439,7 +442,6 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             input_names=['input_ids', 'attention_mask'],  
             output_names=['output'],  
             dynamic_axes={'input_ids': {0: 'batch_size', 1:'token_length'}, 'output': {0: 'batch_size'}, 'attention_mask': {0: 'batch_size', 1: 'token_length'}}
-              
         )
         print(f"Model has been converted to ONNX and saved at {onnx_model_path}")
 

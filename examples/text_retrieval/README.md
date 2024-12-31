@@ -197,6 +197,7 @@ Detailed scripts are in ./training
         inference_engine = BaseRerankerInferenceEngine(args)
         score = inference_engine.inference(qa_pair, batch_size=10, normalize=True)
         ```
+
     2. ONNX
         
         Convert pytorch model to onnx first.
@@ -266,8 +267,8 @@ Detailed scripts are in ./training
             score = inference_engine_tensorrt.inference(qa_pair, normalize=True)
             ```
 
-Normal
-ONNX
-Tensorrt
 ## Eval
+
+TODO
+
 Custom

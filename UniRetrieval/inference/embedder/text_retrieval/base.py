@@ -445,7 +445,11 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         return NormalSession(self.model)
 
     def get_onnx_session(self) -> ort.InferenceSession:
-        providers = ['CPUExecutionProvider'] if self.config['infer_device']=='cpu' else ['CUDAExecutionProvider']
+        if self.config['infer_device'] == 'cpu':
+            providers = ["CPUExecutionProvider"]
+        elif isinstance(self.config['infer_device'], int):
+            providers = [("CUDAExecutionProvider", {"device_id": self.config['infer_device']})]
+            
         onnx_model_path = self.config["onnx_model_path"]
         return ort.InferenceSession(onnx_model_path, providers=providers)
 
@@ -670,22 +674,22 @@ if __name__=='__main__':
     ]
     # 1. convert model to onnx
     # BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
-    sentences='aaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     # 2. test normal session
-    args.infer_mode='normal'
-    inference_engine=BaseEmbedderInferenceEngine(args)
-    s_e_norm=inference_engine.inference(sentences, batch_size=10, normalize=True)
+    # args.infer_mode='normal'
+    # inference_engine=BaseEmbedderInferenceEngine(args)
+    # s_e_norm=inference_engine.inference(sentences, batch_size=10, normalize=True)
     
     # 3. test onnx session
-    args.infer_mode = 'onnx'
-    inference_engine_onnx = BaseEmbedderInferenceEngine(args)
-    s_e_onnx = inference_engine_onnx.inference(sentences, normalize=True)
+    # args.infer_mode = 'onnx'
+    # inference_engine_onnx = BaseEmbedderInferenceEngine(args)
+    # s_e_onnx = inference_engine_onnx.inference(sentences, normalize=True)
     
     # 4. test tensorrt session
     args.infer_mode='tensorrt'
     inference_engine_tensorrt=BaseEmbedderInferenceEngine(args)
     s_e_trt=inference_engine_tensorrt.inference(sentences, normalize=True)
+    print(s_e_trt.shape)
+    # cuda.Context.pop()
     # s2_e=inference_engine_tensorrt.inference(s2)
     # print(f'test tensorrt: {s_e @ s2_e.T}')
-    pdb.set_trace()
     
