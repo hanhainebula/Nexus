@@ -24,7 +24,12 @@ class EncoderOnlyRerankerRunner(AbsRerankerRunner):
         self,
         model_args: AbsTextRerankerModelArguments,
         data_args: AbsTextRerankerDataArguments,
-        training_args: AbsTextRerankerTrainingArguments
+        training_args: AbsTextRerankerTrainingArguments,
+        model=None,
+        dataset=None,
+        trainer=None,
+        loss_function=None,
+        score_function=None
     ):
         self.model_args = model_args
         self.data_args = data_args
@@ -61,11 +66,13 @@ class EncoderOnlyRerankerRunner(AbsRerankerRunner):
         # Set seed
         set_seed(training_args.seed)
 
-        self.model = self.load_model()
+        self.model = model if model is not None else self.load_model()
         self.tokenizer=self.model.tokenizer
-        self.train_dataset = self.load_dataset()
+        self.train_dataset = dataset if dataset is not None else self.load_dataset()
         self.data_collator = self.load_data_collator()
-        self.trainer = self.load_trainer()
+        self.trainer = trainer if trainer is not None else self.load_trainer()
+        self.loss_function = loss_function
+        self.score_function = score_function
    
     def load_model(self) -> CrossEncoderModel:
         """Load the tokenizer and model.
@@ -103,6 +110,8 @@ class EncoderOnlyRerankerRunner(AbsRerankerRunner):
             base_model,
             tokenizer=tokenizer,
             train_batch_size=self.training_args.per_device_train_batch_size,
+            loss_function=self.loss_function,
+            score_function=self.score_function
         )
 
         if self.training_args.gradient_checkpointing:

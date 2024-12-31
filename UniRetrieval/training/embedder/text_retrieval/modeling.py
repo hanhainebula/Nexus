@@ -45,12 +45,18 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
         base_model: AutoModel,
         model_args: BiEncoderOnlyEmbedderModelArguments,
         tokenizer: AutoTokenizer = None,
+        loss_function = None,
+        score_function = None,
         *args, **kwargs
     ):
         # must before super().__init__()
         self.kd_loss_type = model_args.kd_loss_type
         
         super().__init__(*args, **kwargs)
+        if loss_function is not None:
+            self.loss_function = loss_function
+        if score_function is not None:
+            self.score_function = score_function
         
         self.model = base_model
         self.tokenizer = tokenizer

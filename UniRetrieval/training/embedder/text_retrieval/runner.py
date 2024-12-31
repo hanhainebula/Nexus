@@ -25,7 +25,12 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         self,
         model_args: EncoderOnlyEmbedderModelArguments,
         data_args: EncoderOnlyEmbedderDataArguments,
-        training_args: EncoderOnlyEmbedderTrainingArguments
+        training_args: EncoderOnlyEmbedderTrainingArguments,    
+        model=None,
+        dataset=None,
+        trainer=None,
+        loss_function=None,
+        score_function=None
     ):
         self.model_args = model_args
         self.data_args = data_args
@@ -70,11 +75,13 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         # Set seed
         set_seed(training_args.seed)
 
-        self.model = self.load_model()
+        self.model = model if model is not None else self.load_model()
         self.tokenizer=self.model.tokenizer
-        self.train_dataset = self.load_dataset()
+        self.train_dataset = dataset if dataset is not None else self.load_dataset()
         self.data_collator = self.load_data_collator()
-        self.trainer = self.load_trainer()
+        self.trainer = trainer if trainer is not None else self.load_trainer()
+        self.loss_function = loss_function
+        self.score_function = score_function
 
     
     def load_model(self) -> BiEncoderOnlyEmbedderModel:
@@ -109,7 +116,9 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         model = BiEncoderOnlyEmbedderModel(
             base_model,
             tokenizer=tokenizer,
-            model_args=self.encoder_only_model_args
+            model_args=self.encoder_only_model_args,
+            loss_function=self.loss_function,
+            score_function=self.score_function
         )
 
         if self.training_args.gradient_checkpointing:

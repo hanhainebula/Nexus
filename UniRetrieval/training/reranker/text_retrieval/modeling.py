@@ -30,9 +30,18 @@ class CrossEncoderModel(AbsRerankerModel):
         base_model: PreTrainedModel,
         tokenizer: AutoTokenizer = None,
         train_batch_size: int = 4,
+        loss_function = None,
+        score_function = None,
         *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
+        
+        if loss_function is not None:
+            self.loss_function = loss_function
+        
+        if score_function is not None:
+            self.score_function = score_function
+        
         self.model = base_model
         self.tokenizer = tokenizer
 
