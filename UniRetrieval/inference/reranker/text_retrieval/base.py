@@ -17,7 +17,8 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from UniRetrieval.abc.inference import AbsReranker, InferenceEngine, AbsInferenceArguments
 
 def sigmoid(x):
-    return float(1 / (1 + np.exp(-x.item())))
+    x = x.item() if not isinstance(x, float) else x
+    return float(1 / (1 + np.exp(-x)))
 
 
 class BaseReranker(AbsReranker):
@@ -399,6 +400,8 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             providers = ["CPUExecutionProvider"]
         elif isinstance(self.config['infer_device'], int):
             providers = [("CUDAExecutionProvider", {"device_id": self.config['infer_device']})]
+        else:
+            providers = ['CUDAExecutionProvider']
         onnx_model_path = self.config["onnx_model_path"]
         return ort.InferenceSession(onnx_model_path, providers=providers)
 
@@ -594,7 +597,6 @@ if __name__=='__main__':
     
     # 1. test conver_to_onnx
     # BaseRerankerInferenceEngine.convert_to_onnx(args.model_name_or_path, args.onnx_model_path)
-    
     qa_pairs = [
         ("What is the capital of France?", "Paris is the capital and most populous city of France."),
         ("Who wrote 'Pride and Prejudice'?", "'Pride and Prejudice' was written by Jane Austen."),
@@ -626,4 +628,5 @@ if __name__=='__main__':
     inference_engine_tensorrt=BaseRerankerInferenceEngine(args)
     score_trt=inference_engine_tensorrt.inference(qa_pairs, normalize=True, batch_size=5)
     print(score_trt)
+    cuda.Context.pop()
     
