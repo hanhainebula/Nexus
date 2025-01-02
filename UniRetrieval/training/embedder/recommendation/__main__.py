@@ -1,5 +1,5 @@
 from UniRetrieval.training.embedder.recommendation.runner import RetrieverRunner
-
+from UniRetrieval.training.embedder.recommendation.modeling import MLPRetriever
 
 
 def main():
@@ -10,7 +10,8 @@ def main():
     runner = RetrieverRunner(
         model_config_path=model_config_path,
         data_config_path=data_config_path,
-        train_config_path=train_config_path
+        train_config_path=train_config_path,
+        model_class=MLPRetriever,
     )
     runner.run()
 

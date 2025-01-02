@@ -1,5 +1,5 @@
 from UniRetrieval.training.reranker.recommendation.runner import RankerRunner
-
+from UniRetrieval.training.reranker.recommendation.modeling import MLPRanker
 
 
 def main():
@@ -10,7 +10,8 @@ def main():
     runner = RankerRunner(
         model_config_path=model_config_path,
         data_config_path=data_config_path,
-        train_config_path=train_config_path
+        train_config_path=train_config_path,
+        model_class=MLPRanker
     )
     runner.run()
 

@@ -6,10 +6,11 @@ import pycuda.driver as cuda
 import numpy as np
 
 if __name__ == '__main__':
-    infer_config_path = "/data1/home/recstudio/haoran/UniRetrieval/recommender_examples/inference/config/recflow_infer_ranker_config.yaml"
+    infer_config_path = "/data1/home/recstudio/haoran/angqing_temp/mlp_reranker/recflow_infer_ranker_config.yaml"
 
     with open(infer_config_path, 'r') as f:
         config = yaml.safe_load(f)
+        print(config)
 
     rank_inference_engine = BaseRerankerInferenceEngine(config)
     
@@ -17,8 +18,8 @@ if __name__ == '__main__':
         cuda.Context.pop()
     
     
-    infer_df = pd.read_feather('/data1/home/recstudio/haoran/RecStudio-Industry/inference/inference_data/recflow/recflow_infer_data.feather')
-    item_df = pd.read_feather('/data1/home/recstudio/haoran/RecStudio-Industry/inference/inference_data/recflow/realshow_test_video_info.feather')
+    infer_df = pd.read_feather('/data1/home/recstudio/haoran/UniRetrieval/recommender_examples/inference/inference_data/recflow/recflow_infer_data.feather')
+    item_df = pd.read_feather('/data1/home/recstudio/haoran/UniRetrieval/recommender_examples/inference/inference_data/recflow/realshow_test_video_info.feather')
     all_item_ids = np.array(item_df['video_id'])
     for batch_idx in range(10):
         print(f"This is batch {batch_idx}")
