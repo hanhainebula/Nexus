@@ -1,6 +1,6 @@
-from .base import BaseReranker, BaseRerankerInferenceEngine
+from .base import BaseRerankerInferenceEngine
 
 __all__ = [
-    "BaseReranker",
+    # "BaseReranker",
     "BaseRerankerInferenceEngine"
 ]

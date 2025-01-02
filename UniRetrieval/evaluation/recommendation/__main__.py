@@ -3,8 +3,8 @@ from UniRetrieval.evaluation.recommendation import RecommenderEvalArgs, Recommen
 
 def main():
     
-    eval_config_path = "/data1/home/recstudio/haoran/UniRetrieval/recommender_examples/eval/eval_config.json"
-    model_config_path = "/data1/home/recstudio/haoran/UniRetrieval/recommender_examples/eval/eval_model_config.json"
+    eval_config_path = "/data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/eval/eval_config.json"
+    model_config_path = "/data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/eval/eval_model_config.json"
     
     eval_args = RecommenderEvalArgs.from_json(eval_config_path)
     model_args = RecommenderEvalModelArgs.from_json(model_config_path)

@@ -2,7 +2,7 @@ import logging
 from typing import Tuple
 from UniRetrieval.abc.training.embedder import AbsEmbedderRunner
 from .arguments import TrainingArguments, ModelArguments, DataArguments
-from .modeling import MLPRetriever
+from .modeling import BaseRetriever
 from .trainer import RetrieverTrainer
 from .datasets import AbsRecommenderEmbedderCollator, ConfigProcessor, DailyDataset, DailyDataIterator, DataAttr4Model
 from UniRetrieval.modules.optimizer import get_lr_scheduler, get_optimizer
@@ -17,11 +17,13 @@ class RetrieverRunner(AbsEmbedderRunner):
         self,
         model_config_path: str,
         data_config_path: str,
-        train_config_path: str
+        train_config_path: str,
+        model_class: BaseRetriever
     ):        
         self.model_config_path = model_config_path
         self.data_config_path = data_config_path
         self.train_config_path = train_config_path
+        self.model_class = model_class
         
         self.data_args = DataArguments.from_json(self.data_config_path)
         self.model_args = ModelArguments.from_json(self.model_config_path)
@@ -38,9 +40,9 @@ class RetrieverRunner(AbsEmbedderRunner):
         train_data = DailyDataset(train_data_iterator, shuffle=True, attrs=cp.attrs, preload=False)
         return train_data, cp.attrs
     
-    def load_model(self) -> MLPRetriever:
+    def load_model(self) -> BaseRetriever:
         item_loader = self.train_dataset.get_item_loader(self.data_args.item_batch_size)
-        model = MLPRetriever(self.cp_attr, self.model_config_path, item_loader=item_loader)
+        model = self.model_class(self.cp_attr, self.model_config_path, item_loader=item_loader)
         return model
 
     def load_trainer(self) -> RetrieverTrainer:    

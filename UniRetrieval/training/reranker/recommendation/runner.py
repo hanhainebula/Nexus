@@ -1,7 +1,7 @@
 from typing import Tuple
 from UniRetrieval.abc.training.reranker import AbsRerankerRunner
 from .arguments import TrainingArguments, ModelArguments, DataArguments
-from .modeling import MLPRanker
+from .modeling import BaseRanker
 from .trainer import RankerTrainer
 from .datasets import AbsRecommenderRerankerCollator, ConfigProcessor, DailyDataset, DailyDataIterator, DataAttr4Model
 from UniRetrieval.modules.optimizer import get_lr_scheduler, get_optimizer
@@ -14,11 +14,13 @@ class RankerRunner(AbsRerankerRunner):
         self,
         model_config_path: str,
         data_config_path: str,
-        train_config_path: str
+        train_config_path: str,
+        model_class: BaseRanker,
     ):        
         self.model_config_path = model_config_path
         self.data_config_path = data_config_path
         self.train_config_path = train_config_path
+        self.model_class = model_class
         
         self.data_args = DataArguments.from_json(self.data_config_path)
         self.model_args = ModelArguments.from_json(self.model_config_path)
@@ -35,8 +37,8 @@ class RankerRunner(AbsRerankerRunner):
         train_data = DailyDataset(train_data_iterator, shuffle=True, attrs=cp.attrs, preload=False)
         return train_data, cp.attrs
     
-    def load_model(self) -> MLPRanker:
-        model = MLPRanker(self.cp_attr, self.model_config_path)
+    def load_model(self) -> BaseRanker:
+        model = self.model_class(self.cp_attr, self.model_config_path)
         return model
 
     def load_trainer(self) -> RankerTrainer:    

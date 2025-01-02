@@ -7,7 +7,7 @@ import pycuda.driver as cuda
 
 
 if __name__ == '__main__':
-    infer_config_path = "/data1/home/recstudio/haoran/UniRetrieval/recommender_examples/inference/config/recflow_infer_retrieval_config.yaml"
+    infer_config_path = "/data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/inference/config/recflow_infer_retrieval_config.yaml"
 
     with open(infer_config_path, 'r') as f:
         config = yaml.safe_load(f)

@@ -4,3 +4,7 @@ __pycache__/
 *old.json
 recommender_results/
 */recommender_results/
+UniRetrieval.egg-info/
+tmp_trainer/
+build/
+examples/recommendation/inference/inference_data/recflow/*

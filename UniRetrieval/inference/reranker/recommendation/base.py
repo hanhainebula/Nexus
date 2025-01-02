@@ -52,7 +52,6 @@ from copy import deepcopy
 from pandas import DataFrame
 import pdb
 
-from tqdm import tqdm
 import torch
 import numpy as np
 import pandas as pd
@@ -67,321 +66,6 @@ import onnxruntime as ort
 import tensorrt as trt
 import pycuda.driver as cuda
 import pycuda.autoinit
-
-
-def sigmoid(x):
-    return float(1 / (1 + np.exp(-x)))
-
-
-class BaseReranker(AbsReranker):
-    """Base reranker class for encoder only models.
-
-    Args:
-        model_name_or_path (str): If it's a path to a local model, it loads the model from the path. Otherwise tries to download and
-            load a model from HuggingFace Hub with the name.
-        use_fp16 (bool, optional): If true, use half-precision floating-point to speed up computation with a slight performance 
-            degradation. Defaults to :data:`False`.
-        query_instruction_for_rerank (Optional[str], optional): Query instruction for retrieval tasks, which will be used with
-            with :attr:`query_instruction_format`. Defaults to :data:`None`.
-        query_instruction_format (str, optional): The template for :attr:`query_instruction_for_rerank`. Defaults to :data:`"{}{}"`.
-        passage_instruction_format (str, optional): The template for passage. Defaults to "{}{}".
-        cache_dir (Optional[str], optional): Cache directory for the model. Defaults to :data:`None`.
-        devices (Optional[Union[str, List[str], List[int]]], optional): Devices to use for model inference. Defaults to :data:`None`.
-        batch_size (int, optional): Batch size for inference. Defaults to :data:`128`.
-        query_max_length (Optional[int], optional): Maximum length for queries. If not specified, will be 3/4 of :attr:`max_length`.
-            Defaults to :data:`None`.
-        max_length (int, optional): Maximum length of passages. Defaults to :data`512`.
-        normalize (bool, optional): If True, use Sigmoid to normalize the results. Defaults to :data:`False`.
-    """
-    def __init__(
-        self,
-        model_name_or_path: str,
-        use_fp16: bool = False,
-        query_instruction_for_rerank: Optional[str] = None,
-        query_instruction_format: str = "{}{}", # specify the format of query_instruction_for_rerank
-        passage_instruction_for_rerank: Optional[str] = None,
-        passage_instruction_format: str = "{}{}", # specify the format of passage_instruction_for_rerank
-        trust_remote_code: bool = False,
-        cache_dir: Optional[str] = None,
-        devices: Optional[Union[str, List[str], List[int]]] = None, # specify devices, such as ["cuda:0"] or ["0"]
-        # inference
-        batch_size: int = 128,
-        query_max_length: Optional[int] = None,
-        max_length: int = 512,
-        normalize: bool = False,
-        **kwargs: Any,
-    ):
-        self.model_name_or_path = model_name_or_path
-        self.use_fp16 = use_fp16
-        self.query_instruction_for_rerank = query_instruction_for_rerank
-        self.query_instruction_format = query_instruction_format
-        self.passage_instruction_for_rerank = passage_instruction_for_rerank
-        self.passage_instruction_format = passage_instruction_format
-        self.target_devices = self.get_target_devices(devices)
-        
-        self.batch_size = batch_size
-        self.query_max_length = query_max_length
-        self.max_length = max_length
-        self.normalize = normalize
-
-        for k in kwargs:
-            setattr(self, k, kwargs[k])
-
-        self.kwargs = kwargs
-
-        self.pool = None
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name_or_path, 
-            cache_dir=cache_dir
-        )
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            model_name_or_path, 
-            trust_remote_code=trust_remote_code, 
-            cache_dir=cache_dir
-        )
-
-    def get_detailed_instruct(self, instruction_format: str, instruction: str, sentence: str):
-        """Combine the instruction and sentence along with the instruction format.
-
-        Args:
-            instruction_format (str): Format for instruction.
-            instruction (str): The text of instruction.
-            sentence (str): The sentence to concatenate with.
-
-        Returns:
-            str: The complete sentence with instruction
-        """
-        return instruction_format.format(instruction, sentence)
-    
-    def get_detailed_inputs(self, sentence_pairs: Union[str, List[str]]):
-        """get detailed instruct for all the inputs
-
-        Args:
-            sentence_pairs (Union[str, List[str]]): Input sentence pairs
-
-        Returns:
-            list[list[str]]: The complete sentence pairs with instruction
-        """
-        if isinstance(sentence_pairs, str):
-            sentence_pairs = [sentence_pairs]
-
-        if self.query_instruction_for_rerank is not None:
-            if self.passage_instruction_for_rerank is None:
-                return [
-                    [
-                        self.get_detailed_instruct(self.query_instruction_format, self.query_instruction_for_rerank, sentence_pair[0]),
-                        sentence_pair[1]
-                    ] for sentence_pair in sentence_pairs
-                ]
-            else:
-                return [
-                    [
-                        self.get_detailed_instruct(self.query_instruction_format, self.query_instruction_for_rerank, sentence_pair[0]),
-                        self.get_detailed_instruct(self.passage_instruction_format, self.passage_instruction_for_rerank, sentence_pair[1])
-                    ] for sentence_pair in sentence_pairs
-                ]
-        else:
-            if self.passage_instruction_for_rerank is None:
-                return [
-                    [
-                        sentence_pair[0],
-                        sentence_pair[1]
-                    ] for sentence_pair in sentence_pairs
-                ]
-            else:
-                return [
-                    [
-                        sentence_pair[0],
-                        self.get_detailed_instruct(self.passage_instruction_format, self.passage_instruction_for_rerank, sentence_pair[1])
-                    ] for sentence_pair in sentence_pairs
-                ]
-
-    def compute_score(
-        self,
-        sentence_pairs: Union[List[Tuple[str, str]], Tuple[str, str]],
-        **kwargs
-    ):
-        """Compute score for each sentence pair
-
-        Args:
-            sentence_pairs (Union[List[Tuple[str, str]], Tuple[str, str]]): Input sentence pairs to compute.
-
-        Returns:
-            numpy.ndarray: scores of all the sentence pairs.
-        """
-        if isinstance(sentence_pairs[0], str):
-            sentence_pairs = [sentence_pairs]
-        sentence_pairs = self.get_detailed_inputs(sentence_pairs)
-
-        if isinstance(sentence_pairs, str) or len(self.target_devices) == 1:
-            return self.compute_score_single_gpu(
-                sentence_pairs,
-                device=self.target_devices[0],
-                **kwargs
-            )
-
-        if self.pool is None:
-            self.pool = self.start_multi_process_pool()
-        scores = self.encode_multi_process(sentence_pairs,
-                                           self.pool,
-                                           **kwargs)
-        return scores
-
-
-    @torch.no_grad()
-    def compute_score_single_gpu(
-        self,
-        sentence_pairs: Union[List[Tuple[str, str]], Tuple[str, str]],
-        batch_size: Optional[int] = None,
-        query_max_length: Optional[int] = None,
-        max_length: Optional[int] = None,
-        normalize: Optional[bool] = None,
-        device: Optional[str] = None,
-        **kwargs: Any
-    ) -> List[float]:
-        """_summary_
-
-        Args:
-            sentence_pairs (Union[List[Tuple[str, str]], Tuple[str, str]]): Input sentence pairs to compute scores.
-            batch_size (Optional[int], optional): Number of inputs for each iter. Defaults to :data:`None`.
-            query_max_length (Optional[int], optional): Maximum length of tokens of queries. Defaults to :data:`None`.
-            max_length (Optional[int], optional): Maximum length of tokens. Defaults to :data:`None`.
-            normalize (Optional[bool], optional): If True, use Sigmoid to normalize the results. Defaults to :data:`None`.
-            device (Optional[str], optional): Device to use for computation. Defaults to :data:`None`.
-
-        Returns:
-            List[float]: Computed scores of queries and passages.
-        """
-        if batch_size is None: batch_size = self.batch_size
-        if max_length is None: max_length = self.max_length
-        if query_max_length is None:
-            if self.query_max_length is not None:
-                query_max_length = self.query_max_length
-            else:
-                query_max_length = max_length * 3 // 4
-        if normalize is None: normalize = self.normalize
-
-        if device is None:
-            device = self.target_devices[0]
-
-        if device == "cpu": self.use_fp16 = False
-        if self.use_fp16: self.model.half()
-
-        self.model.to(device)
-        self.model.eval()
-
-        assert isinstance(sentence_pairs, list)
-        if isinstance(sentence_pairs[0], str):
-            sentence_pairs = [sentence_pairs]
-        
-        # tokenize without padding to get the correct length
-        all_inputs = []
-        for start_index in trange(0, len(sentence_pairs), batch_size, desc="pre tokenize",
-                                  disable=len(sentence_pairs) < 128):
-            sentences_batch = sentence_pairs[start_index:start_index + batch_size]
-            queries = [s[0] for s in sentences_batch]
-            passages = [s[1] for s in sentences_batch]
-            queries_inputs_batch = self.tokenizer(
-                queries,
-                return_tensors=None,
-                add_special_tokens=False,
-                max_length=query_max_length,
-                truncation=True,
-                **kwargs
-            )['input_ids']
-            passages_inputs_batch = self.tokenizer(
-                passages,
-                return_tensors=None,
-                add_special_tokens=False,
-                max_length=max_length,
-                truncation=True,
-                **kwargs
-            )['input_ids']
-            for q_inp, d_inp in zip(queries_inputs_batch, passages_inputs_batch):
-                item = self.tokenizer.prepare_for_model(
-                    q_inp,
-                    d_inp,
-                    truncation='only_second',
-                    max_length=max_length,
-                    padding=False,
-                )
-                all_inputs.append(item)
-        # sort by length for less padding
-        length_sorted_idx = np.argsort([-len(x['input_ids']) for x in all_inputs])
-        all_inputs_sorted = [all_inputs[i] for i in length_sorted_idx]
-
-        # adjust batch size
-        flag = False
-        while flag is False:
-            try:
-                test_inputs_batch = self.tokenizer.pad(
-                    all_inputs_sorted[:min(len(all_inputs_sorted), batch_size)],
-                    padding=True,
-                    return_tensors='pt',
-                    **kwargs
-                ).to(device)
-                scores = self.model(**test_inputs_batch, return_dict=True).logits.view(-1, ).float()
-                flag = True
-            except RuntimeError as e:
-                batch_size = batch_size * 3 // 4
-            except torch.OutofMemoryError as e:
-                batch_size = batch_size * 3 // 4
-
-        all_scores = []
-        for start_index in tqdm(range(0, len(all_inputs_sorted), batch_size), desc="Compute Scores",
-                                disable=len(all_inputs_sorted) < 128):
-            sentences_batch = all_inputs_sorted[start_index:start_index + batch_size]
-            inputs = self.tokenizer.pad(
-                sentences_batch,
-                padding=True,
-                return_tensors='pt',
-                **kwargs
-            ).to(device)
-
-            scores = self.model(**inputs, return_dict=True).logits.view(-1, ).float()
-            all_scores.extend(scores.cpu().numpy().tolist())
-
-        all_scores = [all_scores[idx] for idx in np.argsort(length_sorted_idx)]
-
-        if normalize:
-            all_scores = [sigmoid(score) for score in all_scores]
-
-        return all_scores
-
-    def encode_multi_process(
-        self,
-        sentence_pairs: List,
-        pool: Dict[Literal["input", "output", "processes"], Any],
-        **kwargs
-    ) -> np.ndarray:
-        chunk_size = math.ceil(len(sentence_pairs) / len(pool["processes"]))
-
-        input_queue = pool["input"]
-        last_chunk_id = 0
-        chunk = []
-
-        for sentence_pair in sentence_pairs:
-            chunk.append(sentence_pair)
-            if len(chunk) >= chunk_size:
-                input_queue.put(
-                    [last_chunk_id, chunk, kwargs]
-                )
-                last_chunk_id += 1
-                chunk = []
-
-        if len(chunk) > 0:
-            input_queue.put([last_chunk_id, chunk, kwargs])
-            last_chunk_id += 1
-
-        output_queue = pool["output"]
-        results_list = sorted(
-            [output_queue.get() for _ in trange(last_chunk_id, desc="Chunks")],
-            key=lambda x: x[0],
-        )
-        scores = np.concatenate([result[1] for result in results_list])
-        return scores
-
-
 
 class BaseRerankerInferenceEngine(InferenceEngine):
 
@@ -413,11 +97,12 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         print('\n\n\n\n',cuda.Context.get_current(),'\n\n\n\n')
         
         # load model session
-        # self.convert_to_onnx()
+        self.convert_to_onnx()
         if config['infer_mode'] == 'ort':
             self.ort_session = self.get_ort_session()
             print(f'Session is using : {self.ort_session.get_providers()}')
         if config['infer_mode'] == 'trt':
+            # pdb.set_trace()
             self.engine = self.get_trt_session()    
             
         # put seq into context_features
@@ -526,7 +211,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
         return all_top10_items
 
-    def convert_to_onnx_dynamic(self):
+    def convert_to_onnx(self):
         """convert pytorch checkpoint to onnx model and then convert onnx model to ort session.
         
         Args:
@@ -582,7 +267,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             verbose=True
         )
     
-    def convert_to_onnx(self):
+    def convert_to_onnx_static(self):
         """Convert PyTorch checkpoint to ONNX model with static shapes.
 
         Args:
@@ -778,8 +463,9 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         trt_engine_path = os.path.join(self.config['model_ckpt_path'], 'model_trt.engine')
         # print('model_onnx_path:',model_onnx_path)
         # Set the GPU device
-        # print('\n\n\n\n',cuda.Context.get_current(),'\n\n\n\n')
+        
         cuda.Device(self.config['infer_device']).make_context()
+        print('\n\n\n\n',cuda.Context.get_current(),'\n\n\n\n')
         # Build or load the engine
         if not os.path.exists(trt_engine_path):
             serialized_engine = self.build_engine(model_onnx_path, trt_engine_path)
@@ -790,24 +476,13 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             print(f'Loading engine from {trt_engine_path}')
             engine = self.load_engine(trt_engine_path)
         
-        pdb.set_trace()
         
         return engine
     
-    def load_engine(self, trt_engine_path):
-        TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
-        runtime = trt.Runtime(TRT_LOGGER)
-
-        if not os.path.exists(trt_engine_path):
-            raise FileNotFoundError(f"TensorRT engine file not found: {trt_engine_path}")
-
-        with open(trt_engine_path, 'rb') as f:
-            serialized_engine = f.read()
-
-        engine = runtime.deserialize_cuda_engine_with_weights(serialized_engine)
-
-        pdb.set_trace()
-        return engine
+    def load_engine(self, engine_file_path):
+        TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)
+        with open(engine_file_path, 'rb') as f, trt.Runtime(TRT_LOGGER) as runtime:
+            return runtime.deserialize_cuda_engine(f.read())
         
     
     def load_engine_old(self, trt_engine_path):
@@ -819,39 +494,44 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         with open(trt_engine_path, 'rb') as f, trt.Runtime(TRT_LOGGER) as runtime:
             return runtime.deserialize_cuda_engine(f.read())
     
-    def build_engine(self, onnx_file_path, engine_file_path):
+    # def build_engine(self, onnx_file_path, engine_file_path):
         
-        TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)
+    #     TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)
         
-        with trt.Builder(TRT_LOGGER) as builder, builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)) as network, trt.OnnxParser(network, TRT_LOGGER) as parser:
-            with open(onnx_file_path, 'rb') as model:
-                if not parser.parse(model.read()):
-                    for error in range(parser.num_errors):
-                        print('\n\n\n\n', parser.get_error(error), '\n\n\n\n')
-                    raise RuntimeError('Failed to parse ONNX model')
+    #     with trt.Builder(TRT_LOGGER) as builder, builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)) as network, trt.OnnxParser(network, TRT_LOGGER) as parser:
+    #         with open(onnx_file_path, 'rb') as model:
+    #             if not parser.parse(model.read()):
+    #                 for error in range(parser.num_errors):
+    #                     print('\n\n\n\n', parser.get_error(error), '\n\n\n\n')
+    #                 raise RuntimeError('Failed to parse ONNX model')
 
-            config = builder.create_builder_config()
-            config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 30)  # 1GB
+    #         config = builder.create_builder_config()
+    #         config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 30)  # 1GB
 
-        # 检查并确保所有输入张量的形状是静态的
-            for i in range(network.num_inputs):
-                input_tensor = network.get_input(i)
-                input_shape = input_tensor.shape
-                if -1 in input_shape:  # 如果存在动态维度
-                    raise RuntimeError(f"Input {input_tensor.name} has dynamic shape {input_shape}. Static shape is required.")
+    #     # 检查并确保所有输入张量的形状是静态的
+    #         for i in range(network.num_inputs):
+    #             input_tensor = network.get_input(i)
+    #             input_shape = input_tensor.shape
+    #             if -1 in input_shape:  # 如果存在动态维度
+    #                 raise RuntimeError(f"Input {input_tensor.name} has dynamic shape {input_shape}. Static shape is required.")
                 
-            # Build and serialize the engine
-            serialized_engine = builder.build_serialized_network(network, config)
-            with open(engine_file_path, 'wb') as f:
-                f.write(serialized_engine)
-            return serialized_engine
+    #         # Build and serialize the engine
+    #         serialized_engine = builder.build_serialized_network(network, config)
+    #         with open(engine_file_path, 'wb') as f:
+    #             f.write(serialized_engine)
+    #         return serialized_engine
     
     
-    def build_engine_old(self, onnx_file_path, engine_file_path):
+    def build_engine(self, onnx_file_path, engine_file_path):
         TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+        print('\n\n\n\n',cuda.Context.get_current(),'\n\n\n\n')
+        
+        onnx_model = onnx.load(onnx_file_path)
+        onnx.checker.check_model(onnx_model)
         with trt.Builder(TRT_LOGGER) as builder, builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)) as network, trt.OnnxParser(network, TRT_LOGGER) as parser:
             # Parse ONNX model
             with open(onnx_file_path, 'rb') as model:
+                # print('\n\n\n\n',model.read(),'\n\n\n\n')
                 if not parser.parse(model.read()):
                     for error in range(parser.num_errors):
                         print('\n\n\n\n',parser.get_error(error),'\n\n\n\n')
@@ -859,10 +539,18 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
             # Create builder config
             config = builder.create_builder_config()
+            print('builder 1:',builder)
+            print('config 1:',config)
             config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 30)  # 1GB
 
+            print('builder 2:',builder)
+            print('config 2:',config)
+            
             # Create optimization profile
             profile = builder.create_optimization_profile()
+            
+            print('builder 3:',profile)
+
             for i in range(network.num_inputs):
                 input_name = network.get_input(i).name
                 input_shape = network.get_input(i).shape
@@ -872,16 +560,18 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                 max_shape = [self.config['infer_batch_size'] if dim == -1 else dim for dim in input_shape]
                 profile.set_shape(input_name, tuple(min_shape), tuple(opt_shape), tuple(max_shape))
             config.add_optimization_profile(profile)
-
+            print('config 3:',config)
             # Build and serialize the engine
             serialized_engine = builder.build_serialized_network(network, config)
+            print('serialized_engine:',serialized_engine)
             with open(engine_file_path, 'wb') as f:
                 f.write(serialized_engine)
             return serialized_engine
     
     
     def infer_with_trt(self, inputs):
-
+        
+        
         with self.engine.create_execution_context() as context:
             stream = cuda.Stream()
             bindings = [0] * self.engine.num_io_tensors
@@ -892,6 +582,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                 tensor_name = self.engine.get_tensor_name(i)
                 # print('tensor_name:', tensor_name)
                 # print('self.engine.get_tensor_mode(tensor_name):', self.engine.get_tensor_mode(tensor_name))
+                # print('tensor shape:', self.engine.get_tensor_shape(tensor_name))
                 
                 dtype = trt.nptype(self.engine.get_tensor_dtype(tensor_name))
                 if self.engine.get_tensor_mode(tensor_name) == trt.TensorIOMode.INPUT:
@@ -899,7 +590,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                     # print('inputs[tensor_name].type:', type(inputs[tensor_name]))
                     # print('inputs[tensor_name].dtype:', inputs[tensor_name].dtype)
                     if -1 in tuple(self.engine.get_tensor_shape(tensor_name)):  # dynamic
-                        # print(f'dynamic :{tensor_name}')
+                        print(f'dynamic :{tensor_name}')
                         context.set_input_shape(tensor_name, tuple(self.engine.get_tensor_profile_shape(tensor_name, 0)[2]))
                         # context.set_input_shape(tensor_name, tuple(inputs[tensor_name].shape))
                     input_mem = cuda.mem_alloc(inputs[tensor_name].nbytes)
@@ -908,10 +599,10 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                     cuda.memcpy_htod_async(input_mem, inputs[tensor_name], stream)
                     input_memory.append(input_mem)
                 else:  # output
-                    # print('at else.****************')
-                    # print('dtype:',dtype)
-                    shape = tuple(context.get_tensor_shape(tensor_name))
-                    # print(shape)
+                    print('at else.****************')
+                    print('dtype:',dtype)
+                    shape = tuple(self.engine.get_tensor_shape(tensor_name))
+                    pdb.set_trace()
                     output_buffer = np.empty(shape, dtype=dtype)
                     output_buffer = np.ascontiguousarray(output_buffer)
                     output_memory = cuda.mem_alloc(output_buffer.nbytes)
