@@ -271,4 +271,81 @@ class MLPRanker(BaseRanker):
         )
         return pred_mlp
     
+class MyMLPRanker(MLPRanker):
+    def __init__(self, ranker_data_config, ranker_model_config, *args, **kwargs):
+        super().__init__(ranker_data_config, ranker_model_config, *args, **kwargs)
+        self.topk=6 
+
+    def compute_score(self, batch, *args, **kwargs) -> RankerModelOutput:
+        context_feat, seq_feat, item_feat = split_batch(batch, self.data_config)
+        all_embs = []
+        if len(seq_feat) > 0:
+            seq_emb = self.embedding_layer(seq_feat, strict=False)
+            seq_rep = self.sequence_encoder(seq_emb)   # [B, N1, D]
+            all_embs.append(seq_rep)
+        context_emb = self.embedding_layer(context_feat, strict=False)  # [B, N2, D]
+        item_emb = self.embedding_layer(item_feat, strict=False)    # [B, N3, D]
+        all_embs += [context_emb, item_emb]
+        all_embs = torch.concat(all_embs, dim=1) # [B, N1+N2+N3, D]
+        interacted_emb = self.feature_interaction_layer(all_embs)    # [B, **]
+        score = self.prediction_layer(interacted_emb)   # [B], sigmoid
+        if len(score.shape) == 2 and score.size(-1) == 1:
+            score = score.squeeze(-1)   # [B, 1] -> [B]
+        return RankerModelOutput(score, [context_emb, item_emb, seq_emb])
+    
+    def forward(self, batch, cal_loss=False, *args, **kwargs) -> RankerModelOutput:
+        output = self.compute_score(batch, *args, **kwargs)
+        return output
+    
+    @torch.no_grad()
+    def predict(self, context_input: Dict, candidates: Dict, topk: int=6, gpu_mem_save=False, *args, **kwargs):
+        """ predict topk candidates for each context
+        
+        Args:
+            context_input (Dict): input context feature
+            candidates (Dict): candidate items
+            topk (int): topk candidates
+            gpu_mem_save (bool): whether to save gpu memroy by using loop to process each candidate
+
+        Returns:
+            torch.Tensor: topk indices (offset instead of real item id)
+        """
+        num_candidates = candidates[self.fiid].size(1)
+        
+        if not gpu_mem_save:
+            self.topk=1
+            batch_size = candidates[self.fiid].size(0)
+            for k, v in context_input.items():
+                # B, * -> BxN, *
+                if isinstance(v, dict):
+                    for k_, v_ in v.items():
+                        # 替代 repeat_interleave
+                        v_expanded = v_.unsqueeze(1).expand(-1, num_candidates, *v_.shape[1:])  # 扩展
+                        v[k_] = v_expanded.reshape(-1, *v_.shape[1:])  # 展平
+                else:
+                    # 替代 repeat_interleave
+                    v_expanded = v.unsqueeze(1).expand(-1, num_candidates, *v.shape[1:])  # 扩展
+                    context_input[k] = v_expanded.reshape(-1, *v.shape[1:])  # 展平
+                    
+            for k, v in candidates.items():
+                # B, N, * -> BxN, *
+                candidates[k] = v.view(-1, *v.shape[2:])
+            context_input.update(candidates)    # {key: BxN, *}
+            output = self.score(context_input, *args, **kwargs)
+            scores = output.score.view(batch_size, num_candidates) 
+            
+        else:
+            scores = []
+            for i in range(num_candidates):
+                candidate = {k: v[:, i] for k, v in candidates.items()}
+                new_batch = dict(**context_input)
+                new_batch.update(candidate)
+                output = self.compute_score(new_batch, *args, **kwargs)
+                scores.append(output.score)
+            scores = torch.stack(scores, dim=-1)  
+        # get topk idx
+        
+        self.topk = min(self.topk, num_candidates)
+        topk_score, topk_idx = torch.topk(scores, self.topk)
+        return topk_idx
     
