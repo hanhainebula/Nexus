@@ -1,0 +1,36 @@
+MyMLPRanker(
+  (embedding_layer): MultiFeatEmbedding(
+    (feat2embedding): ModuleDict(
+      (user_id): Embedding(42472, 2, padding_idx=0)
+      (device_id): Embedding(42561, 2, padding_idx=0)
+      (age): Embedding(8, 2, padding_idx=0)
+      (gender): Embedding(3, 2, padding_idx=0)
+      (province): Embedding(79, 2, padding_idx=0)
+      (video_id): Embedding(82216301, 2, padding_idx=0)
+      (author_id): Embedding(33474011, 2, padding_idx=0)
+      (category_level_two): Embedding(784, 2, padding_idx=0)
+      (upload_type): Embedding(40, 2, padding_idx=0)
+      (category_level_one): Embedding(140, 2, padding_idx=0)
+    )
+  )
+  (sequence_encoder): AverageAggregator(dim=1)
+  (feature_interaction_layer): Sequential(
+    (0): LambdaModule()
+    (1): MLPModule(
+      (model): Sequential(
+        (0): Dropout(p=0.1, inplace=False)
+        (1): Linear(in_features=30, out_features=128, bias=True)
+      )
+    )
+  )
+  (prediction_layer): MLPModule(
+    (model): Sequential(
+      (0): Dropout(p=0.1, inplace=False)
+      (1): Linear(in_features=128, out_features=32, bias=True)
+      (2): ReLU()
+      (3): Dropout(p=0.1, inplace=False)
+      (4): Linear(in_features=32, out_features=1, bias=True)
+    )
+  )
+  (loss_function): BCEWithLogitLoss()
+)

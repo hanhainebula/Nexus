@@ -7,4 +7,4 @@ recommender_results/
 UniRetrieval.egg-info/
 tmp_trainer/
 build/
-recommender_examples/inference/inference_data/recflow/*
+examples/recommendation/inference/inference_data/recflow/*
