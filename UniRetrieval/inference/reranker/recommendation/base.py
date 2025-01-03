@@ -437,11 +437,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         
         return res_dict
 
-    def get_normal_session(self):
-        pass
-    
-    def get_onnx_session(self):
-        pass
+
     
     def get_ort_session(self) -> ort.InferenceSession:
         model_onnx_path = os.path.join(self.config['model_ckpt_path'], 'model_onnx.pb')
@@ -602,7 +598,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                     print('at else.****************')
                     print('dtype:',dtype)
                     shape = tuple(self.engine.get_tensor_shape(tensor_name))
-                    pdb.set_trace()
+                    # pdb.set_trace()
                     output_buffer = np.empty(shape, dtype=dtype)
                     output_buffer = np.ascontiguousarray(output_buffer)
                     output_memory = cuda.mem_alloc(output_buffer.nbytes)
@@ -620,12 +616,12 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         
         return output_buffers['output'][0]
     
-    def get_tensorrt_session(self):
-        pass
+    # def get_trt_session(self):
+    #     pass
     
-    def inference(self):
-        pass
+    # def inference(self):
+    #     pass
     
-    def load_model(self):
-        pass
+    # def load_model(self):
+    #     pass
     

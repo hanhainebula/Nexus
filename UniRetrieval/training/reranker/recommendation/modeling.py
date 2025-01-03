@@ -137,7 +137,7 @@ class BaseRanker(AbsRerankerModel):
         return pred, target
 
     @torch.no_grad()
-    def predict(self, context_input: Dict, candidates: Dict, topk: int, gpu_mem_save=False, *args, **kwargs):
+    def predict(self, context_input: Dict, candidates: Dict, topk: int=6, gpu_mem_save=False, *args, **kwargs):
         """ predict topk candidates for each context
         
         Args:
@@ -157,9 +157,14 @@ class BaseRanker(AbsRerankerModel):
                 # B, * -> BxN, *
                 if isinstance(v, dict):
                     for k_, v_ in v.items():
-                        v[k_] = v_.repeat_interleave(num_candidates, dim=0)
+                        # 替代 repeat_interleave
+                        v_expanded = v_.unsqueeze(1).expand(-1, num_candidates, *v_.shape[1:])  # 扩展
+                        v[k_] = v_expanded.reshape(-1, *v_.shape[1:])  # 展平
                 else:
-                    context_input[k] = v.repeat_interleave(num_candidates, dim=0)
+                    # 替代 repeat_interleave
+                    v_expanded = v.unsqueeze(1).expand(-1, num_candidates, *v.shape[1:])  # 扩展
+                    context_input[k] = v_expanded.reshape(-1, *v.shape[1:])  # 展平
+                    
             for k, v in candidates.items():
                 # B, N, * -> BxN, *
                 candidates[k] = v.view(-1, *v.shape[2:])
@@ -178,6 +183,7 @@ class BaseRanker(AbsRerankerModel):
             scores = torch.stack(scores, dim=-1)    # [B, N]
         
         # get topk idx
+        topk = min(self.model_config.topk, num_candidates)
         topk_score, topk_idx = torch.topk(scores, topk)
         return topk_idx
 
@@ -331,8 +337,8 @@ class MyMLPRanker(MLPRanker):
                 # B, N, * -> BxN, *
                 candidates[k] = v.view(-1, *v.shape[2:])
             context_input.update(candidates)    # {key: BxN, *}
-            output = self.score(context_input, *args, **kwargs)
-            scores = output.score.view(batch_size, num_candidates) 
+            output = self.compute_score(context_input, *args, **kwargs)
+            scores = output.score.view(batch_size, num_candidates)
             
         else:
             scores = []

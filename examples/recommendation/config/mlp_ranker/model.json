@@ -4,5 +4,6 @@
     "prediction_layers": [32],
     "activation": "relu",
     "dropout": 0.1,
-    "batch_norm": false
+    "batch_norm": false,
+    "topk": 1
 }

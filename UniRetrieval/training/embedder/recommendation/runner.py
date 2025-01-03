@@ -18,7 +18,11 @@ class RetrieverRunner(AbsEmbedderRunner):
         model_config_path: str,
         data_config_path: str,
         train_config_path: str,
-        model_class: BaseRetriever
+        model_class: BaseRetriever,
+        model=None,
+        trainer=None,
+        *args,
+        **kwargs,
     ):        
         self.model_config_path = model_config_path
         self.data_config_path = data_config_path
@@ -30,9 +34,9 @@ class RetrieverRunner(AbsEmbedderRunner):
         self.training_args = TrainingArguments.from_json(self.train_config_path)
         
         self.train_dataset, self.cp_attr = self.load_dataset()
-        self.model = self.load_model()
+        self.model = model if model is not None else self.load_model()
         self.data_collator = self.load_data_collator()
-        self.trainer = self.load_trainer()
+        self.trainer = trainer if trainer is not None else self.load_trainer()
 
     def load_dataset(self) -> Tuple[DailyDataset, DataAttr4Model]:
         cp = ConfigProcessor(self.data_config_path)
