@@ -444,7 +444,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             self.load_model()
         return NormalSession(self.model)
 
-    def get_onnx_session(self) -> ort.InferenceSession:
+    def get_ort_session(self) -> ort.InferenceSession:
         if self.config['infer_device'] == 'cpu':
             providers = ["CPUExecutionProvider"]
         elif isinstance(self.config['infer_device'], int):
@@ -453,7 +453,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         onnx_model_path = self.config["onnx_model_path"]
         return ort.InferenceSession(onnx_model_path, providers=providers)
 
-    def get_tensorrt_session(self) -> trt.ICudaEngine:
+    def get_trt_session(self) -> trt.ICudaEngine:
         device=self.config['infer_device']
         if not isinstance(device, int):
             device=0
@@ -673,7 +673,7 @@ if __name__=='__main__':
         "The human brain is an incredibly complex organ."
     ]
     # 1. convert model to onnx
-    # BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
+    BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
     # 2. test normal session
     # args.infer_mode='normal'
     # inference_engine=BaseEmbedderInferenceEngine(args)
