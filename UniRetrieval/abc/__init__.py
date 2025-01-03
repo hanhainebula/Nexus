@@ -1,4 +1,4 @@
-from inference import AbsInferenceArguments
+from .inference import AbsInferenceArguments
 
 
 __all__ = [
