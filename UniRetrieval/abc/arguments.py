@@ -66,7 +66,12 @@ class AbsArguments:
 
     @classmethod
     def from_dict(cls, _dict: dict):
-        _fields_wo_type = [x for x in cls.__dict__.keys() if not x.startswith("__") and not x.endswith("__")]
+        _fields_w_type = [_field.name for _field in fields(cls)]
+        
+        _fields_wo_type = [
+            x for x in cls.__dict__.keys()
+            if not x.startswith("__") and not x.endswith("__") and x not in _fields_w_type
+        ]
         _fields_wo_type_dict = {
             _field_name: _dict.pop(_field_name)
             for _field_name in _fields_wo_type if _field_name in _dict
