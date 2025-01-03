@@ -5,6 +5,26 @@ from typing import Union
 from dataclasses import dataclass, asdict, fields
 
 
+def init_argument(type_, x):
+    if x is None:
+        return None
+    if isinstance(x, type_):
+        return x
+    tmp_x = None
+    try:
+        for tmp_type_ in type_.__args__:
+            if tmp_type_ is None:
+                continue
+            if isinstance(x, tmp_type_):
+                tmp_x = x
+                break
+    except AttributeError:
+        raise TypeError(f"{x} must be an instance of {type_}.")
+    if tmp_x is None:
+        raise TypeError(f"{x} must be an instance of {type_}.")
+    return tmp_x
+
+
 @dataclass
 class AbsArguments:
 
@@ -39,9 +59,9 @@ class AbsArguments:
                     _dict[_field.name] = dict(_dict[_field.name])
             else:
                 if isinstance(_dict[_field.name], list):
-                    _dict[_field.name] = [_field.type(x) for x in _dict[_field.name]]
+                    _dict[_field.name] = [init_argument(_field.type, x) for x in _dict[_field.name]]
                 else:
-                    _dict[_field.name] = _field.type(_dict[_field.name])
+                    _dict[_field.name] = init_argument(_field.type, _dict[_field.name])
         return cls(**_dict)
 
     @classmethod
