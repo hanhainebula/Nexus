@@ -6,7 +6,7 @@ from transformers import TrainerCallback
 import torch
 import logging
 
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 class Callback:
     def __init__(self):
@@ -76,7 +76,7 @@ class ItemVectorCallback(TrainerCallback):
     def __init__(self, trainer: RetrieverTrainer):
         self.trainer = trainer
 
-    def on_train_end(
+    def on_epoch_end(
         self,
         *args,
         **kwargs
@@ -86,10 +86,10 @@ class ItemVectorCallback(TrainerCallback):
             self.trainer.model.eval()
             all_item_vectors, all_item_ids = [], []
             model = self.trainer.accelerator.unwrap_model(self.trainer.model)
-            for item_batch in self.trainer.model.item_loader:
-                item_vector = self.trainer.model.item_encoder(item_batch)
+            for item_batch in self.trainer.accelerator.prepare(model.item_loader):
+                item_vector = model.item_encoder(item_batch)
                 all_item_vectors.append(item_vector)
-                all_item_ids.append(item_batch[self.trainer.model.fiid].to('cuda'))
+                all_item_ids.append(item_batch[model.fiid])
             all_item_vectors = self.trainer.accelerator.gather_for_metrics(all_item_vectors)
             all_item_ids = self.trainer.accelerator.gather_for_metrics(all_item_ids)
             all_item_vectors = torch.cat(all_item_vectors, dim=0)
@@ -97,12 +97,7 @@ class ItemVectorCallback(TrainerCallback):
             self.trainer.item_vectors = all_item_vectors
             self.trainer.item_ids = all_item_ids
             
-            # checkpoint_dir = self.trainer.args.output_dir
-            # if self.model_type == "retriever":
-            #     item_vectors_path = os.path.join(checkpoint_dir, 'item_vectors.pt')
-            #     torch.save({'item_vectors': self.trainer.item_vectors, 'item_ids': self.trainer.item_ids}, item_vectors_path)
-            #     logger.info(f'Item vectors saved.')
-    
+            
 class EarlyStopCallback(Callback):
     def __init__(
             self,

@@ -23,10 +23,11 @@ if __name__ == '__main__':
         batch_st = batch_idx * 128 
         batch_ed = (batch_idx + 1) * 128 
         batch_infer_df = infer_df.iloc[batch_st:batch_ed]
+        np.random.seed(42)
         batch_candidates = np.random.choice(all_item_ids, size=(128, 50))
         batch_candidates_df = pd.DataFrame({rank_inference_engine.feature_config['fiid']: batch_candidates.tolist()})
         ranker_outputs = rank_inference_engine.batch_inference(batch_infer_df, batch_candidates_df)
-        print(type(ranker_outputs), ranker_outputs.shape)
+        print(type(ranker_outputs), ranker_outputs.shape, ranker_outputs[-5:])
         
     if rank_inference_engine.config['infer_mode'] == 'trt':
         cuda.Context.pop()

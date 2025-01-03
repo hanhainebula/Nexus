@@ -1,6 +1,7 @@
 import os
 from UniRetrieval.abc.training.embedder import AbsEmbedderTrainer
 import torch
+from loguru import logger
 
 class RetrieverTrainer(AbsEmbedderTrainer):
     def __init__(self, model, train=True, *args, **kwargs):
@@ -27,6 +28,12 @@ class RetrieverTrainer(AbsEmbedderTrainer):
             unwrapped_model = self.accelerator.unwrap_model(self.model)
             unwrapped_model.save(checkpoint_dir)
             print(f"Model saved in {checkpoint_dir}.")
+            
+            checkpoint_dir = self.args.output_dir
+            
+            item_vectors_path = os.path.join(checkpoint_dir, 'item_vectors.pt')
+            torch.save({'item_vectors': self.item_vectors, 'item_ids': self.item_ids}, item_vectors_path)
+            logger.info(f'Item vectors saved.')
             
     
         

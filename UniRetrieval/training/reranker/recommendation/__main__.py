@@ -1,5 +1,5 @@
 from UniRetrieval.training.reranker.recommendation.runner import RankerRunner
-from UniRetrieval.training.reranker.recommendation.modeling import MLPRanker, MyMLPRanker
+from UniRetrieval.training.reranker.recommendation.modeling import MLPRanker
 
 
 def main():
