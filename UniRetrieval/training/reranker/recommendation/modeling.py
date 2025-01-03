@@ -10,7 +10,7 @@ from UniRetrieval.abc.training.reranker import AbsRerankerModel, RerankerOutput
 from UniRetrieval.training.reranker.recommendation.arguments import DataAttr4Model, ModelArguments
 from UniRetrieval.modules import MLPModule, LambdaModule, MultiFeatEmbedding, AverageAggregator
 from UniRetrieval.modules.arguments import get_model_cls, get_modules, split_batch
-
+from loguru import logger
 
 @dataclass
 class RankerModelOutput(RerankerOutput):
@@ -132,7 +132,7 @@ class BaseRanker(AbsRerankerModel):
         return pred, target
 
     @torch.no_grad()
-    def predict(self, context_input: Dict, candidates: Dict, gpu_mem_save=False, *args, **kwargs):
+    def predict(self, context_input: Dict, candidates: Dict, output_topk=None, gpu_mem_save=False, *args, **kwargs):
         """ predict topk candidates for each context
         
         Args:
@@ -145,39 +145,44 @@ class BaseRanker(AbsRerankerModel):
             torch.Tensor: topk indices (offset instead of real item id)
         """
         num_candidates = candidates[self.fiid].size(1)
-        if not gpu_mem_save:
-            # expand batch to match the number of candidates, consuming more memory
-            batch_size = candidates[self.fiid].size(0)
-            for k, v in context_input.items():
-                # B, * -> BxN, *
-                if isinstance(v, dict):
-                    for k_, v_ in v.items():
-                        # 替代 repeat_interleave
-                        v_expanded = v_.unsqueeze(1).expand(-1, num_candidates, *v_.shape[1:])  # 扩展
-                        v[k_] = v_expanded.reshape(-1, *v_.shape[1:])  # 展平
-                else:
+        # if not gpu_mem_save:
+        print('not gpu_mem_save')
+        # expand batch to match the number of candidates, consuming more memory
+        batch_size = candidates[self.fiid].size(0)
+        for k, v in context_input.items():
+            # logger.info(k)
+            # B, * -> BxN, *
+            if isinstance(v, dict):
+                for k_, v_ in v.items():
                     # 替代 repeat_interleave
-                    v_expanded = v.unsqueeze(1).expand(-1, num_candidates, *v.shape[1:])  # 扩展
-                    context_input[k] = v_expanded.reshape(-1, *v.shape[1:])  # 展平
-                    
-            for k, v in candidates.items():
-                # B, N, * -> BxN, *
-                candidates[k] = v.view(-1, *v.shape[2:])
-            context_input.update(candidates)    # {key: BxN, *}
-            output = self.compute_score(context_input, *args, **kwargs)
-            scores = output.score.view(batch_size, num_candidates)  # [B, N]
-        else:
-            # use loop to process each candidate
-            scores = []
-            for i in range(num_candidates):
-                candidate = {k: v[:, i] for k, v in candidates.items()}
-                new_batch = dict(**context_input)
-                new_batch.update(candidate)
-                output = self.compute_score(new_batch, *args, **kwargs)
-                scores.append(output.score)
-            scores = torch.stack(scores, dim=-1)    # [B, N]
+                    v_expanded = v_.unsqueeze(1).expand(-1, num_candidates, *v_.shape[1:])  # 扩展
+                    v[k_] = v_expanded.reshape(-1, *v_.shape[1:])  # 展平
+            else:
+                # 替代 repeat_interleave
+                v_expanded = v.unsqueeze(1).expand(-1, num_candidates, *v.shape[1:])  # 扩展
+                context_input[k] = v_expanded.reshape(-1, *v.shape[1:])  # 展平
+                
+        for k, v in candidates.items():
+            # B, N, * -> BxN, *
+            candidates[k] = v.view(-1, *v.shape[2:])
+        context_input.update(candidates)    # {key: BxN, *}
+        output = self.compute_score(context_input, *args, **kwargs)
+        scores = output.score.view(batch_size, num_candidates)  # [B, N]
+        # else:
+        #     print('gpu_mem_save')
+        #     # use loop to process each candidate
+        #     scores = []
+        #     batch_size = candidates[self.fiid].size(0)
+        #     for i in range(num_candidates):
+        #         candidate = {k: v[:, i] for k, v in candidates.items()}
+        #         new_batch = dict(**context_input)
+        #         new_batch.update(candidate)
+        #         output = self.compute_score(new_batch, *args, **kwargs)
+        #         scores.append(output.score)
+        #     scores = torch.stack(scores, dim=-1)  # [B, N]
         
         # get topk idx
+        # self.model_config.topk = output_topk
         topk = min(self.model_config.topk, num_candidates)
         topk_score, topk_idx = torch.topk(scores, topk)
         return topk_idx

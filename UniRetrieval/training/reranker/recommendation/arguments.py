@@ -15,8 +15,8 @@ from UniRetrieval.modules.arguments import DataAttr4Model, Statistics
 class TrainingArguments(AbsRerankerTrainingArguments):
     train_batch_size: int = 512
     
-    cutoffs: list = field(default_factory=lambda : [1, 5, 10])
-    metrics: list = field(default_factory=lambda : ["ndcg", "recall"])
+    cutoffs: int = field(default_factory=lambda : [1, 5, 10], metadata={"nargs": "+"})
+    metrics: str = field(default_factory=lambda : ["ndcg", "recall"], metadata={"nargs": "+"})
     
     checkpoint_best_ckpt: bool = True   # if true, save best model in earystop callback
     checkpoint_steps: int = 1000    # if none, save model per epoch; else save model by steps
