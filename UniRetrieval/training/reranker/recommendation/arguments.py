@@ -35,6 +35,7 @@ class ModelArguments(AbsRerankerModelArguments):
     dropout: float = 0.3
     batch_norm: bool = True
     model_name_or_path: str = ''
+    topk: int = 1
     
 
 REQUIRED_DATA_CONFIG = [

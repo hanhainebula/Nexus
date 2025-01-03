@@ -390,11 +390,6 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         
         return res_dict
 
-    def get_normal_session(self):
-        pass
-    
-    def get_onnx_session(self):
-        pass
     
     def get_ort_session(self) -> ort.InferenceSession:
         model_onnx_path = os.path.join(self.config['model_ckpt_path'], 'model_onnx.pb')
@@ -466,12 +461,12 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                 f.write(serialized_engine)
             return serialized_engine
         
-    def get_tensorrt_session(self):
-        pass
+    # def get_trt_session(self):
+    #     pass
     
-    def inference(self):
-        pass
+    # def inference(self):
+    #     pass
     
-    def load_model(self):
-        pass
+    # def load_model(self):
+    #     pass
     

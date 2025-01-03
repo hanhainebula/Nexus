@@ -395,7 +395,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             self.load_model()
         return NormalSession(self.model)
 
-    def get_onnx_session(self) -> ort.InferenceSession:
+    def get_ort_session(self) -> ort.InferenceSession:
         if self.config['infer_device'] == 'cpu':
             providers = ["CPUExecutionProvider"]
         elif isinstance(self.config['infer_device'], int):
@@ -405,7 +405,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         onnx_model_path = self.config["onnx_model_path"]
         return ort.InferenceSession(onnx_model_path, providers=providers)
 
-    def get_tensorrt_session(self) -> trt.ICudaEngine:
+    def get_trt_session(self) -> trt.ICudaEngine:
         device=self.config['infer_device']
         if not isinstance(device, int):
             device=0
