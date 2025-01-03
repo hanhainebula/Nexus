@@ -538,11 +538,11 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         engine=self.session
         all_outputs=[]
 
-        for i in range(0, len(inputs), batch_size):
-            batch_inputs=inputs[i: i+batch_size]
+        for idx in trange(0, len(inputs), batch_size, desc='Batch Inference'):
+            batch_inputs=inputs[idx: idx+batch_size]
             
             encoded_inputs= tokenizer(batch_inputs, return_tensors="np", padding=True, truncation=True, max_length=512)
-            inputs={
+            inputs_feed={
                 'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
                 'attention_mask':encoded_inputs['attention_mask'],
                 'token_type_ids':encoded_inputs['token_type_ids']
@@ -559,11 +559,11 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                     if engine.get_tensor_mode(tensor_name) == trt.TensorIOMode.INPUT:
                         if -1 in tuple(engine.get_tensor_shape(tensor_name)):  # dynamic
                             # context.set_input_shape(tensor_name, tuple(engine.get_tensor_profile_shape(tensor_name, 0)[2]))
-                            context.set_input_shape(tensor_name, tuple(inputs[tensor_name].shape))
-                        input_mem = cuda.mem_alloc(inputs[tensor_name].nbytes)
+                            context.set_input_shape(tensor_name, tuple(inputs_feed[tensor_name].shape))
+                        input_mem = cuda.mem_alloc(inputs_feed[tensor_name].nbytes)
                         bindings[i] = int(input_mem)
                         context.set_tensor_address(tensor_name, int(input_mem))
-                        cuda.memcpy_htod_async(input_mem, inputs[tensor_name], stream)
+                        cuda.memcpy_htod_async(input_mem, inputs_feed[tensor_name], stream)
                         input_memory.append(input_mem)
                     else:  # output
                         shape = tuple(context.get_tensor_shape(tensor_name))
@@ -595,7 +595,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             
         tokenizer = self.model.tokenizer
         all_outputs=[]
-        for i in range(0, len(inputs), batch_size):
+        for i in trange(0, len(inputs), batch_size, desc='Batch Inference'):
             batch_inputs= inputs[i:i+batch_size]
             encoded_inputs = tokenizer(batch_inputs, return_tensors="np", padding=True,  truncation=True, max_length=512)
             # input_ids = encoded_inputs['input_ids']
@@ -673,7 +673,7 @@ if __name__=='__main__':
         "The human brain is an incredibly complex organ."
     ]
     # 1. convert model to onnx
-    # BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
+    BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
     # 2. test normal session
     # args.infer_mode='normal'
     # inference_engine=BaseEmbedderInferenceEngine(args)

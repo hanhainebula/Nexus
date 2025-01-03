@@ -1,8 +1,6 @@
-from dataclasses import dataclass
 import os
 import json
 from typing import Dict, Union, Tuple
-import faiss.contrib.torch_utils
 from typing import OrderedDict
 import torch
 
@@ -141,7 +139,7 @@ class BaseRanker(AbsRerankerModel):
         return pred, target
 
     @torch.no_grad()
-    def predict(self, context_input: Dict, candidates: Dict, topk: int=6, gpu_mem_save=False, *args, **kwargs):
+    def predict(self, context_input: Dict, candidates: Dict, gpu_mem_save=False, *args, **kwargs):
         """ predict topk candidates for each context
         
         Args:

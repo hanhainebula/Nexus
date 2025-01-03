@@ -24,7 +24,4 @@ setup(
         'sentencepiece',
         'protobuf'
     ],
-    extras_require={
-        'finetune': ['deepspeed', 'flash-attn'],
-    },
 )

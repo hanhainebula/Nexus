@@ -1,8 +1,39 @@
 import json
 import yaml
+import logging
 from pathlib import Path
 from typing import Union
 from dataclasses import dataclass, asdict, fields
+
+logger = logging.getLogger(__name__)
+
+
+def init_argument(type_, x):
+    if x is None:
+        return None
+    tmp_x = None
+    try:
+        if isinstance(x, type_):
+            tmp_x = x
+        else:
+            tmp_x = type_(x)
+            logger.warning(f"Init argument: Convert {x} ({type(x)}) to {tmp_x} ({type(tmp_x)}).")
+    except:
+        try:
+            for tmp_type_ in type_.__args__:
+                if tmp_type_ is None:
+                    continue
+                if isinstance(x, tmp_type_):
+                    tmp_x = x
+                    break
+                else:
+                    tmp_x = type_(x)
+                    logger.warning(f"Init argument: Convert {x} ({type(x)}) to {tmp_x} ({type(tmp_x)}).")
+        except AttributeError:
+            raise TypeError(f"Failed to init argument {x} ({type(x)}) to {type_}.")
+    if tmp_x is None:
+        raise TypeError(f"Failed to init argument {x} ({type(x)}) to {type_}.")
+    return tmp_x
 
 
 @dataclass
@@ -39,9 +70,9 @@ class AbsArguments:
                     _dict[_field.name] = dict(_dict[_field.name])
             else:
                 if isinstance(_dict[_field.name], list):
-                    _dict[_field.name] = [_field.type(x) if is_basic_type(x) else x for x in _dict[_field.name]]
+                    _dict[_field.name] = [init_argument(_field.type, x) for x in _dict[_field.name]]
                 else:
-                    _dict[_field.name] = _field.type(_dict[_field.name])
+                    _dict[_field.name] = init_argument(_field.type, _dict[_field.name])
         return cls(**_dict)
 
     @classmethod
@@ -67,7 +98,3 @@ class AbsArguments:
         with open(load_path, "r", encoding="utf-8") as f:
             _dict = yaml.safe_load(f)
             return cls.from_dict(_dict)
-
-
-def is_basic_type(value):
-    return isinstance(value, (int, float, str, bool, type(None)))

@@ -611,22 +611,24 @@ if __name__=='__main__':
     ]
     qa_pairs=("What is the capital of France?", "Paris is the capital and most populous city of France.")
     # 2. test normal session
-    args.infer_mode='normal'
-    inference_engine=BaseRerankerInferenceEngine(args)
-    score_normal=inference_engine.inference(qa_pairs, batch_size=5)
-    print(score_normal)
+    # args.infer_mode='normal'
+    # inference_engine=BaseRerankerInferenceEngine(args)
+    # score_normal=inference_engine.inference(qa_pairs, batch_size=5)
+    # print(score_normal)
     
-    # 3. test onnx session
+    # # 3. test onnx session
     
-    args.infer_mode='onnx'
-    inference_engine_onnx=BaseRerankerInferenceEngine(args)
-    score_onnx=inference_engine_onnx.inference(qa_pairs, normalize=True, batch_size=5)
-    print(score_onnx)
+    # args.infer_mode='onnx'
+    # inference_engine_onnx=BaseRerankerInferenceEngine(args)
+    # score_onnx=inference_engine_onnx.inference(qa_pairs, normalize=True, batch_size=5)
+    # print(score_onnx)
     
     # 4. test tensorrt session
     args.infer_mode='tensorrt'
     inference_engine_tensorrt=BaseRerankerInferenceEngine(args)
     score_trt=inference_engine_tensorrt.inference(qa_pairs, normalize=True, batch_size=5)
     print(score_trt)
+    
+    pdb.set_trace()
     cuda.Context.pop()
     

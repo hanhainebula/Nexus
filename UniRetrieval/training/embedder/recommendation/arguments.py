@@ -75,12 +75,12 @@ class DataArguments(AbsEmbedderDataArguments):
     context_features: str = field(default=None, metadata={"nargs": "+"})
     item_features: str = field(default=None, metadata={"nargs": "+"})
     item_batch_size: int = 2048 # only used for retriever training
-    files: List[str] = field(default_factory=list)
+    files: str = field(default=None, metadata={"nargs": "+"})
 
     # Optional fields with default values
     train_period: Dict[str, datetime] = field(default=None, metadata={"required_keys": ["start_date", "end_date"]})
     test_period: Dict[str, datetime] = field(default=None, metadata={"required_keys": ["start_date", "end_date"]})
-    user_sequential_info: Optional[List[Dict[str, Any]]] = None
+    user_sequential_info: Optional[Dict[str, Any]] = field(default=None)
     post_process: Optional[Dict[str, Any]] = None
     filter_settings: Optional[Dict[str, Any]] = field(default=None, metadata={"required_keys": ["by", "filter_conditions"]})
     item_info: Optional[Dict[str, Any]] = field(default=None, metadata={"required_keys": ["url", "key", "columns", "use_cols"]})
