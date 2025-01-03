@@ -1,27 +1,38 @@
 import json
 import yaml
+import logging
 from pathlib import Path
 from typing import Union
 from dataclasses import dataclass, asdict, fields
+
+logger = logging.getLogger(__name__)
 
 
 def init_argument(type_, x):
     if x is None:
         return None
-    if isinstance(x, type_):
-        return x
     tmp_x = None
     try:
-        for tmp_type_ in type_.__args__:
-            if tmp_type_ is None:
-                continue
-            if isinstance(x, tmp_type_):
-                tmp_x = x
-                break
-    except AttributeError:
-        raise TypeError(f"{x} must be an instance of {type_}.")
+        if isinstance(x, type_):
+            tmp_x = x
+        else:
+            tmp_x = type_(x)
+            logger.warning(f"Init argument: Convert {x} ({type(x)}) to {tmp_x} ({type(tmp_x)}).")
+    except:
+        try:
+            for tmp_type_ in type_.__args__:
+                if tmp_type_ is None:
+                    continue
+                if isinstance(x, tmp_type_):
+                    tmp_x = x
+                    break
+                else:
+                    tmp_x = type_(x)
+                    logger.warning(f"Init argument: Convert {x} ({type(x)}) to {tmp_x} ({type(tmp_x)}).")
+        except AttributeError:
+            raise TypeError(f"Failed to init argument {x} ({type(x)}) to {type_}.")
     if tmp_x is None:
-        raise TypeError(f"{x} must be an instance of {type_}.")
+        raise TypeError(f"Failed to init argument {x} ({type(x)}) to {type_}.")
     return tmp_x
 
 
