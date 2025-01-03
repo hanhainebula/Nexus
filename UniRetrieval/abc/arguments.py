@@ -11,29 +11,40 @@ logger = logging.getLogger(__name__)
 def init_argument(type_, x):
     if x is None:
         return None
-    tmp_x = None
-    try:
-        if isinstance(x, type_):
-            tmp_x = x
-        else:
-            tmp_x = type_(x)
-            logger.warning(f"Init argument: Convert {x} ({type(x)}) to {tmp_x} ({type(tmp_x)}).")
-    except:
+    if isinstance(x, dict):
         try:
-            for tmp_type_ in type_.__args__:
-                if tmp_type_ is None:
-                    continue
-                if isinstance(x, tmp_type_):
-                    tmp_x = x
-                    break
-                else:
-                    tmp_x = type_(x)
-                    logger.warning(f"Init argument: Convert {x} ({type(x)}) to {tmp_x} ({type(tmp_x)}).")
-        except AttributeError:
+            # is subclass of AbsArguments
+            return type_.from_dict(x)
+        except:
+            # dict
+            return dict(x)
+    elif isinstance(x, list):
+        # List[type_]
+        return [init_argument(type_, i) for i in x]
+    else:
+        tmp_x = None
+        try:
+            if isinstance(x, type_):
+                tmp_x = x
+            else:
+                tmp_x = type_(x)
+                logger.warning(f"Init argument: Convert {x} ({type(x)}) to {tmp_x} ({type(tmp_x)}).")
+        except:
+            try:
+                for tmp_type_ in type_.__args__:
+                    if tmp_type_ is None:
+                        continue
+                    if isinstance(x, tmp_type_):
+                        tmp_x = x
+                        break
+                    else:
+                        tmp_x = type_(x)
+                        logger.warning(f"Init argument: Convert {x} ({type(x)}) to {tmp_x} ({type(tmp_x)}).")
+            except AttributeError:
+                raise TypeError(f"Failed to init argument {x} ({type(x)}) to {type_}.")
+        if tmp_x is None:
             raise TypeError(f"Failed to init argument {x} ({type(x)}) to {type_}.")
-    if tmp_x is None:
-        raise TypeError(f"Failed to init argument {x} ({type(x)}) to {type_}.")
-    return tmp_x
+        return tmp_x
 
 
 @dataclass
@@ -55,25 +66,26 @@ class AbsArguments:
 
     @classmethod
     def from_dict(cls, _dict: dict):
+        _fields_wo_type = [x for x in cls.__dict__.keys() if not x.startswith("__") and not x.endswith("__")]
+        _fields_wo_type_dict = {
+            _field_name: _dict.pop(_field_name)
+            for _field_name in _fields_wo_type if _field_name in _dict
+        }
+        
         for k in _dict.keys():
             if k not in [_field.name for _field in fields(cls)]:
                 raise ValueError(f'{k} is not in fields({cls}).')
+
         for _field in fields(cls):
             if _field.name not in _dict:
                 continue
-            if isinstance(_dict[_field.name], dict):
-                try:
-                    if issubclass(_field.type, AbsArguments):
-                    # if isinstance(_field, AbsArguments):
-                        _dict[_field.name] = _field.type.from_dict(_dict[_field.name])
-                except TypeError: 
-                    _dict[_field.name] = dict(_dict[_field.name])
-            else:
-                if isinstance(_dict[_field.name], list):
-                    _dict[_field.name] = [init_argument(_field.type, x) for x in _dict[_field.name]]
-                else:
-                    _dict[_field.name] = init_argument(_field.type, _dict[_field.name])
-        return cls(**_dict)
+            _dict[_field.name] = init_argument(_field.type, _dict[_field.name])
+        
+        _instance = cls(**_dict)
+        
+        for _field_name, _field_value in _fields_wo_type_dict.items():
+            setattr(_instance, _field_name, _field_value)
+        return _instance
 
     @classmethod
     def from_json(cls, load_path: Union[str, Path]):
