@@ -4,5 +4,5 @@ feature_cache_config_path: /data1/home/recstudio/haoran/UniRetrieval/examples/re
 output_topk: 6
 infer_batch_size: 1
 infer_device: 0
-# infer_mode: ort
-infer_mode: trt
+infer_mode: ort
+# infer_mode: trt

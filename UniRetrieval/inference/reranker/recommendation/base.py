@@ -93,9 +93,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         self.redis_client = redis.Redis(host=self.feature_cache_config['host'], 
                                         port=self.feature_cache_config['port'], 
                                         db=self.feature_cache_config['db'])
-        
-        print('\n\n\n\n',cuda.Context.get_current(),'\n\n\n\n')
-        
+                
         # load model session
         self.convert_to_onnx()
         if config['infer_mode'] == 'ort':
@@ -131,7 +129,6 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         feed_dict = {}
         feed_dict.update(batch_user_context_dict)
         feed_dict.update(batch_candidates_dict)
-        feed_dict['output_topk'] = self.config['output_topk']
         for key in feed_dict:
             feed_dict[key] = np.array(feed_dict[key])
             
@@ -267,68 +264,6 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             verbose=True
         )
     
-    def convert_to_onnx_static(self):
-        """Convert PyTorch checkpoint to ONNX model with static shapes.
-
-        Args:
-            None
-        Return:
-            None
-        """
-        model = BaseRanker.from_pretrained(self.config['model_ckpt_path'])
-        checkpoint = torch.load(os.path.join(self.config['model_ckpt_path'], 'model.pt'),
-                                map_location=torch.device('cpu'))
-        model.load_state_dict(checkpoint)
-
-        model.eval()
-        model.forward = model.predict
-
-        input_names = []
-        # 设置静态形状
-        static_batch_size = 128  # 固定的 batch size
-        static_seq_length = 50  # 根据输入的实际序列长度设置
-        static_num_candidates = 50  # 根据输入的实际候选数量设置
-
-        # user/context input
-        context_input = {}
-        for feat in self.feature_config['context_features']:
-            if isinstance(feat, str):
-                context_input[feat] = torch.randint(self.feature_config['stats'][feat], (static_batch_size,))
-                input_names.append(feat)
-
-        # 获取序列长度
-        seq_input = {}
-        for field in self.feature_config['seq_features']:
-            seq_tensor = torch.randint(self.feature_config['stats'][field], (static_batch_size, 50))  # 假设初始序列长度为 50
-            # static_seq_length = seq_tensor.shape[1]  # 根据实际输入设置序列长度
-            seq_input[field] = seq_tensor
-            input_names.append('seq_' + field)
-        context_input['seq'] = seq_input
-
-        # 获取候选数量
-        candidates_input = {}
-        for feat in self.feature_config['item_features']:
-            if isinstance(feat, str):
-                candidates_tensor = torch.randint(self.feature_config['stats'][feat], (static_batch_size, 50))  
-                # static_num_candidates = candidates_tensor.shape[1]  # 根据实际输入设置候选数量
-                candidates_input[feat] = candidates_tensor
-                input_names.append('candidates_' + feat)
-
-        output_topk = self.config['output_topk']
-        input_names.append('output_topk')
-
-        # 打印静态形状信息
-        print(f"Static shapes - batch_size: {static_batch_size}, seq_length: {static_seq_length}, num_candidates: {static_num_candidates}")
-        model_onnx_path = os.path.join(self.config['model_ckpt_path'], 'model_onnx.pb')
-        torch.onnx.export(
-            model,
-            (context_input, candidates_input, output_topk),
-            model_onnx_path,
-            input_names=input_names,
-            output_names=["output"],
-            opset_version=15,
-            verbose=False
-        )
     
     def get_user_context_features(self, batch_infer_df: DataFrame):
         '''
@@ -457,11 +392,9 @@ class BaseRerankerInferenceEngine(InferenceEngine):
     def get_trt_session(self):
         model_onnx_path = os.path.join(self.config['model_ckpt_path'], 'model_onnx.pb')
         trt_engine_path = os.path.join(self.config['model_ckpt_path'], 'model_trt.engine')
-        # print('model_onnx_path:',model_onnx_path)
         # Set the GPU device
         
         cuda.Device(self.config['infer_device']).make_context()
-        print('\n\n\n\n',cuda.Context.get_current(),'\n\n\n\n')
         # Build or load the engine
         if not os.path.exists(trt_engine_path):
             serialized_engine = self.build_engine(model_onnx_path, trt_engine_path)
@@ -481,53 +414,12 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             return runtime.deserialize_cuda_engine(f.read())
         
     
-    def load_engine_old(self, trt_engine_path):
-        device=self.config['infer_device']
-        if not isinstance(device, int):
-            device=0
-        # cuda.Device(device).make_context()
-        TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
-        with open(trt_engine_path, 'rb') as f, trt.Runtime(TRT_LOGGER) as runtime:
-            return runtime.deserialize_cuda_engine(f.read())
-    
-    # def build_engine(self, onnx_file_path, engine_file_path):
-        
-    #     TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)
-        
-    #     with trt.Builder(TRT_LOGGER) as builder, builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)) as network, trt.OnnxParser(network, TRT_LOGGER) as parser:
-    #         with open(onnx_file_path, 'rb') as model:
-    #             if not parser.parse(model.read()):
-    #                 for error in range(parser.num_errors):
-    #                     print('\n\n\n\n', parser.get_error(error), '\n\n\n\n')
-    #                 raise RuntimeError('Failed to parse ONNX model')
-
-    #         config = builder.create_builder_config()
-    #         config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 30)  # 1GB
-
-    #     # 检查并确保所有输入张量的形状是静态的
-    #         for i in range(network.num_inputs):
-    #             input_tensor = network.get_input(i)
-    #             input_shape = input_tensor.shape
-    #             if -1 in input_shape:  # 如果存在动态维度
-    #                 raise RuntimeError(f"Input {input_tensor.name} has dynamic shape {input_shape}. Static shape is required.")
-                
-    #         # Build and serialize the engine
-    #         serialized_engine = builder.build_serialized_network(network, config)
-    #         with open(engine_file_path, 'wb') as f:
-    #             f.write(serialized_engine)
-    #         return serialized_engine
-    
     
     def build_engine(self, onnx_file_path, engine_file_path):
         TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
-        print('\n\n\n\n',cuda.Context.get_current(),'\n\n\n\n')
-        
-        onnx_model = onnx.load(onnx_file_path)
-        onnx.checker.check_model(onnx_model)
         with trt.Builder(TRT_LOGGER) as builder, builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)) as network, trt.OnnxParser(network, TRT_LOGGER) as parser:
             # Parse ONNX model
             with open(onnx_file_path, 'rb') as model:
-                # print('\n\n\n\n',model.read(),'\n\n\n\n')
                 if not parser.parse(model.read()):
                     for error in range(parser.num_errors):
                         print('\n\n\n\n',parser.get_error(error),'\n\n\n\n')
@@ -535,18 +427,11 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
             # Create builder config
             config = builder.create_builder_config()
-            print('builder 1:',builder)
-            print('config 1:',config)
             config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 30)  # 1GB
 
-            print('builder 2:',builder)
-            print('config 2:',config)
             
             # Create optimization profile
             profile = builder.create_optimization_profile()
-            
-            print('builder 3:',profile)
-
             for i in range(network.num_inputs):
                 input_name = network.get_input(i).name
                 input_shape = network.get_input(i).shape
@@ -556,10 +441,8 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                 max_shape = [self.config['infer_batch_size'] if dim == -1 else dim for dim in input_shape]
                 profile.set_shape(input_name, tuple(min_shape), tuple(opt_shape), tuple(max_shape))
             config.add_optimization_profile(profile)
-            print('config 3:',config)
             # Build and serialize the engine
             serialized_engine = builder.build_serialized_network(network, config)
-            print('serialized_engine:',serialized_engine)
             with open(engine_file_path, 'wb') as f:
                 f.write(serialized_engine)
             return serialized_engine
@@ -576,29 +459,17 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             output_buffers = {}
             for i in range(self.engine.num_io_tensors):
                 tensor_name = self.engine.get_tensor_name(i)
-                # print('tensor_name:', tensor_name)
-                # print('self.engine.get_tensor_mode(tensor_name):', self.engine.get_tensor_mode(tensor_name))
-                # print('tensor shape:', self.engine.get_tensor_shape(tensor_name))
-                
                 dtype = trt.nptype(self.engine.get_tensor_dtype(tensor_name))
                 if self.engine.get_tensor_mode(tensor_name) == trt.TensorIOMode.INPUT:
-                    # print('inputs[tensor_name]:', inputs[tensor_name])
-                    # print('inputs[tensor_name].type:', type(inputs[tensor_name]))
-                    # print('inputs[tensor_name].dtype:', inputs[tensor_name].dtype)
                     if -1 in tuple(self.engine.get_tensor_shape(tensor_name)):  # dynamic
-                        print(f'dynamic :{tensor_name}')
                         context.set_input_shape(tensor_name, tuple(self.engine.get_tensor_profile_shape(tensor_name, 0)[2]))
-                        # context.set_input_shape(tensor_name, tuple(inputs[tensor_name].shape))
                     input_mem = cuda.mem_alloc(inputs[tensor_name].nbytes)
                     bindings[i] = int(input_mem)
                     context.set_tensor_address(tensor_name, int(input_mem))
                     cuda.memcpy_htod_async(input_mem, inputs[tensor_name], stream)
                     input_memory.append(input_mem)
                 else:  # output
-                    print('at else.****************')
-                    print('dtype:',dtype)
                     shape = tuple(self.engine.get_tensor_shape(tensor_name))
-                    # pdb.set_trace()
                     output_buffer = np.empty(shape, dtype=dtype)
                     output_buffer = np.ascontiguousarray(output_buffer)
                     output_memory = cuda.mem_alloc(output_buffer.nbytes)
