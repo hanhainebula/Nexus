@@ -29,4 +29,3 @@ class RetrieverTrainer(AbsEmbedderTrainer):
             print(f"Model saved in {checkpoint_dir}.")
             
     
-        

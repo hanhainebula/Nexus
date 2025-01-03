@@ -155,7 +155,6 @@ class BaseRetriever(AbsEmbedderModel):
             query_vec = self.query_encoder(batch)
             pos_vec = self.item_encoder(batch)
             pos_scores = self.score_function(query_vec, pos_vec)
-            # TODO: use faiss to reduce memory usage
             res = faiss.StandardGpuResources()
             if self.score_function.__class__.__name__ == 'InnerProductScorer':
                 index_flat = faiss.IndexFlatIP(item_vectors.shape[-1])
@@ -281,7 +280,7 @@ class BaseRetriever(AbsEmbedderModel):
         return super().encode_info(*args, **kwargs)
 
 
-# 已经改过了，把代码放在modules里了
+
 class MLPRetriever(BaseRetriever):
     def __init__(self, retriever_data_config, retriever_model_config, item_loader=None, *args, **kwargs):
         super().__init__(data_config=retriever_data_config, model_config=retriever_model_config, item_loader=item_loader, *args, **kwargs)

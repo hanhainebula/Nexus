@@ -21,7 +21,7 @@ class MultiFeatEmbedding(torch.nn.Module):
         """
         super().__init__(*args, **kwargs)
         self.feat2number = {
-            f: getattr(stats, f) for f in features
+            f: stats.get(f) for f in features
         }
         self.embedding_dim = embedding_dim
         self.feat2embedding = torch.nn.ModuleDict({

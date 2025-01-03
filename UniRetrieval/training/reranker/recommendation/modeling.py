@@ -12,15 +12,6 @@ from UniRetrieval.modules import MLPModule, LambdaModule, MultiFeatEmbedding, Av
 from UniRetrieval.modules.arguments import get_model_cls, get_modules, split_batch
 
 
-@dataclass
-class RankerModelOutput(RerankerOutput):
-    score: torch.Tensor = None
-    embedding: torch.Tensor = None
-
-    def to_dict(self):
-        return {k: v for k, v in self.__dict__.items()}
-
-
 class BaseRanker(AbsRerankerModel):
     def __init__(
             self, 
@@ -32,7 +23,7 @@ class BaseRanker(AbsRerankerModel):
         
         self.data_config: DataAttr4Model = data_config
         self.model_config: ModelArguments = self.load_config(model_config)
-        self.num_seq_feat = len(data_config.seq_features)
+        self.num_seq_feat = sum([len(seq_feats) for seq_feats in data_config.seq_features.values()])
         self.num_context_feat = len(data_config.context_features)
         self.num_item_feat = len(data_config.item_features)
         self.num_feat = self.num_seq_feat + self.num_context_feat + self.num_item_feat
@@ -41,9 +32,15 @@ class BaseRanker(AbsRerankerModel):
         self.model_type = "ranker"
         self.num_items: int = self.data_config.num_items
         self.fiid: str = self.data_config.fiid  # item id field
-        self.flabel: str = self.data_config.flabels[0]
+        self.flabel: str = self.set_labels()
         self.init_modules()
         
+    def set_labels(self) -> str:
+        # label fields, base ranker only support one label
+        # if need multiple labels, use MultiTaskRanker instead
+        self.flabel: str = self.data_config.flabels[0]
+        return self.data_config.flabels[0]
+    
         
     def init_modules(self):
         super().init_modules()
@@ -55,7 +52,7 @@ class BaseRanker(AbsRerankerModel):
 
     def get_embedding_layer(self):
         emb = MultiFeatEmbedding(
-            features=self.data_config.features,
+            features=list(self.data_config.stats.keys()),
             stats=self.data_config.stats,
             embedding_dim=self.model_config.embedding_dim,
             concat_embeddings=False,
@@ -84,22 +81,29 @@ class BaseRanker(AbsRerankerModel):
             batch, 
             *args, 
             **kwargs
-        ) -> RankerModelOutput:
-        context_feat, seq_feat, item_feat = split_batch(batch, self.data_config)
+        ) -> RerankerOutput:
+        context_feat, item_feat, seq_feat_dict = split_batch(batch, self.data_config)
         all_embs = []
-        if len(seq_feat) > 0:
-            seq_emb = self.embedding_layer(seq_feat, strict=False)
-            seq_rep = self.sequence_encoder(seq_emb)   # [B, N1, D]
-            all_embs.append(seq_rep)
         context_emb = self.embedding_layer(context_feat, strict=False)  # [B, N2, D]
         item_emb = self.embedding_layer(item_feat, strict=False)    # [B, N3, D]
+        if len(seq_feat_dict) > 0:
+            for seq_name, seq_feat in seq_feat_dict.items():
+                padding_mask = seq_feat[self.fiid] == 0
+                seq_emb = self.embedding_layer(seq_feat, strict=False)
+                seq_rep = self.sequence_encoder[seq_name](
+                    seq=seq_emb,
+                    padding_mask=padding_mask,
+                    target=item_emb,
+                )   # [B, N1, D]
+                all_embs.append(seq_rep)
         all_embs += [context_emb, item_emb]
         all_embs = torch.concat(all_embs, dim=1) # [B, N1+N2+N3, D]
         interacted_emb = self.feature_interaction_layer(all_embs)    # [B, **]
         score = self.prediction_layer(interacted_emb)   # [B], sigmoid
         if len(score.shape) == 2 and score.size(-1) == 1:
             score = score.squeeze(-1)   # [B, 1] -> [B]
-        return RankerModelOutput(score=score, embedding=[context_emb, item_emb, seq_emb])
+        return RerankerOutput(score, [context_emb, item_emb, seq_emb])
+    
     
     def get_score_function(self):
         return self.compute_score
@@ -107,7 +111,7 @@ class BaseRanker(AbsRerankerModel):
     def sampling(self, query, num_neg, *args, **kwargs):
         return self.negative_sampler(query, num_neg)
         
-    def forward(self, batch, cal_loss=False, *args, **kwargs) -> RankerModelOutput:
+    def forward(self, batch, cal_loss=False, *args, **kwargs) -> RerankerOutput:
         if cal_loss:
             return self.compute_loss(batch, *args, **kwargs)
         else:
@@ -246,10 +250,11 @@ class MLPRanker(BaseRanker):
         super().__init__(ranker_data_config, ranker_model_config, *args, **kwargs)
         
     def get_sequence_encoder(self):
-        # cls = get_modules("module", "AverageAggregator")
-        # encoder = cls(dim=1)
-        encoder = AverageAggregator(dim=1)
-        return encoder
+        encoder_dict = torch.nn.ModuleDict({
+            name: AverageAggregator(dim=1)
+            for name in self.data_config.seq_features
+        })
+        return encoder_dict
         
     def get_feature_interaction_layer(self):
         flatten_layer = LambdaModule(lambda x: x.flatten(start_dim=1))  # [B, N, D] -> [B, N*D]
@@ -282,7 +287,7 @@ class MyMLPRanker(MLPRanker):
         super().__init__(ranker_data_config, ranker_model_config, *args, **kwargs)
         self.topk=6 
 
-    def compute_score(self, batch, *args, **kwargs) -> RankerModelOutput:
+    def compute_score(self, batch, *args, **kwargs) -> RerankerOutput:
         context_feat, seq_feat, item_feat = split_batch(batch, self.data_config)
         all_embs = []
         if len(seq_feat) > 0:
@@ -297,9 +302,9 @@ class MyMLPRanker(MLPRanker):
         score = self.prediction_layer(interacted_emb)   # [B], sigmoid
         if len(score.shape) == 2 and score.size(-1) == 1:
             score = score.squeeze(-1)   # [B, 1] -> [B]
-        return RankerModelOutput(score, [context_emb, item_emb, seq_emb])
+        return RerankerOutput(score, [context_emb, item_emb, seq_emb])
     
-    def forward(self, batch, cal_loss=False, *args, **kwargs) -> RankerModelOutput:
+    def forward(self, batch, cal_loss=False, *args, **kwargs) -> RerankerOutput:
         output = self.compute_score(batch, *args, **kwargs)
         return output
     

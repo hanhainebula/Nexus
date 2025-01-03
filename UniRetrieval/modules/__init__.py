@@ -1,17 +1,9 @@
 from .activations import Dice, get_activation
-from .aggregate import AverageAggregator
+from .aggregate import *
 from .embedding import MultiFeatEmbedding
-from .layer import MLPModule, LambdaModule
+from .layer import *
 from .query_encoder import BaseQueryEncoderWithSeq, QueryEncoder
 from .item_encoder import ItemEncoder
 from .sampler import UniformSampler
+from .feature_interaction import *
 
-__all__=[
-    'BaseQueryEncoderWithSeq', 'QueryEncoder',
-    'Dice', 'get_activation',
-    'AverageAggregator',
-    'MultiFeatEmbedding',
-    'MLPModule', 'LambdaModule',
-    'ItemEncoder', 
-    'UniformSampler'
-]

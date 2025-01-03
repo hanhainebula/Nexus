@@ -85,11 +85,11 @@ class ItemVectorCallback(TrainerCallback):
             logger.info(f'Update item vectors...')
             self.trainer.model.eval()
             all_item_vectors, all_item_ids = [], []
-            model = self.trainer.accelerator.unwrap_model(self.trainer.model)
-            for item_batch in self.trainer.model.item_loader:
+            item_loader = self.trainer.accelerator.prepare(self.trainer.model.item_loader)
+            for item_batch in item_loader:
                 item_vector = self.trainer.model.item_encoder(item_batch)
                 all_item_vectors.append(item_vector)
-                all_item_ids.append(item_batch[self.trainer.model.fiid].to('cuda'))
+                all_item_ids.append(item_batch[self.trainer.model.fiid])
             all_item_vectors = self.trainer.accelerator.gather_for_metrics(all_item_vectors)
             all_item_ids = self.trainer.accelerator.gather_for_metrics(all_item_ids)
             all_item_vectors = torch.cat(all_item_vectors, dim=0)
@@ -97,6 +97,7 @@ class ItemVectorCallback(TrainerCallback):
             self.trainer.item_vectors = all_item_vectors
             self.trainer.item_ids = all_item_ids
             
+            logger.info(f'Item vectors updated.')
             # checkpoint_dir = self.trainer.args.output_dir
             # if self.model_type == "retriever":
             #     item_vectors_path = os.path.join(checkpoint_dir, 'item_vectors.pt')

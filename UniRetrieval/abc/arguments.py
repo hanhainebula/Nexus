@@ -39,7 +39,7 @@ class AbsArguments:
                     _dict[_field.name] = dict(_dict[_field.name])
             else:
                 if isinstance(_dict[_field.name], list):
-                    _dict[_field.name] = [_field.type(x) for x in _dict[_field.name]]
+                    _dict[_field.name] = [_field.type(x) if is_basic_type(x) else x for x in _dict[_field.name]]
                 else:
                     _dict[_field.name] = _field.type(_dict[_field.name])
         return cls(**_dict)
@@ -67,3 +67,7 @@ class AbsArguments:
         with open(load_path, "r", encoding="utf-8") as f:
             _dict = yaml.safe_load(f)
             return cls.from_dict(_dict)
+
+
+def is_basic_type(value):
+    return isinstance(value, (int, float, str, bool, type(None)))

@@ -233,9 +233,9 @@ class BCEWithLogitLoss(PointwiseLoss):
         super().__init__()
         self.reduction = reduction
 
-    def forward(self, label, score, *args, **kwargs):
+    def forward(self, label, scores, *args, **kwargs):
         loss = F.binary_cross_entropy_with_logits(
-            score, label, reduction=self.reduction)
+            scores, label, reduction=self.reduction)
         return loss
     
 class BCELoss(PointwiseLoss):
@@ -243,9 +243,9 @@ class BCELoss(PointwiseLoss):
         super().__init__()
         self.reduction = reduction
 
-    def forward(self, label, score, *args, **kwargs):
+    def forward(self, label, scores, *args, **kwargs):
         loss = F.binary_cross_entropy(
-            score, label, reduction=self.reduction)
+            scores, label, reduction=self.reduction)
         return loss
 
 class MSELoss(PointwiseLoss):
