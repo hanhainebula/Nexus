@@ -304,22 +304,6 @@ class DailyDataIterator(object):
         p.join()
 
 
-DATA_KEYS = [
-    'request_id', 
-    'user_id', 
-    'device_id', 
-    'age', 
-    'gender', 
-    'province', 
-    'video_id', 
-    'author_id', 
-    'category_level_two', 
-    'upload_type', 
-    'category_level_one', 
-    'like', 
-    'seq'
-]
-
 class DailyDataset(IterableDataset):
     def __init__(self, daily_iterator: DailyDataIterator, attrs, shuffle=False, preload=False, seed=42, **kwargs):
         super(DailyDataset, self).__init__(**kwargs)
@@ -429,7 +413,7 @@ class AbsRecommenderEmbedderCollator(AbsEmbedderCollator):
                     all_dicts[k][_k] = torch.stack(all_dicts[k][_k], dim=0)
             else:
                 all_dicts[k] = torch.stack(all_dicts[k], dim=0)
-              
+            
         
         return all_dicts
         # return features

@@ -1,16 +1,7 @@
 {
     "dataset_path": "/data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/config/data_config_template.json", 
-    "type": "hdfs",
     "eval_output_dir": "/data1/home/recstudio/haoran/UniRetrieval/recommender_results/eval",
     "cutoffs": [1, 5, 10],
     "metrics": ["ndcg", "recall", "auc"],
-    "item_info": {
-        "url": "hdfs://node1:8020/recstudio/recflow/others/video_info.pkl",
-        "key": "video_id",
-        "columns": ["video_id", "author_id", "category_level_two", "upload_type", "upload_timestamp", "category_level_one"],
-        "use_cols": ["video_id", "author_id", "category_level_two", "upload_type", "category_level_one"]
-    },
-    "eval_batch_size": 100,
-    "item_batch_size": 4096
-
+    "eval_batch_size": 100
 }
