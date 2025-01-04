@@ -7,6 +7,7 @@ import json
 from loguru import logger
 import os
 import json
+import numpy as np
 import pandas as pd
 from typing import Dict, Optional, List, Union, Tuple
 
@@ -180,12 +181,28 @@ class RecommenderAbsEvaluator(AbsEvaluator):
             out = {}
             output, bs = zip(*outputs)
             pred, target = zip(*output)
-            pred = torch.cat(pred, dim=-1)
-            target = torch.cat(target, dim=-1)
-            metrics: list = get_eval_metrics(self.config.metrics, model.model_type)
-            for metric, func in metrics:
-                out[metric] = func(pred, target)
-                out[metric] = out[metric].item() if isinstance(out[metric], torch.Tensor) else out[metric]
+            pred = torch.cat(pred, dim=0)   # [N] or [N, K]
+            target = torch.cat(target, dim=0)   # [N] or [N, K]
+            metrics: list = get_eval_metrics(self.config.metrics, self.model_type)
+            if pred.dim() == 2 and target.dim() == 2:
+                # multi task
+                if isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
+                    labels = self.model.module.flabel
+                else:
+                    labels = self.model.flabel
+                for i, task in enumerate(labels):
+                    for metric, func in metrics:
+                        _m = func(pred[:, i], target[:, i])
+                        out[f"{metric}/{task}"] = _m.item() if isinstance(_m, torch.Tensor) else _m
+                # overall metrics
+                for metric, func in metrics:
+                    avg_metric = sum([out[f"{metric}/{label}"] for label in labels]) / len(labels)
+                    out[metric] = avg_metric
+            else:   # single task
+                for metric, func in metrics:
+                    _m = func(pred, target)
+                    out[metric] = _m if isinstance(_m , torch.Tensor) else _m 
+            out = {m: v.item() if (isinstance(v, torch.Tensor) or isinstance(v, np.ndarray)) else v for m, v in out.items()}
             return out
             
     
