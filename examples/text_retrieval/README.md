@@ -141,15 +141,16 @@
     eval $cmd
     ```
 
-3. Multi-level-training
+3. Multi-Node-training
 
-    We Use accelerate to train models on multi-workers.
+    We Use accelerate to train models on multi-nodes.
     
-    1. Generate accelerate config file
+    1. Generate accelerate config file.
     ```bash
     accelerate config --config_file accelerate_config.json
-    
     ```
+
+    2. Run above accelerate scrpits in each Node respectively.  
 
 Detailed scripts are in ./training
 
