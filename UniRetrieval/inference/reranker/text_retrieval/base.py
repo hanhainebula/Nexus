@@ -1,4 +1,6 @@
 import os
+import sys
+import subprocess
 import torch
 import math
 import numpy as np
@@ -421,8 +423,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
     @classmethod
     def convert_to_onnx(cls, model_name_or_path: str = None, onnx_model_path: str = None, opset_version = 14, use_fp16=False):
-        # model = AutoModel.from_pretrained(model_name_or_path)
-        # tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+
         print(model_name_or_path)
         os.makedirs(os.path.dirname(onnx_model_path), exist_ok=True)
         base_model=BaseReranker(model_name_or_path=model_name_or_path, use_fp16=False)
@@ -450,6 +451,36 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             dynamic_axes={'input_ids': {0: 'batch_size', 1:'token_length'}, 'output': {0: 'batch_size'}, 'attention_mask': {0: 'batch_size', 1: 'token_length'}}
         )
         print(f"Model has been converted to ONNX and saved at {onnx_model_path}")
+
+    def convert_to_tensorrt(self, onnx_model_path: str= None, trt_model_path: str = None):
+        # use trtexec
+        if not onnx_model_path or not trt_model_path:
+            onnx_model_path = self.config['onnx_model_path']
+            trt_model_path = self.config['trt_model_path']
+            
+        if not os.path.isfile(onnx_model_path):
+            raise FileNotFoundError(f"ONNX model not exists: {onnx_model_path}")
+        
+        trt_save_dir = os.path.dirname(trt_model_path)
+        if not os.path.exists(trt_save_dir):
+            os.makedirs(trt_save_dir)
+
+        trtexec_cmd = (
+            f"trtexec --onnx={onnx_model_path} --saveEngine={trt_model_path} "
+            f"--minShapes=input_ids:1x1,attention_mask:1x1 "
+            f"--optShapes=input_ids:{self.batch_size}x512,attention_mask:{self.batch_size}x512 "
+            f"--maxShapes=input_ids:{self.batch_size}x512,attention_mask:{self.batch_size}x512 "
+            "--verbose"
+        )
+
+        try:
+            result = subprocess.run(trtexec_cmd, check=True, capture_output=True, text=True)
+            print("DONE!")
+            print(result.stdout)
+        except subprocess.CalledProcessError as e:
+            print("FAIL!")
+            print(f"ERROR MESSAGES: {e.stderr}")
+            sys.exit(1)
 
     def inference(
         self,

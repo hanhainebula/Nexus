@@ -1,4 +1,6 @@
 import os
+import sys
+import subprocess
 from tqdm import tqdm, trange
 from typing import cast, Any, List, Union, Optional, Tuple, Type
 import onnx
@@ -416,10 +418,13 @@ class NormalSession():
             name='embeddings'
         )]
 
-    def run(self, output_names, input_feed, batch_size=None, run_options=None):
+    def run(self, output_names, input_feed, batch_size=None, encode_query=False, run_options=None):
             
-        sentences=input_feed['sentences']            
-        embeddings = self.model.encode(sentences, batch_size=batch_size)
+        sentences=input_feed['sentences']    
+        if encode_query:      
+            embeddings = self.model.encode_query(sentences, batch_size=batch_size)
+        else:
+            embeddings = self.model.encode_info(sentences, batch_size=batch_size)
         
         if not isinstance(embeddings, list):
             embeddings = [embeddings]
@@ -498,14 +503,40 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         )
         print(f"Model has been converted to ONNX and saved at {onnx_model_path}")
 
-    @classmethod
-    def convert_to_tensorrt(cls, onnx_model_path: str= None, trt_model_path: str = None):
+    def convert_to_tensorrt(self, onnx_model_path: str= None, trt_model_path: str = None):
         # use trtexec
-        pass
+        if not onnx_model_path or not trt_model_path:
+            onnx_model_path = self.config['onnx_model_path']
+            trt_model_path = self.config['trt_model_path']
+            
+        if not os.path.isfile(onnx_model_path):
+            raise FileNotFoundError(f"ONNX model not exists: {onnx_model_path}")
+        
+        trt_save_dir = os.path.dirname(trt_model_path)
+        if not os.path.exists(trt_save_dir):
+            os.makedirs(trt_save_dir)
+
+        trtexec_cmd = (
+            f"trtexec --onnx={onnx_model_path} --saveEngine={trt_model_path} "
+            f"--minShapes=input_ids:1x1,attention_mask:1x1,token_type_ids:1x1 "
+            f"--optShapes=input_ids:{self.batch_size}x512,attention_mask:{self.batch_size}x512,token_type_ids:{self.batch_size}x512 "
+            f"--maxShapes=input_ids:{self.batch_size}x512,attention_mask:{self.batch_size}x512,token_type_ids:{self.batch_size}x512 "
+            "--verbose"
+        )
+
+        try:
+            result = subprocess.run(trtexec_cmd, check=True, capture_output=True, text=True)
+            print("DONE!")
+            print(result.stdout)
+        except subprocess.CalledProcessError as e:
+            print("FAIL!")
+            print(f"ERROR MESSAGES: {e.stderr}")
+            sys.exit(1)
 
     def inference(
         self,
         inputs: Union[List[str], List[Tuple[str, str]], pd.DataFrame, Any],
+        encode_query=False,
         *args,
         **kwargs
     ):
@@ -531,7 +562,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         elif session_type == 'onnx':
             return self._inference_onnx(inputs, *args, **kwargs)
         elif session_type == 'normal':
-            return self._inference_normal(inputs, *args, **kwargs)
+            return self._inference_normal(inputs, encode_query=encode_query,*args, **kwargs)
         else:
             raise ValueError(f"Unsupported session type: {session_type}")
 
@@ -630,13 +661,13 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         
         return cls_emb
 
-    def _inference_normal(self, inputs,batch_size = None, *args, **kwargs):
+    def _inference_normal(self, inputs,batch_size = None, encode_query = False, *args, **kwargs):
         if not batch_size:
             batch_size = self.batch_size
             
         input_feed = {self.session.get_inputs()[0].name: inputs}
 
-        outputs = self.session.run([self.session.get_outputs()[0].name], input_feed, batch_size=batch_size)
+        outputs = self.session.run([self.session.get_outputs()[0].name], input_feed, encode_query = encode_query ,batch_size = batch_size)
         
         embeddings = outputs[0]
         return embeddings
@@ -645,7 +676,8 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         inputs: Union[List[str], List[Tuple[str, str]], pd.DataFrame, Any],
         *args,
         **kwargs):
-        return self.inference(inputs, *args, **kwargs)
+        
+        return self.inference(inputs, encode_query=True ,*args, **kwargs)
     
     def encode_info(self,
         inputs: Union[List[str], List[Tuple[str, str]], pd.DataFrame, Any],
@@ -657,7 +689,7 @@ if __name__=='__main__':
     import pdb
     # sentences_1 = ["样例数据-1", "样例数据-2"]
     # sentences_2 = ["样例数据-3", "样例数据-4"]
-    model = BaseEmbedder(model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5', use_fp16=True, devices=['cuda:1','cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
+    # model = BaseEmbedder(model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5', use_fp16=True, devices=['cuda:1','cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
     # pdb.set_trace()
     # embeddings_1 = model.encode(sentences_1)
     # embeddings_2 = model.encode(sentences_2)
@@ -701,22 +733,24 @@ if __name__=='__main__':
         "The human brain is an incredibly complex organ."
     ]
     # 1. convert model to onnx
-    BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
+    # BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
     # 2. test normal session
-    # args.infer_mode='normal'
-    # inference_engine=BaseEmbedderInferenceEngine(args)
-    # s_e_norm=inference_engine.inference(sentences, batch_size=10, normalize=True)
+    args.infer_mode='normal'
+    inference_engine=BaseEmbedderInferenceEngine(args)
+    s_e_norm=inference_engine.encode_query(sentences, batch_size=10, normalize=True)
+    print(s_e_norm.shape)
     
     # 3. test onnx session
-    # args.infer_mode = 'onnx'
-    # inference_engine_onnx = BaseEmbedderInferenceEngine(args)
-    # s_e_onnx = inference_engine_onnx.inference(sentences, normalize=True)
+    args.infer_mode = 'onnx'
+    inference_engine_onnx = BaseEmbedderInferenceEngine(args)
+    s_e_onnx = inference_engine_onnx.encode_query(sentences, normalize=True)
+    print(s_e_onnx.shape)
     
     # 4. test tensorrt session
-    args.infer_mode='tensorrt'
-    inference_engine_tensorrt=BaseEmbedderInferenceEngine(args)
-    s_e_trt=inference_engine_tensorrt.inference(sentences, normalize=True)
-    print(s_e_trt.shape)
+    # args.infer_mode='tensorrt'
+    # inference_engine_tensorrt=BaseEmbedderInferenceEngine(args)
+    # s_e_trt=inference_engine_tensorrt.inference(sentences, normalize=True)
+    # print(s_e_trt.shape)
     # cuda.Context.pop()
     # s2_e=inference_engine_tensorrt.inference(s2)
     # print(f'test tensorrt: {s_e @ s2_e.T}')
