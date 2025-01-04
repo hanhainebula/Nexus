@@ -1,6 +1,6 @@
-from .base import BaseReranker as FlagReranker, BaseRerankerInferenceEngine
+from .base import BaseReranker as TextReranker, BaseRerankerInferenceEngine
 
 __all__ = [
-    "FlagReranker",
+    "TextReranker",
     "BaseRerankerInferenceEngine"
 ]
