@@ -84,6 +84,11 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                                         port=self.feature_cache_config['port'], 
                                         db=self.feature_cache_config['db'])
         
+        # put seq into context_features
+        # self.feature_config is deepcopy of self.model_ckpt_config['data_config']
+        if 'seq_features' in self.model_ckpt_config['data_config']:
+            self.feature_config['context_features'].append(self.model_ckpt_config['data_config']['seq_features'])
+        
         # load model session
         self.convert_to_onnx()
         if config['infer_mode'] == 'ort':
@@ -92,11 +97,6 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         if config['infer_mode'] == 'trt':
             self.engine = self.get_trt_session()    
             
-        # put seq into context_features
-        # self.feature_config is deepcopy of self.model_ckpt_config['data_config']
-        if 'seq_features' in self.model_ckpt_config['data_config']:
-            self.feature_config['context_features'].append({'seq_effective_50': self.model_ckpt_config['data_config']['seq_features']})
-
         self.retrieve_index_config = config['retrieve_index_config']
 
         if config['stage'] == 'retrieve':
@@ -235,9 +235,6 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
 
     def convert_to_onnx(self):
         model = BaseRetriever.from_pretrained(self.config['model_ckpt_path'])
-        checkpoint = torch.load(os.path.join(self.config['model_ckpt_path'], 'model.pt'),
-                                map_location=torch.device('cpu'))
-        model.load_state_dict(checkpoint)
         
         model.eval()
         model.forward = model.encode_query
@@ -252,15 +249,18 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                 context_input[feat] = torch.randint(self.feature_config['stats'][feat], (5,))
                 input_names.append(feat)
                 dynamic_axes[feat] = {0: "batch_size"}
-        # TODO: need to be modified for better universality 
-        # special process for seq feature 
-        # TODO: how to get the length of the seq 
-        seq_input = {}
-        for field in self.feature_config['seq_features']:
-            seq_input[field] = torch.randint(self.feature_config['stats'][field], (5, 50))
-            input_names.append('seq_' + field)
-            dynamic_axes['seq_' + field] = {0: "batch_size"}
-        context_input['seq'] = seq_input
+            elif isinstance(feat, dict): # for nested features
+                for feat_name, sub_feat_list in feat.items():
+                    sub_context_input = {}
+                    for sub_feat in sub_feat_list:
+                        if feat_name in self.feature_config['seq_features']:
+                            sub_context_input[sub_feat] = torch.randint(self.feature_config['stats'][sub_feat], 
+                                                                         (5, self.feature_config['seq_lengths'][feat_name]))
+                        else:
+                            sub_context_input[sub_feat] = torch.randint(self.feature_config['stats'][sub_feat], (5,))
+                        input_names.append(feat_name + '_' + sub_feat)
+                        dynamic_axes[feat_name + '_' + sub_feat] = {0: "batch_size"}
+                    context_input[feat_name] = sub_context_input
 
         model_onnx_path = os.path.join(self.config['model_ckpt_path'], 'model_onnx.pb')
         torch.onnx.export(
@@ -291,9 +291,10 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             "age",
             "gender",
             "province", 
-            {"seq_effective_50" : ["video_id", "author_id", "category_level_two", "category_level_one", "upload_type"]}
+            {"user_seq_effective_50" : ["video_id", "author_id", "category_level_two", "category_level_one", "upload_type"]}
         ]
         ''' 
+        
         batch_infer_df = batch_infer_df.rename(mapper=(lambda col: col.strip(' ')), axis='columns')
         
         # user and context side features 
@@ -304,31 +305,31 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             context_features, 
             [self.feature_cache_config['features'][feat] for feat in context_features])
         
+        # expand features with nested keys
         for feat in self.feature_config['context_features']:
             if isinstance(feat, dict):
                 for feat_name, feat_fields in feat.items():
                     cur_dict = defaultdict(list) 
                     if isinstance(user_context_dict[feat_name][0], Iterable):
-                        for seq in user_context_dict[feat_name]:
+                        # the case is for sequence features 
+                        for proto_seq in user_context_dict[feat_name]:
                             for field in feat_fields: 
-                                cur_list = [getattr(proto, field) for proto in seq]
-                                cur_dict[feat_name + '_' + field].append(cur_list)
-                        user_context_dict.update(cur_dict)  
+                                cur_list = [getattr(proto, field) for proto in proto_seq]
+                                cur_dict[field].append(cur_list)
+                        
                         del user_context_dict[feat_name]
+                        for field in feat_fields:
+                            user_context_dict[feat_name + '_' + field] = cur_dict[field]
                     else:
                         for proto in user_context_dict[feat_name]:
                             for field in feat_fields:
-                                cur_dict[feat_name + '_' + field].append(getattr(proto, field))
+                                cur_dict[field].append(getattr(proto, field))
+                        
                         del user_context_dict[feat_name]
- 
-        batch_user_context_dict = user_context_dict
-
-        for k, v in list(batch_user_context_dict.items()):
-            if k.startswith('seq_effective_50_'):
-                batch_user_context_dict['seq_' + k[len('seq_effective_50_'):]] = v
-                del batch_user_context_dict[k]
-
-        return batch_user_context_dict
+                        for field in feat_fields:
+                            user_context_dict[feat_name + '_' + field] = cur_dict[field]
+        
+        return user_context_dict
     
     def _row_get_features(self, row_df:pd.DataFrame, feats_list, feats_cache_list):
         # each row represents one entry 
@@ -368,6 +369,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         # get feats from these values
         for row in row_df.itertuples():
             cur_all_values = dict()
+            # get all protos that this row needs 
             for key_temp in feats_key_temp_list:
                 key_feats = re.findall('{(.*?)}', key_temp) 
                 cur_key = key_temp
@@ -375,6 +377,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                     cur_key = cur_key.replace(f'{{{key_feat}}}', str(getattr(row, key_feat)))
                 cur_all_values[key_temp] = feats_k2p[cur_key]
 
+            # get features from these protos 
             for feat, cache in zip(feats_list, feats_cache_list):
                 res_dict[feat].append(getattr(cur_all_values[cache['key_temp']], cache['field']))
         

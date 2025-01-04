@@ -7,7 +7,7 @@ import numpy as np
 
 if __name__ == '__main__':
     # infer_config_path = "/data1/home/recstudio/haoran/angqing_temp/mlp_reranker/recflow_infer_ranker_config.yaml"
-    infer_config_path = "/data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/inference/config/recflow_infer_ranker_config.yaml"
+    infer_config_path = "./examples/recommendation/inference/config/recflow_infer_ranker_config.yaml"
     
     with open(infer_config_path, 'r') as f:
         config = yaml.safe_load(f)
