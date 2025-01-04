@@ -1,6 +1,16 @@
 import torch
 from . import get_activation
 
+__all__ = [
+    "InnerProductScorer",
+    "CosineScorer",
+    "IP_text_retrieval",
+    "EuclideanScorer",
+    "MLPScorer",
+    "NormScorer",
+    "GMFScorer",
+    "FusionMFMLPScorer",
+]
 
 class InnerProductScorer(torch.nn.Module):
     def forward(self, query, items):

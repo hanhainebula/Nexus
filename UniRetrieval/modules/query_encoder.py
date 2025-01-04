@@ -5,7 +5,7 @@ from .layer import MLPModule
 from .embedding import MultiFeatEmbedding
 
 
-__all__ = ["BaseQueryEncoderWithSeq", "SASRecEncoder"]
+__all__ = ["BaseQueryEncoderWithSeq", "SASRecEncoder", "MLPQueryEncoder"]
 
 def get_seq_data(d: dict, seq_name: Optional[str]):
     """ Get sequence data from a batch.
@@ -112,9 +112,9 @@ class SASRecEncoder(BaseQueryEncoderWithSeq):
     
         
         
-class QueryEncoder(torch.nn.Module):
+class MLPQueryEncoder(torch.nn.Module):
     def __init__(self, data_config, model_config, item_encoder):
-        super(QueryEncoder, self).__init__()
+        super(MLPQueryEncoder, self).__init__()
         
         self.context_emb = MultiFeatEmbedding(
             features=data_config.context_features,

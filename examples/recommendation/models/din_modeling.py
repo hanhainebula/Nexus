@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from UniRetrieval.training.reranker.recommendation.runner import RankerRunner
 from UniRetrieval.training.reranker.recommendation.arguments import ModelArguments
 from UniRetrieval.training.reranker.recommendation.modeling import BaseRanker
-from UniRetrieval.modules import AverageAggregator, LambdaModule, MLPModule, HStackModule, CrossNetwork
+from UniRetrieval.modules import LambdaModule, MLPModule, HStackModule, CrossNetwork
 from UniRetrieval.modules import (
     MLPModule, LambdaModule, MultiFeatEmbedding,
     DeepInterestAggregator, CrossNetwork, HStackModule

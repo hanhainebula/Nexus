@@ -10,8 +10,8 @@ import faiss.contrib.torch_utils
 from UniRetrieval.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
 from UniRetrieval.training.embedder.recommendation.arguments import DataAttr4Model, ModelArguments
 from UniRetrieval.training.embedder.recommendation.datasets import ItemDataset
-from UniRetrieval.modules.query_encoder import QueryEncoder
-from UniRetrieval.modules.item_encoder import ItemEncoder
+from UniRetrieval.modules.query_encoder import MLPQueryEncoder
+from UniRetrieval.modules.item_encoder import MLPItemEncoder
 from UniRetrieval.modules.sampler import UniformSampler
 from UniRetrieval.modules.score import InnerProductScorer
 from UniRetrieval.modules.loss import BPRLoss
@@ -286,11 +286,11 @@ class MLPRetriever(BaseRetriever):
         super().__init__(data_config=retriever_data_config, model_config=retriever_model_config, item_loader=item_loader, *args, **kwargs)
 
     def get_item_encoder(self):
-        return ItemEncoder(self.data_config, self.model_config)
+        return MLPItemEncoder(self.data_config, self.model_config)
     
 
     def get_query_encoder(self):
-        return QueryEncoder(self.data_config, self.model_config,self.item_encoder)
+        return MLPQueryEncoder(self.data_config, self.model_config,self.item_encoder)
     
 
     def get_score_function(self):

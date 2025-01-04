@@ -1,7 +1,9 @@
 from typing import Dict, Union
 import torch
 
-
+__all__ = [
+    "MultiFeatEmbedding",
+]
 
 class MultiFeatEmbedding(torch.nn.Module):
     def __init__(self, features, stats, embedding_dim, concat_embeddings=True, stack_embeddings=False, *args, **kwargs):
@@ -21,7 +23,7 @@ class MultiFeatEmbedding(torch.nn.Module):
         """
         super().__init__(*args, **kwargs)
         self.feat2number = {
-            f: stats.get(f) for f in features
+            f: getattr(stats, f) for f in features
         }
         self.embedding_dim = embedding_dim
         self.feat2embedding = torch.nn.ModuleDict({

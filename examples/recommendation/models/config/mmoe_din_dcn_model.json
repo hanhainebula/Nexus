@@ -1,0 +1,13 @@
+{
+    "embedding_dim": 2,
+    "n_experts": 3,
+    "mlp_layers": [128, 128],
+    "gate_layers": [32],
+    "tower_layers": [32],
+    "activation": "relu",
+    "dropout": 0.1,
+    "batch_norm": false,
+    "din_hidden_size": 36,
+    "cross_net_layers": 3, 
+    "deep_cross_combination": "parallel"
+}

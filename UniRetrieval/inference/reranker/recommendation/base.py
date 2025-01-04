@@ -67,6 +67,8 @@ import tensorrt as trt
 import pycuda.driver as cuda
 import pycuda.autoinit
 
+from loguru import logger
+
 class BaseRerankerInferenceEngine(InferenceEngine):
 
     def __init__(self, config: dict) -> None:
@@ -141,6 +143,10 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             batch_outputs_idx = self.infer_with_trt(feed_dict)
         # batch_outputs = batch_outputs_idx
         batch_outputs = []
+        print('batch_outputs_idx:')
+        print(type(np.array(batch_outputs_idx)), np.array(batch_outputs_idx).shape, np.array(batch_outputs_idx)[-5:], 'max:', max(max(row) for row in batch_outputs_idx))
+        # print(type(np.array(batch_outputs_idx)), np.array(batch_outputs_idx).shape, np.array(batch_outputs_idx)[-5:])
+
         for row_idx, output_idx in enumerate(batch_outputs_idx):
             batch_outputs.append(
                 np.array(batch_candidates_df.iloc[row_idx][self.feature_config['fiid']])[output_idx])
@@ -216,13 +222,14 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         Return: 
             onnxruntime.InferenceSession: The ONNX Runtime session object.
         """
-        model = BaseRanker.from_pretrained(self.config['model_ckpt_path'])
+        model: BaseRanker = BaseRanker.from_pretrained(self.config['model_ckpt_path'])
         checkpoint = torch.load(os.path.join(self.config['model_ckpt_path'], 'model.pt'),
                                 map_location=torch.device('cpu'))
         model.load_state_dict(checkpoint)
         
         model.eval()
         model.forward = model.predict 
+        
 
         input_names = []
         dynamic_axes = {} 
@@ -251,6 +258,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
         output_topk = self.config['output_topk']
         input_names.append('output_topk')
+        model.model_config.topk = output_topk
 
         model_onnx_path = os.path.join(self.config['model_ckpt_path'], 'model_onnx.pb')
         torch.onnx.export(
@@ -261,7 +269,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             output_names=["output"],
             dynamic_axes=dynamic_axes,
             opset_version=15,
-            verbose=True
+            verbose=False
         )
     
     
@@ -312,7 +320,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                             for field in feat_fields:
                                 cur_dict[feat_name + '_' + field].append(getattr(proto, field))
                         del user_context_dict[feat_name]
- 
+
         batch_user_context_dict = user_context_dict
         
         for k, v in list(batch_user_context_dict.items()):
@@ -437,8 +445,16 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                 input_shape = network.get_input(i).shape
                 # Set the min, opt, and max shapes for the input
                 min_shape = [1 if dim == -1 else dim for dim in input_shape]
-                opt_shape = [self.config['infer_batch_size'] if dim == -1 else dim for dim in input_shape]
-                max_shape = [self.config['infer_batch_size'] if dim == -1 else dim for dim in input_shape]
+                opt_shape = [dim for dim in input_shape]
+                opt_shape[0] = self.config['infer_batch_size'] if opt_shape[0] == -1 else opt_shape[0]
+                opt_shape[-1] = self.config['num_candidates'] if opt_shape[-1] == -1 else opt_shape[-1]
+                max_shape = [dim for dim in input_shape]
+                max_shape[0] = self.config['infer_batch_size'] if max_shape[0] == -1 else max_shape[0]
+                max_shape[-1] = self.config['num_candidates'] if max_shape[-1] == -1 else max_shape[-1]
+                
+                for dim in input_shape:
+                    if dim == -1:
+                        print('input_name:', input_name, 'input_shape:', input_shape, 'opt_shape:', opt_shape, 'max_shape:', max_shape)
                 profile.set_shape(input_name, tuple(min_shape), tuple(opt_shape), tuple(max_shape))
             config.add_optimization_profile(profile)
             # Build and serialize the engine
@@ -449,8 +465,6 @@ class BaseRerankerInferenceEngine(InferenceEngine):
     
     
     def infer_with_trt(self, inputs):
-        
-        
         with self.engine.create_execution_context() as context:
             stream = cuda.Stream()
             bindings = [0] * self.engine.num_io_tensors
@@ -469,13 +483,13 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                     cuda.memcpy_htod_async(input_mem, inputs[tensor_name], stream)
                     input_memory.append(input_mem)
                 else:  # output
-                    shape = tuple(self.engine.get_tensor_shape(tensor_name))
+                    shape = tuple(context.get_tensor_shape(tensor_name))
                     output_buffer = np.empty(shape, dtype=dtype)
                     output_buffer = np.ascontiguousarray(output_buffer)
                     output_memory = cuda.mem_alloc(output_buffer.nbytes)
                     bindings[i] = int(output_memory)
                     context.set_tensor_address(tensor_name, output_memory)
-                    cuda.memcpy_htod_async(output_memory, output_buffer, stream)
+                    # cuda.memcpy_htod_async(output_memory, output_buffer, stream)
                     output_buffers[tensor_name] = (output_buffer, output_memory)
 
             context.execute_async_v3(stream_handle=stream.handle)
@@ -486,13 +500,3 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         
         
         return output_buffers['output'][0]
-    
-    # def get_trt_session(self):
-    #     pass
-    
-    # def inference(self):
-    #     pass
-    
-    # def load_model(self):
-    #     pass
-    

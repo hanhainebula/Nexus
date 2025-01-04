@@ -16,7 +16,7 @@ retrieve_index_config:
   i2i_redis_port: 6379
   i2i_redis_db: 4
 
-infer_mode: ort
-# infer_mode: trt
+# infer_mode: ort
+infer_mode: trt
 retrieval_mode: u2i
-infer_batch_size: 3
+infer_batch_size: 128

@@ -181,28 +181,18 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             output_buffers = {}
             for i in range(self.engine.num_io_tensors):
                 tensor_name = self.engine.get_tensor_name(i)
-                # print('tensor_name:', tensor_name)
-                # print('self.engine.get_tensor_mode(tensor_name):', self.engine.get_tensor_mode(tensor_name))
-                
                 dtype = trt.nptype(self.engine.get_tensor_dtype(tensor_name))
                 if self.engine.get_tensor_mode(tensor_name) == trt.TensorIOMode.INPUT:
-                    # print('inputs[tensor_name]:', inputs[tensor_name])
-                    # print('inputs[tensor_name].type:', type(inputs[tensor_name]))
-                    # print('inputs[tensor_name].dtype:', inputs[tensor_name].dtype)
                     if -1 in tuple(self.engine.get_tensor_shape(tensor_name)):  # dynamic
-                        # print(f'dynamic :{tensor_name}')
                         context.set_input_shape(tensor_name, tuple(self.engine.get_tensor_profile_shape(tensor_name, 0)[2]))
-                        # context.set_input_shape(tensor_name, tuple(inputs[tensor_name].shape))
                     input_mem = cuda.mem_alloc(inputs[tensor_name].nbytes)
                     bindings[i] = int(input_mem)
                     context.set_tensor_address(tensor_name, int(input_mem))
                     cuda.memcpy_htod_async(input_mem, inputs[tensor_name], stream)
                     input_memory.append(input_mem)
                 else:  # output
-                    # print('at else.****************')
-                    # print('dtype:',dtype)
                     shape = tuple(context.get_tensor_shape(tensor_name))
-                    # print(shape)
+                    print(tensor_name,'shape:',shape)
                     output_buffer = np.empty(shape, dtype=dtype)
                     output_buffer = np.ascontiguousarray(output_buffer)
                     output_memory = cuda.mem_alloc(output_buffer.nbytes)
@@ -281,7 +271,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             output_names=["output"],
             dynamic_axes=dynamic_axes,
             opset_version=15,
-            verbose=True
+            verbose=False
         )
         
     def get_user_context_features(self, batch_infer_df: DataFrame):
@@ -452,7 +442,12 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                 min_shape = [1 if dim == -1 else dim for dim in input_shape]
                 opt_shape = [self.config['infer_batch_size'] if dim == -1 else dim for dim in input_shape]
                 max_shape = [self.config['infer_batch_size'] if dim == -1 else dim for dim in input_shape]
+                
+                for dim in input_shape:
+                    if dim == -1:
+                        print('input_name:', input_name, 'input_shape:', input_shape, 'opt_shape:', opt_shape, 'max_shape:', max_shape)
                 profile.set_shape(input_name, tuple(min_shape), tuple(opt_shape), tuple(max_shape))
+                
             config.add_optimization_profile(profile)
 
             # Build and serialize the engine
@@ -461,12 +456,4 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                 f.write(serialized_engine)
             return serialized_engine
         
-    # def get_trt_session(self):
-    #     pass
-    
-    # def inference(self):
-    #     pass
-    
-    # def load_model(self):
-    #     pass
     

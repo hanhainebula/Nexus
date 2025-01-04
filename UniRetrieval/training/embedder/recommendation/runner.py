@@ -71,7 +71,7 @@ class RetrieverRunner(AbsEmbedderRunner):
             optimizers=[self.optimizer, self.lr_scheduler]
         )
         # TODO: earlystop
-        trainer.add_callback(ItemVectorCallback(trainer=trainer))
+        # trainer.add_callback(ItemVectorCallback(trainer=trainer))
         # if self.data_args.same_dataset_within_batch:
         #     trainer.add_callback(EmbedderTrainerCallbackForDataRefresh(self.train_dataset))
         return trainer
