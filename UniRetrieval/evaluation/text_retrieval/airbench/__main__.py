@@ -1,6 +1,6 @@
 from transformers import HfArgumentParser
 
-from FlagEmbedding.evaluation.air_bench import (
+from UniRetrieval.evaluation.text_retrieval.airbench import (
     AIRBenchEvalArgs, AIRBenchEvalModelArgs,
     AIRBenchEvalRunner
 )
