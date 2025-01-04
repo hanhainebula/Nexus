@@ -183,7 +183,7 @@ class RecommenderAbsEvaluator(AbsEvaluator):
             pred, target = zip(*output)
             pred = torch.cat(pred, dim=0)   # [N] or [N, K]
             target = torch.cat(target, dim=0)   # [N] or [N, K]
-            metrics: list = get_eval_metrics(self.config.metrics, self.model_type)
+            metrics: list = get_eval_metrics(self.config.metrics, model.model_type)
             if pred.dim() == 2 and target.dim() == 2:
                 # multi task
                 if isinstance(self.model, torch.nn.parallel.DistributedDataParallel):

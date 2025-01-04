@@ -131,7 +131,7 @@ def extract_timestamp(filename: str, format: str="%Y-%m-%d") -> datetime:
     return datetime.strptime(match.group(), format)
 
 
-def extract_number(filename: str, format: str="(\d{4})") -> int:
+def extract_number(filename: str, format: str="{\d{4})") -> int:
     """Extract number from filename using regex according to the given format"""
     # get regex according to the given format
     match = re.search(format, filename)
