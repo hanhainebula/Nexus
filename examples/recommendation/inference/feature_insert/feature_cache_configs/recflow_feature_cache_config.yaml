@@ -41,7 +41,7 @@ features:
   province:
     key_temp: recflow:user_timestamp:{user_id}_{request_timestamp}
     field: province
-  seq_effective_50:
+  user_seq_effective_50:
     key_temp: recflow:user_timestamp:{user_id}_{request_timestamp}
     field: seq_effective_50
 key_temp2proto:

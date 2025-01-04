@@ -16,7 +16,9 @@ class Statistics:
 
     @staticmethod
     def from_dict(d: dict) -> "Statistics":
-        stat = Statistics(d.pop("columns"))
+        if "columns" in d:
+            d.pop("columns")
+        stat = Statistics()
         for k, v in d.items():
             setattr(stat, k, v)
             stat.columns.append(k)
