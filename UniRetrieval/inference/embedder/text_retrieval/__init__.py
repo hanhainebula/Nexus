@@ -1,7 +1,7 @@
-from .base import BaseEmbedder as FlagModel
+from .base import BaseEmbedder as TextEmbedder
 from .base import BaseEmbedderInferenceEngine
 
 __all__ = [
-    "FlagModel",
+    "TextEmbedder",
     "BaseEmbedderInferenceEngine"
 ]

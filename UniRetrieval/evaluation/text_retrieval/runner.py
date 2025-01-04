@@ -3,7 +3,8 @@ import json
 import logging
 from typing import List, Union, Tuple
 
-from FlagEmbedding import FlagAutoModel, FlagAutoReranker
+# from FlagEmbedding import FlagAutoModel, FlagAutoReranker
+from UniRetrieval import TextEmbedder, TextReranker, BaseEmbedderInferenceEngine, BaseRerankerInferenceEngine
 from .arguments import TextRetrievalEvalArgs, TextRetrievalEvalModelArgs
 from .evaluator import TextRetrievalAbsEvaluator
 from .searcher import TextRetrievalEvalDenseRetriever, TextRetrievalEvalReranker
@@ -34,7 +35,7 @@ class TextRetrievalEvalRunner(AbsEvalRunner):
         self.evaluator = self.load_evaluator()
 
     @staticmethod
-    def get_models(model_args: TextRetrievalEvalModelArgs) -> Tuple[FlagAutoModel, Union[FlagAutoReranker, None]]:
+    def get_models(model_args: TextRetrievalEvalModelArgs) -> Tuple[TextEmbedder, Union[TextReranker, None]]:
         """Get the embedding and reranker model
 
         Args:
@@ -44,7 +45,7 @@ class TextRetrievalEvalRunner(AbsEvalRunner):
             Tuple[FlagAutoModel, Union[FlagAutoReranker, None]]: A :class:FlagAutoModel object of embedding model, and 
                 :class:FlagAutoReranker object of reranker model if path provided.
         """
-        embedder = FlagAutoModel.from_finetuned(
+        embedder = TextEmbedder(
             model_name_or_path=model_args.embedder_name_or_path,
             model_class=model_args.embedder_model_class,
             normalize_embeddings=model_args.normalize_embeddings,
@@ -64,7 +65,7 @@ class TextRetrievalEvalRunner(AbsEvalRunner):
         embedder.model.config._name_or_path = model_args.embedder_name_or_path
         reranker = None
         if model_args.reranker_name_or_path is not None:
-            reranker = FlagAutoReranker.from_finetuned(
+            reranker = TextReranker(
                 model_name_or_path=model_args.reranker_name_or_path,
                 model_class=model_args.reranker_model_class,
                 peft_path=model_args.reranker_peft_path,

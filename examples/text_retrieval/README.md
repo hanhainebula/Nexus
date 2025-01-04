@@ -141,15 +141,16 @@
     eval $cmd
     ```
 
-3. Multi-level-training
+3. Multi-Node-training
 
-    We Use accelerate to train models on multi-workers.
+    We Use accelerate to train models on multi-nodes.
     
-    1. Generate accelerate config file
+    1. Generate accelerate config file.
     ```bash
     accelerate config --config_file accelerate_config.json
-    
     ```
+
+    2. Run above accelerate scrpits in each Node respectively.  
 
 Detailed scripts are in ./training
 
@@ -354,6 +355,29 @@ Detailed scripts are in ./training
 
 ## Eval
 
-TODO
+```bash
+BASE_DIR=/data1/home/recstudio/angqing/UniRetrieval
+EMBEDDER=/data1/home/recstudio/angqing/models/bge-base-zh-v1.5
+RERANKER=/data1/home/recstudio/angqing/models/bge-reranker-base
 
-Custom
+cd $BASE_DIR
+
+
+python -m UniRetrieval.evaluation.text_retrieval.airbench \
+    --benchmark_version AIR-Bench_24.05 \
+    --task_types qa \
+    --domains arxiv \
+    --languages en \
+    --splits dev test \
+    --output_dir $BASE_DIR/examples/text_retrieval/evaluation/air_bench/search_results \
+    --search_top_k 1000 \
+    --rerank_top_k 20 \
+    --cache_dir $BASE_DIR/examples/text_retrieval/evaluation/cache/data \
+    --overwrite False \
+    --embedder_name_or_path $EMBEDDER \
+    --reranker_name_or_path $RERANKER \
+    --devices cuda:0 \
+    --model_cache_dir $BASE_DIR/examples/text_retrieval/evaluation/cache/model \
+    --reranker_query_max_length 128 \
+    --reranker_max_length 512
+```

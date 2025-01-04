@@ -1,9 +1,9 @@
-from .embedder.text_retrieval import FlagModel, BaseEmbedderInferenceEngine
-from .reranker.text_retrieval import FlagReranker, BaseRerankerInferenceEngine
+from .embedder.text_retrieval import TextEmbedder, BaseEmbedderInferenceEngine
+from .reranker.text_retrieval import TextReranker, BaseRerankerInferenceEngine
 
 __all__=[
-    'FlagModel',
+    'TextEmbedder',
     'BaseEmbedderInferenceEngine',
-    'FlagReranker',
+    'TextReranker',
     'BaseRerankerInferenceEngine'
 ]

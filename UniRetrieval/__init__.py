@@ -1,3 +1,3 @@
 from .abc import AbsInferenceArguments
-from .inference import FlagModel, BaseEmbedderInferenceEngine, FlagReranker, BaseRerankerInferenceEngine
+from .inference import TextEmbedder, BaseEmbedderInferenceEngine, TextReranker, BaseRerankerInferenceEngine
 
