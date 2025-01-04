@@ -6,7 +6,7 @@ from UniRetrieval.evaluation.text_retrieval import TextRetrievalEvalModelArgs
 
 
 @dataclass
-class AIRBenchEvalModelArgs(TextRetrievalEvalModelArgs):
+class AIRBenchEvalModelArgs:
     """
     Evaluation Model arguments for AIR Bench.
     """
