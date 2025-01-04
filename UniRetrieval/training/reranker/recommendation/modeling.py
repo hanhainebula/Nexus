@@ -184,7 +184,7 @@ class BaseRanker(AbsRerankerModel):
             candidates[k] = v.view(-1, *v.shape[2:])
         context_input.update(candidates)    # {key: BxN, *}
         output = self.compute_score(context_input, *args, **kwargs)
-        scores = output.score.view(batch_size, num_candidates)  # [B, N]
+        scores = output.scores.view(batch_size, num_candidates)  # [B, N]
         # else:
         #     print('gpu_mem_save')
         #     # use loop to process each candidate
