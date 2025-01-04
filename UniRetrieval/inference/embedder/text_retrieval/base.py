@@ -450,6 +450,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         return NormalSession(self.model)
 
     def get_ort_session(self) -> ort.InferenceSession:
+        providers = ['CUDAExecutionProvider']
         if self.config['infer_device'] == 'cpu':
             providers = ["CPUExecutionProvider"]
         elif isinstance(self.config['infer_device'], int):

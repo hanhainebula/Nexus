@@ -22,7 +22,7 @@ class AbsEmbedder(ABC):
     Extend this class and implement :meth:`encode_queries`, :meth:`encode_corpus`, :meth:`encode` for custom embedders.
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__()
         
     def stop_self_pool(self):
         if self.pool is not None:
