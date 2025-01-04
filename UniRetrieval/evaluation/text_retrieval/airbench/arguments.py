@@ -2,10 +2,11 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from air_benchmark import EvalArgs as AIRBenchEvalArgs
+from UniRetrieval.evaluation.text_retrieval import TextRetrievalEvalModelArgs
 
 
 @dataclass
-class AIRBenchEvalModelArgs:
+class AIRBenchEvalModelArgs(TextRetrievalEvalModelArgs):
     """
     Evaluation Model arguments for AIR Bench.
     """
@@ -103,3 +104,21 @@ class AIRBenchEvalModelArgs:
     compress_layers: Optional[int] = field(
         default=None, metadata={"help": "The compress layers of lightweight reranker.", "nargs": "+"}
     )
+    embedder_infer_mode: str = field(
+        default=None, metadata={'help':'inference mode of embedder', 'choices':['normal','onnx', 'tensorrt']}
+    )
+    reranker_infer_mode: str = field(
+        default=None, metadata={'help':'inference mode of reranker', 'choices':['normal','onnx', 'tensorrt']}
+    )
+    embedder_onnx_model_path: str = field(
+        default=None, metadata={"help" : "embedder onnx model path"}
+    )
+    embedder_trt_model_path: str = field(
+        default=None, metadata={"help" : "embedder trt model path"}
+    )
+    reranker_onnx_model_path: str = field(
+        default=None, metadata={"help" : "reranker onnx model path"}
+    )
+    reranker_trt_model_path: str = field(
+        default=None, metadata={"help" : "reranker trt model path"}
+    )    
