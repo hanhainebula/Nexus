@@ -1,16 +1,26 @@
 import json
 from datetime import datetime
 import torch
-from typing import List
+from typing import Dict, List
 from copy import deepcopy
 import re
 import os 
 import fsspec
 import pandas as pd
 
+
 class BaseClient(object):
     def __init__(self, url: str):
         self.url = url
+        
+    def build_file_index(self, file_partition_format: Dict[str, str]) -> dict:
+        filenames = self.list_dir()
+        extract_func = extract_number if file_partition_format['type'] == "number" else extract_timestamp
+        dates_or_numbers = [extract_func(filename, file_partition_format["format"]) for filename in filenames]
+        number_to_file = {}
+        for i, filename in enumerate(filenames):
+            number_to_file[dates_or_numbers[i]] = filename
+        return number_to_file
 
     def load_file(self, path=None, **kwargs):
         if not path:
@@ -33,6 +43,25 @@ class BaseClient(object):
     def list_dir(self) -> list[str]:
         """List all files and directories in the given directory."""
         return os.listdir(self.url)
+    
+    def get_train_eval_filenames(
+            self, 
+            file_partition_format: Dict[str, str],
+            train_period: Dict[str, str],
+            eval_period: Dict[str, str],
+        ):
+        filenames = self.list_dir()
+        extract_func = extract_number if file_partition_format["type"] == "number" else extract_timestamp
+        name_format = file_partition_format["format"]
+        dates_or_numbers = [extract_func(filename, file_partition_format["format"]) for filename in filenames]
+        train_files = [filename for date_or_number, filename in zip(dates_or_numbers, filenames)
+                       if date_or_number >= extract_func(train_period["start_date"], name_format)
+                       and date_or_number < extract_func(train_period["end_date"], name_format)]
+        eval_files = [filename for date_or_number, filename in zip(dates_or_numbers, filenames)
+                       if date_or_number >= extract_func(eval_period["start_date"], name_format) 
+                       and date_or_number < extract_func(eval_period["end_date"], name_format)]
+        return train_files, eval_files
+    
     
 class HDFSClient(BaseClient):
     def __init__(self, url: str):
@@ -101,6 +130,16 @@ def extract_timestamp(filename: str, format: str="%Y-%m-%d") -> datetime:
         raise ValueError(f"No date found in {filename}")
     return datetime.strptime(match.group(), format)
 
+
+def extract_number(filename: str, format: str="(\d{4})") -> int:
+    """Extract number from filename using regex according to the given format"""
+    # get regex according to the given format
+    match = re.search(format, filename)
+    if not match:
+        raise ValueError(f"No number found in {filename} using pattern '{format}'")
+    return int(match.group(1))
+
+
 def time2datestr(dt: datetime, format: str="%Y-%m-%d") -> str:
     return dt.strftime(format)
 
@@ -167,7 +206,7 @@ def process_conditions(conditions: List[str]):
 
     # Convert each condition string to a lambda function and combine them with logical AND
     lambda_functions = [parse_condition(cond) for cond in conditions]
-    return lambda x: all(func(x) for func in lambda_functions)
+    return lambda_functions
 
 
 def detect_file_type(path: str) -> str:

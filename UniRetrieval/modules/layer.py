@@ -3,6 +3,13 @@ import torch
 
 from . import get_activation
 
+__all__ = [
+    "MLPModule",
+    "ActivationUnit",
+    "LambdaModule",
+    "HStackModule",
+]
+
 class MLPModule(torch.nn.Module):
     def __init__(
             self, 
@@ -94,6 +101,40 @@ class MLPModule(torch.nn.Module):
     #            f"\tbias={self.bias}")
 
 
+class ActivationUnit(torch.nn.Module):
+    """ Attention layer to get the relevance of historical items purchased to the target item
+    Input shape:
+        - tensor of shape ```(batch_size, timestep, embedding_dim)```
+    Output shape:
+        - tensor of shape ```(batch_size, timestep, 1)```
+    """
+    def __init__(self, input_dim: int, hidden_size: int):
+        super().__init__()
+        # use linear layer as a proxy for a deep neural network for simplicity
+        self.dnn = torch.nn.Linear(4 * input_dim, hidden_size)
+        self.dice = get_activation("dice", hidden_size)
+        self.dense = torch.nn.Linear(hidden_size, 1)
+        
+    def forward(self, query: torch.Tensor, keys: torch.Tensor):
+        """
+        Args:
+            query(torch.Tensor): the query vector with shape (batch_size, ...)
+            keys(torch.Tensor): the key vectors with shape (batch_size, seq_len, ...)
+        
+        Returns:
+            attention_score(torch.Tensor): the attention scores with shape (batch_size, seq_len, 1)
+        """
+        keys = keys.view(*keys.shape[:2], -1)   # (B, L, ...) -> (B, L, D)
+        query = query.view(query.size(0), -1)   # (B, ...) -> (B, D)
+        sequence_length = keys.size(1) # get sequence length
+        query = query.unsqueeze(1).repeat(1, sequence_length, 1) # (B, 1, D) -> (B, L, D)
+        attention_input = torch.cat([query, keys, query-keys, query * keys], dim=-1) # (B, L, E * 4)
+        attention_output = self.dice(self.dnn(attention_input)) # (B,T, hidden_units[-1])
+        # attention score represents the attention score from each keys timestep to the query
+        attention_score = self.dense(attention_output) # (B, T, hidden_units[-1]) -> (B, T , 1)
+        return attention_score
+
+
 class LambdaModule(torch.nn.Module):
     def __init__(self, func: Callable):
         super().__init__()
@@ -101,3 +142,16 @@ class LambdaModule(torch.nn.Module):
 
     def forward(self, x):
         return self.func(x)
+    
+
+class HStackModule(torch.nn.Module):
+    def __init__(self, modules: list, aggregate_function):
+        super().__init__()
+        self.layers = torch.nn.ModuleList(modules)
+        self.aggregate_function = aggregate_function
+
+    def forward(self, x):
+        layer_outputs = []
+        for layer in self.layers:
+            layer_outputs.append(layer(x))
+        return self.aggregate_function(layer_outputs)

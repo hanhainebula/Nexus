@@ -1,4 +1,6 @@
 import os
+from loguru import logger
+
 from UniRetrieval.abc.training.reranker import AbsRerankerTrainer
 
 class RankerTrainer(AbsRerankerTrainer):
@@ -21,6 +23,6 @@ class RankerTrainer(AbsRerankerTrainer):
             os.makedirs(checkpoint_dir, exist_ok=True)
             unwrapped_model = self.accelerator.unwrap_model(self.model)
             unwrapped_model.save(checkpoint_dir)
-            print(f"Model saved in {checkpoint_dir}.")
+            logger.info(f"Model saved in {checkpoint_dir}.")
         
 

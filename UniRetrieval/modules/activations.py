@@ -1,5 +1,9 @@
 import torch
 
+__all__ = [
+    'Dice',
+    'get_activation'
+]
 
 class Dice(torch.nn.Module):
     __constants__ = ['num_parameters']

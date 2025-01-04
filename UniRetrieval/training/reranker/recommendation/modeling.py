@@ -1,9 +1,6 @@
-from dataclasses import dataclass
 import os
 import json
-from typing import Dict, Union, Tuple
-import faiss.contrib.torch_utils
-from typing import OrderedDict
+from typing import Dict, Union, Tuple, List
 import torch
 
 from UniRetrieval.abc.training.reranker import AbsRerankerModel, RerankerOutput
@@ -11,15 +8,6 @@ from UniRetrieval.training.reranker.recommendation.arguments import DataAttr4Mod
 from UniRetrieval.modules import MLPModule, LambdaModule, MultiFeatEmbedding, AverageAggregator
 from UniRetrieval.modules.arguments import get_model_cls, get_modules, split_batch
 from loguru import logger
-
-@dataclass
-class RankerModelOutput(RerankerOutput):
-    score: torch.Tensor = None
-    embedding: torch.Tensor = None
-
-    def to_dict(self):
-        return {k: v for k, v in self.__dict__.items()}
-
 
 class BaseRanker(AbsRerankerModel):
     def __init__(
@@ -32,18 +20,23 @@ class BaseRanker(AbsRerankerModel):
         
         self.data_config: DataAttr4Model = data_config
         self.model_config: ModelArguments = self.load_config(model_config)
-        self.num_seq_feat = len(data_config.seq_features)
+        self.num_seq_feat = sum([len(seq_feats) for seq_feats in data_config.seq_features.values()])
         self.num_context_feat = len(data_config.context_features)
         self.num_item_feat = len(data_config.item_features)
         self.num_feat = self.num_seq_feat + self.num_context_feat + self.num_item_feat
-        super(BaseRanker, self).__init__(*args, **kwargs)
-        
         self.model_type = "ranker"
         self.num_items: int = self.data_config.num_items
         self.fiid: str = self.data_config.fiid  # item id field
-        self.flabel: str = self.data_config.flabels[0]
-        self.init_modules()
+        self.flabel: str = self.set_labels()
+        super(BaseRanker, self).__init__(*args, **kwargs)
         
+        
+    def set_labels(self) -> Union[str, List[str]]:
+        # label fields, base ranker only support one label
+        # if need multiple labels, use MultiTaskRanker instead
+        flabel: str = self.data_config.flabels[0]
+        return flabel
+    
         
     def init_modules(self):
         super().init_modules()
@@ -55,7 +48,7 @@ class BaseRanker(AbsRerankerModel):
 
     def get_embedding_layer(self):
         emb = MultiFeatEmbedding(
-            features=self.data_config.features,
+            features=self.data_config.stats.columns,
             stats=self.data_config.stats,
             embedding_dim=self.model_config.embedding_dim,
             concat_embeddings=False,
@@ -79,22 +72,34 @@ class BaseRanker(AbsRerankerModel):
         return get_modules("loss", "BCEWithLogitLoss")(reduction='mean')
 
 
-    def compute_score(self, batch, *args, **kwargs) -> RankerModelOutput:
-        context_feat, seq_feat, item_feat = split_batch(batch, self.data_config)
+    def compute_score(
+            self, 
+            batch, 
+            *args, 
+            **kwargs
+        ) -> RerankerOutput:
+        context_feat, item_feat, seq_feat_dict = split_batch(batch, self.data_config)
         all_embs = []
-        if len(seq_feat) > 0:
-            seq_emb = self.embedding_layer(seq_feat, strict=False)
-            seq_rep = self.sequence_encoder(seq_emb)   # [B, N1, D]
-            all_embs.append(seq_rep)
         context_emb = self.embedding_layer(context_feat, strict=False)  # [B, N2, D]
         item_emb = self.embedding_layer(item_feat, strict=False)    # [B, N3, D]
+        if len(seq_feat_dict) > 0:
+            for seq_name, seq_feat in seq_feat_dict.items():
+                padding_mask = seq_feat[self.fiid] == 0
+                seq_emb = self.embedding_layer(seq_feat, strict=False)
+                seq_rep = self.sequence_encoder[seq_name](
+                    seq=seq_emb,
+                    padding_mask=padding_mask,
+                    target=item_emb,
+                )   # [B, N1, D]
+                all_embs.append(seq_rep)
         all_embs += [context_emb, item_emb]
         all_embs = torch.concat(all_embs, dim=1) # [B, N1+N2+N3, D]
         interacted_emb = self.feature_interaction_layer(all_embs)    # [B, **]
         score = self.prediction_layer(interacted_emb)   # [B], sigmoid
         if len(score.shape) == 2 and score.size(-1) == 1:
             score = score.squeeze(-1)   # [B, 1] -> [B]
-        return RankerModelOutput(score=score, embedding=[context_emb, item_emb, seq_emb], scores=score)
+        return RerankerOutput(score, [context_emb, item_emb, seq_emb])
+    
     
     def get_score_function(self):
         return self.compute_score
@@ -102,7 +107,7 @@ class BaseRanker(AbsRerankerModel):
     def sampling(self, query, num_neg, *args, **kwargs):
         return self.negative_sampler(query, num_neg)
         
-    def forward(self, batch, cal_loss=False, *args, **kwargs) -> RankerModelOutput:
+    def forward(self, batch, cal_loss=False, *args, **kwargs) -> RerankerOutput:
         if cal_loss:
             return self.compute_loss(batch, *args, **kwargs)
         else:
@@ -110,9 +115,15 @@ class BaseRanker(AbsRerankerModel):
         return output
 
     def compute_loss(self, batch, *args, **kwargs) -> Dict:
-        label = batch[self.flabel].float()
         output = self.forward(batch, *args, **kwargs)
         output_dict = output.to_dict()
+        if isinstance(self.flabel, str): # single task
+            label = batch[self.flabel].float()
+        else:
+            label = []
+            for flabel in self.flabel:
+                label.append(batch[flabel].float())
+            label = torch.stack(label, dim=1) # [batch_size, n_task]
         output_dict['label'] = label
         loss = self.loss_function(**output_dict)
         
@@ -124,11 +135,17 @@ class BaseRanker(AbsRerankerModel):
     @torch.no_grad()
     def eval_step(self, batch, *args, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
         output = self.compute_score(batch, *args, **kwargs)
-        score = output.score
+        score = output.scores
         # check if the last layer of the model is a sigmoid function
         # get the last layer of the model
         pred = score
-        target = batch[self.flabel].float()
+        if isinstance(self.flabel, str):    # single task
+            target = batch[self.flabel].float()
+        else:   # multi task
+            target = []
+            for flabel in self.flabel:
+                target.append(batch[flabel].float())
+            target = torch.stack(target, dim=1) # [batch_size, n_task]
         return pred, target
 
     @torch.no_grad()
@@ -167,7 +184,7 @@ class BaseRanker(AbsRerankerModel):
             candidates[k] = v.view(-1, *v.shape[2:])
         context_input.update(candidates)    # {key: BxN, *}
         output = self.compute_score(context_input, *args, **kwargs)
-        scores = output.score.view(batch_size, num_candidates)  # [B, N]
+        scores = output.scores.view(batch_size, num_candidates)  # [B, N]
         # else:
         #     print('gpu_mem_save')
         #     # use loop to process each candidate
@@ -246,10 +263,11 @@ class MLPRanker(BaseRanker):
         super().__init__(ranker_data_config, ranker_model_config, *args, **kwargs)
         
     def get_sequence_encoder(self):
-        # cls = get_modules("module", "AverageAggregator")
-        # encoder = cls(dim=1)
-        encoder = AverageAggregator(dim=1)
-        return encoder
+        encoder_dict = torch.nn.ModuleDict({
+            name: AverageAggregator(dim=1)
+            for name in self.data_config.seq_features
+        })
+        return encoder_dict
         
     def get_feature_interaction_layer(self):
         flatten_layer = LambdaModule(lambda x: x.flatten(start_dim=1))  # [B, N, D] -> [B, N*D]
@@ -276,3 +294,82 @@ class MLPRanker(BaseRanker):
             last_bn=False
         )
         return pred_mlp
+    
+class MyMLPRanker(MLPRanker):
+    def __init__(self, ranker_data_config, ranker_model_config, *args, **kwargs):
+        super().__init__(ranker_data_config, ranker_model_config, *args, **kwargs)
+        self.topk=6 
+
+    def compute_score(self, batch, *args, **kwargs) -> RerankerOutput:
+        context_feat, seq_feat, item_feat = split_batch(batch, self.data_config)
+        all_embs = []
+        if len(seq_feat) > 0:
+            seq_emb = self.embedding_layer(seq_feat, strict=False)
+            seq_rep = self.sequence_encoder(seq_emb)   # [B, N1, D]
+            all_embs.append(seq_rep)
+        context_emb = self.embedding_layer(context_feat, strict=False)  # [B, N2, D]
+        item_emb = self.embedding_layer(item_feat, strict=False)    # [B, N3, D]
+        all_embs += [context_emb, item_emb]
+        all_embs = torch.concat(all_embs, dim=1) # [B, N1+N2+N3, D]
+        interacted_emb = self.feature_interaction_layer(all_embs)    # [B, **]
+        score = self.prediction_layer(interacted_emb)   # [B], sigmoid
+        if len(score.shape) == 2 and score.size(-1) == 1:
+            score = score.squeeze(-1)   # [B, 1] -> [B]
+        return RerankerOutput(score, [context_emb, item_emb, seq_emb])
+    
+    def forward(self, batch, cal_loss=False, *args, **kwargs) -> RerankerOutput:
+        output = self.compute_score(batch, *args, **kwargs)
+        return output
+    
+    @torch.no_grad()
+    def predict(self, context_input: Dict, candidates: Dict, topk: int=6, gpu_mem_save=False, *args, **kwargs):
+        """ predict topk candidates for each context
+        
+        Args:
+            context_input (Dict): input context feature
+            candidates (Dict): candidate items
+            topk (int): topk candidates
+            gpu_mem_save (bool): whether to save gpu memroy by using loop to process each candidate
+
+        Returns:
+            torch.Tensor: topk indices (offset instead of real item id)
+        """
+        num_candidates = candidates[self.fiid].size(1)
+        
+        if not gpu_mem_save:
+            self.topk=1
+            batch_size = candidates[self.fiid].size(0)
+            for k, v in context_input.items():
+                # B, * -> BxN, *
+                if isinstance(v, dict):
+                    for k_, v_ in v.items():
+                        # 替代 repeat_interleave
+                        v_expanded = v_.unsqueeze(1).expand(-1, num_candidates, *v_.shape[1:])  # 扩展
+                        v[k_] = v_expanded.reshape(-1, *v_.shape[1:])  # 展平
+                else:
+                    # 替代 repeat_interleave
+                    v_expanded = v.unsqueeze(1).expand(-1, num_candidates, *v.shape[1:])  # 扩展
+                    context_input[k] = v_expanded.reshape(-1, *v.shape[1:])  # 展平
+                    
+            for k, v in candidates.items():
+                # B, N, * -> BxN, *
+                candidates[k] = v.view(-1, *v.shape[2:])
+            context_input.update(candidates)    # {key: BxN, *}
+            output = self.compute_score(context_input, *args, **kwargs)
+            scores = output.score.view(batch_size, num_candidates)
+            
+        else:
+            scores = []
+            for i in range(num_candidates):
+                candidate = {k: v[:, i] for k, v in candidates.items()}
+                new_batch = dict(**context_input)
+                new_batch.update(candidate)
+                output = self.compute_score(new_batch, *args, **kwargs)
+                scores.append(output.score)
+            scores = torch.stack(scores, dim=-1)  
+        # get topk idx
+        
+        self.topk = min(self.topk, num_candidates)
+        topk_score, topk_idx = torch.topk(scores, self.topk)
+        return topk_idx
+    

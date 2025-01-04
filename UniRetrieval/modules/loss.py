@@ -3,6 +3,30 @@ import torch.nn.functional as F
 from torch import nn, Tensor
 
 
+__all__ = [
+    'FullScoreLoss', 
+    'PairwiseLoss', 
+    'PointwiseLoss', 
+    'SquareLoss', 
+    'SoftmaxLoss', 
+    'BPRLoss',
+    'Top1Loss',
+    'SampledSoftmaxLoss',
+    'WeightedBPRLoss',
+    'CrossEntropyLoss',
+    'KL_Div_Loss',
+    'm3_KDLoss',
+    'BinaryCrossEntropyLoss',
+    'WeightedBinaryCrossEntropyLoss',
+    'HingeLoss',
+    'InfoNCELoss',
+    'NCELoss',
+    'CCLLoss',
+    'BCEWithLogitLoss',
+    'BCELoss',
+    'MSELoss',
+]
+
 class FullScoreLoss(torch.nn.Module):
     r"""Calculate loss with positive scores and scores on all items.
 
@@ -233,9 +257,9 @@ class BCEWithLogitLoss(PointwiseLoss):
         super().__init__()
         self.reduction = reduction
 
-    def forward(self, label, score, *args, **kwargs):
+    def forward(self, label, scores, *args, **kwargs):
         loss = F.binary_cross_entropy_with_logits(
-            score, label, reduction=self.reduction)
+            scores, label, reduction=self.reduction)
         return loss
     
 class BCELoss(PointwiseLoss):
@@ -243,9 +267,9 @@ class BCELoss(PointwiseLoss):
         super().__init__()
         self.reduction = reduction
 
-    def forward(self, label, score, *args, **kwargs):
+    def forward(self, label, scores, *args, **kwargs):
         loss = F.binary_cross_entropy(
-            score, label, reduction=self.reduction)
+            scores, label, reduction=self.reduction)
         return loss
 
 class MSELoss(PointwiseLoss):

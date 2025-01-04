@@ -4,7 +4,6 @@ from UniRetrieval.training.embedder.recommendation.trainer import RetrieverTrain
 import json
 from transformers import TrainerCallback
 import torch
-import logging
 
 from loguru import logger
 
@@ -76,7 +75,7 @@ class ItemVectorCallback(TrainerCallback):
     def __init__(self, trainer: RetrieverTrainer):
         self.trainer = trainer
 
-    def on_epoch_end(
+    def on_save(
         self,
         *args,
         **kwargs
@@ -94,10 +93,18 @@ class ItemVectorCallback(TrainerCallback):
             all_item_ids = self.trainer.accelerator.gather_for_metrics(all_item_ids)
             all_item_vectors = torch.cat(all_item_vectors, dim=0)
             all_item_ids = torch.cat(all_item_ids, dim=0).cpu()
-            self.trainer.item_vectors = all_item_vectors
-            self.trainer.item_ids = all_item_ids
+            # self.trainer.item_vectors = all_item_vectors
+            # self.trainer.item_ids = all_item_ids
             
-            
+            logger.info(f'Item vectors updated.')
+            if self.trainer.accelerator.is_main_process:
+                checkpoint_dir = self.trainer.args.output_dir
+                if model.model_type == "retriever":
+                    item_vectors_path = os.path.join(checkpoint_dir, 'item_vectors.pt')
+                    torch.save({'item_vectors': all_item_vectors, 'item_ids': all_item_ids}, item_vectors_path)
+                    logger.info(f'Item vectors saved.')
+                # self.trainer.model.save(os.path.join(self.trainer.checkpoint_dir, "final"))
+    
 class EarlyStopCallback(Callback):
     def __init__(
             self,

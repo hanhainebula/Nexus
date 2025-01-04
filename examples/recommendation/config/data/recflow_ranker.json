@@ -2,18 +2,25 @@
     "name": "recflow",
     "type": "hdfs",
     "url": "hdfs://node1:8020/recstudio/recflow/realshow",
+    "file_partition": {
+        "type": "date",
+        "format": "%Y-%m-%d"
+    },
     "item_col": "video_id",
     "context_features": ["user_id", "device_id", "age", "gender", "province"],
     "item_features": ["video_id", "author_id", "category_level_two", "upload_type", "category_level_one"],
-    "labels": ["like"],
-    "user_sequential_info": {
-        "url": "hdfs://node1:8020/recstudio/recflow/seq_effective_50",
-        "key": "request_id",
-        "columns": ["video_id", "author_id", "category_level_two", "category_level_one", "upload_type", "upload_timestamp", "duration", "request_timestamp", "playing_time", "request_id"],
-        "use_cols": ["video_id", "author_id", "category_level_two", "category_level_one", "upload_type"]
-    },
+    "labels": ["like", "follow", "forward", "comment"],
+    "user_sequential_info": [
+        {
+            "name": "user_seq_effective_50",
+            "url": "hdfs://node1:8020/recstudio/recflow/seq_effective_50",
+            "key": "request_id",
+            "columns": ["video_id", "author_id", "category_level_two", "category_level_one", "upload_type", "upload_timestamp", "duration", "request_timestamp", "playing_time", "request_id"],
+            "use_cols": ["video_id", "author_id", "category_level_two", "category_level_one", "upload_type"],
+            "length": 50
+        }
+    ],
     "stats": {
-        "request_id": 9370581,
         "user_id": 42472,
         "device_id": 42561,
         "age": 8,
@@ -25,11 +32,11 @@
         "category_level_two": 784,
         "upload_type": 40
     },
-    "train_settings": {
-        "start_date": "2024-02-07",
+    "train_period": {
+        "start_date": "2024-02-06",
         "end_date": "2024-02-08"
     },
-    "test_settings": {
+    "test_period": {
         "start_date": "2024-02-08",
         "end_date": "2024-02-09"
     }

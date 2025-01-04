@@ -8,3 +8,7 @@ UniRetrieval.egg-info/
 tmp_trainer/
 build/
 examples/recommendation/inference/inference_data/recflow/*
+
+.vscode/
+saves/
+*/saves/

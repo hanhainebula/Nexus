@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 class RerankerOutput(AbsModelOutput, ModelOutput):
     scores: Optional[Tensor] = None
     embedding: Optional[Tensor] = None
+    
+    def to_dict(self):
+        return {k: v for k, v in self.__dict__.items()}
 
 
 class AbsRerankerModel(AbsReranker, nn.Module):

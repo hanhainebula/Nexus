@@ -3,9 +3,14 @@ import torch
 from collections import OrderedDict
 from . import MultiFeatEmbedding, MLPModule
 
-class ItemEncoder(torch.nn.Module):
+__all__ = [
+    "MLPItemEncoder",
+]
+
+
+class MLPItemEncoder(torch.nn.Module):
     def __init__(self, data_config, model_config):
-        super(ItemEncoder, self).__init__()
+        super(MLPItemEncoder, self).__init__()
         
         self.item_emb = MultiFeatEmbedding(
             features=data_config.item_features,
