@@ -230,7 +230,7 @@ class BaseRanker(AbsRerankerModel):
         
         model_config = ModelArguments.from_dict(config_dict)
         ckpt_path = os.path.join(checkpoint_dir, "model.pt")
-        state_dict = torch.load(ckpt_path, weights_only=True)
+        state_dict = torch.load(ckpt_path, weights_only=True, map_location="cpu")
         model = model_cls(data_config, model_config)
         if "item_vectors" in state_dict:
             model.item_vectors = state_dict["item_vectors"]

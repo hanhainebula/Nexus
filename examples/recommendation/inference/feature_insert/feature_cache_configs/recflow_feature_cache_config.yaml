@@ -43,11 +43,11 @@ features:
     field: province
   user_seq_effective_50:
     key_temp: recflow:user_timestamp:{user_id}_{request_timestamp}
-    field: seq_effective_50
+    field: user_seq_effective_50
 key_temp2proto:
   recflow:item:{video_id}:
     class_name: Item
-    module_path: /data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/inference/feature_insert/protos/recflow_pb2.py
+    module_path: /data1/home/recstudio/xiaolong/UniRetrieval/examples/recommendation/inference/feature_insert/protos/recflow_pb2.py
   recflow:user_timestamp:{user_id}_{request_timestamp}:
     class_name: UserTimestamp
-    module_path: /data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/inference/feature_insert/protos/recflow_pb2.py
+    module_path: /data1/home/recstudio/xiaolong/UniRetrieval/examples/recommendation/inference/feature_insert/protos/recflow_pb2.py
