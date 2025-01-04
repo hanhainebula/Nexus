@@ -6,7 +6,7 @@ import torch
 from dataclasses import dataclass
 
 from UniRetrieval.abc.training.reranker import AbsRerankerModel, RerankerOutput
-from UniRetrieval.modules.loss import CrossEntropyLoss, KL_Div_Loss
+from UniRetrieval.modules.loss import CrossEntropyLoss, KLDivLoss
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class CrossEncoderModel(AbsRerankerModel):
         return self.compute_score
 
     def get_distill_loss(self):
-        return KL_Div_Loss()
+        return KLDivLoss()
     
     def gradient_checkpointing_enable(self, **kwargs):
         """

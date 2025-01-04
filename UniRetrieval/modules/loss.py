@@ -14,8 +14,8 @@ __all__ = [
     'SampledSoftmaxLoss',
     'WeightedBPRLoss',
     'CrossEntropyLoss',
-    'KL_Div_Loss',
-    'm3_KDLoss',
+    'KLDivLoss',
+    'M3KDLoss',
     'BinaryCrossEntropyLoss',
     'WeightedBinaryCrossEntropyLoss',
     'HingeLoss',
@@ -134,13 +134,13 @@ class CrossEntropyLoss(nn.CrossEntropyLoss):
             label_smoothing=self.label_smoothing,
         )
     
-class KL_Div_Loss(nn.Module):
+class KLDivLoss(nn.Module):
     def forward(self, student_scores, teacher_targets, *args, **kwargs):
         return - torch.mean(
                 torch.sum(torch.log_softmax(student_scores, dim=-1) * teacher_targets, dim=-1)
             )
         
-class m3_KDLoss(nn.Module):
+class M3KDLoss(nn.Module):
     def forward(self, student_scores, teacher_targets, group_size):
         labels = torch.arange(student_scores.size(0), device=student_scores.device, dtype=torch.long)
         labels = labels * group_size

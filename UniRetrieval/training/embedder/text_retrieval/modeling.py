@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from UniRetrieval.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
-from UniRetrieval.modules.loss import CrossEntropyLoss, KL_Div_Loss, m3_KDLoss
+from UniRetrieval.modules.loss import CrossEntropyLoss, KLDivLoss, M3KDLoss
 from UniRetrieval.modules.score import IP_text_retrieval
 
 from .arguments import WrappedTextEmbedderModelArguments
@@ -81,11 +81,11 @@ class BiTextEmbedderModel(AbsEmbedderModel):
         if kd_loss_type == 'kl_div':
             # teacher_targets: (batch_size, group_size) / (world_size * batch_size, group_size)
             # student_scores: (batch_size, group_size) / (world_size * batch_size, group_size)
-            return KL_Div_Loss()
+            return KLDivLoss()
         elif kd_loss_type == 'm3_kd_loss':
             # teacher_targets: (batch_size, group_size) / (world_size * batch_size, group_size)
             # student_scores: (batch_size, batch_size * group_size) / (world_size * batch_size, world_size * batch_size * group_size)
-            return m3_KDLoss()
+            return M3KDLoss()
         else:
             raise ValueError(f"Invalid kd_loss_type: {kd_loss_type}")
         
