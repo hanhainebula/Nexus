@@ -166,6 +166,24 @@ class TextRetrievalEvalModelArgs():
     compress_layers: Optional[int] = field(
         default=None, metadata={"help": "The compress layers of lightweight reranker.", "nargs": "+"}
     )
+    embedder_infer_mode: str = field(
+        default=None, metadata={'help':'inference mode of embedder', 'choices':['normal','onnx', 'tensorrt']}
+    )
+    reranker_infer_mode: str = field(
+        default=None, metadata={'help':'inference mode of reranker', 'choices':['normal','onnx', 'tensorrt']}
+    )
+    embedder_onnx_model_path: str = field(
+        default=None, metadata={"help" : "embedder onnx model path"}
+    )
+    embedder_trt_model_path: str = field(
+        default=None, metadata={"help" : "embedder trt model path"}
+    )
+    reranker_onnx_model_path: str = field(
+        default=None, metadata={"help" : "reranker onnx model path"}
+    )
+    reranker_trt_model_path: str = field(
+        default=None, metadata={"help" : "reranker trt model path"}
+    )    
 
     
     

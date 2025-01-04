@@ -6,10 +6,11 @@ import logging
 import gc
 import torch
 import numpy as np
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 from abc import ABC, abstractmethod
 
 from UniRetrieval.abc.inference import AbsEmbedder, AbsReranker
+from UniRetrieval import BaseEmbedderInferenceEngine, BaseRerankerInferenceEngine, TextEmbedder, TextReranker
 from .utils import index, search
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ class TextRetrievalEvalRetriever(ABC):
     """
     This is the base class for retriever.
     """
-    def __init__(self, embedder: AbsEmbedder, search_top_k: int = 1000, overwrite: bool = False):
+    def __init__(self, embedder: Union[BaseEmbedderInferenceEngine, TextEmbedder], search_top_k: int = 1000, overwrite: bool = False):
         self.embedder = embedder
         self.search_top_k = search_top_k
         self.overwrite = overwrite
@@ -28,7 +29,10 @@ class TextRetrievalEvalRetriever(ABC):
         """
         Returns: str: Name of the retriever.
         """
-        return os.path.basename(self.embedder.model.config._name_or_path)
+        if isinstance(self.embedder, TextEmbedder):
+            return os.path.basename(self.embedder.model.config._name_or_path)
+        else:
+            return os.path.basename(self.embedder.model.model.config._name_or_path)
 
     def stop_multi_process_pool(self):
         self.embedder.stop_self_pool()
@@ -122,11 +126,11 @@ class TextRetrievalEvalDenseRetriever(TextRetrievalEvalRetriever):
             if os.path.exists(os.path.join(corpus_embd_save_dir, "doc.npy")) and not self.overwrite:
                 corpus_emb = np.load(os.path.join(corpus_embd_save_dir, "doc.npy"))
             else:
-                corpus_emb = self.embedder.encode_corpus(corpus_texts, **kwargs)
+                corpus_emb = self.embedder.encode_info(corpus_texts, **kwargs)
         else:
-            corpus_emb = self.embedder.encode_corpus(corpus_texts, **kwargs)
+            corpus_emb = self.embedder.encode_info(corpus_texts, **kwargs)
 
-        queries_emb = self.embedder.encode_queries(queries_texts, **kwargs)
+        queries_emb = self.embedder.encode_query(queries_texts, **kwargs)
 
         # check if the embeddings are in dictionary format: M3Embedder
         if isinstance(corpus_emb, dict):
@@ -155,13 +159,13 @@ class TextRetrievalEvalDenseRetriever(TextRetrievalEvalRetriever):
                     results[queries_ids[idx]][corpus_ids[indice]] = float(score)
 
         return results
-
+    
 
 class TextRetrievalEvalReranker:
     """
     Class for reranker during evaluation.
     """
-    def __init__(self, reranker: AbsReranker, rerank_top_k: int = 100):
+    def __init__(self, reranker: Union[TextReranker, BaseRerankerInferenceEngine], rerank_top_k: int = 100):
         self.reranker = reranker
         self.rerank_top_k = rerank_top_k
 
@@ -169,7 +173,10 @@ class TextRetrievalEvalReranker:
         """
         Returns: str: Name of the reranker.
         """
-        return os.path.basename(self.reranker.model.config._name_or_path)
+        if isinstance(self.reranker, TextReranker):
+            return os.path.basename(self.reranker.model.config._name_or_path)
+        else:
+            return os.path.basename(self.reranker.model.model.config._name_or_path)
 
     def stop_multi_process_pool(self):
         self.reranker.stop_self_pool()

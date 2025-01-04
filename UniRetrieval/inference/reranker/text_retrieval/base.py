@@ -379,10 +379,13 @@ class NormalSession():
 
 
 class BaseRerankerInferenceEngine(InferenceEngine):
-    def __init__(self, infer_args: AbsInferenceArguments):
+    def __init__(self, infer_args: AbsInferenceArguments, model: BaseReranker = None):
         super().__init__(infer_args)
         # normal model
-        self.load_model()
+        if not model:
+            self.load_model()
+        else:
+            self.model=model
         # session
         self.session = self.get_inference_session()
         self.device = self.config['infer_device']
@@ -573,6 +576,9 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         outputs = self.session.run([self.session.get_outputs()[0].name], batch_size = batch_size, normalize=normalize,input_feed=input_feed)
         scores = outputs
         return scores
+    
+    def compute_score(self, inputs, *args, **kwargs):
+        return self.inference(inputs, *args, **kwargs)
 
 
 if __name__=='__main__':

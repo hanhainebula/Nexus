@@ -4,7 +4,7 @@ import logging
 from typing import List, Union, Tuple
 
 # from FlagEmbedding import FlagAutoModel, FlagAutoReranker
-from UniRetrieval import TextEmbedder, TextReranker, BaseEmbedderInferenceEngine, BaseRerankerInferenceEngine
+from UniRetrieval import TextEmbedder, TextReranker, BaseEmbedderInferenceEngine, BaseRerankerInferenceEngine, AbsInferenceArguments
 from .arguments import TextRetrievalEvalArgs, TextRetrievalEvalModelArgs
 from .evaluator import TextRetrievalAbsEvaluator
 from .searcher import TextRetrievalEvalDenseRetriever, TextRetrievalEvalReranker
@@ -35,7 +35,7 @@ class TextRetrievalEvalRunner(AbsEvalRunner):
         self.evaluator = self.load_evaluator()
 
     @staticmethod
-    def get_models(model_args: TextRetrievalEvalModelArgs) -> Tuple[TextEmbedder, Union[TextReranker, None]]:
+    def get_models(model_args: TextRetrievalEvalModelArgs) -> Tuple[Union[TextEmbedder, BaseEmbedderInferenceEngine], Union[TextReranker, BaseRerankerInferenceEngine, None]]:
         """Get the embedding and reranker model
 
         Args:
@@ -45,7 +45,8 @@ class TextRetrievalEvalRunner(AbsEvalRunner):
             Tuple[FlagAutoModel, Union[FlagAutoReranker, None]]: A :class:FlagAutoModel object of embedding model, and 
                 :class:FlagAutoReranker object of reranker model if path provided.
         """
-        embedder = TextEmbedder(
+        embedder_infer_mode=model_args.embedder_infer_mode
+        base_embedder = TextEmbedder(
             model_name_or_path=model_args.embedder_name_or_path,
             model_class=model_args.embedder_model_class,
             normalize_embeddings=model_args.normalize_embeddings,
@@ -62,10 +63,27 @@ class TextRetrievalEvalRunner(AbsEvalRunner):
             query_max_length=model_args.embedder_query_max_length,
             passage_max_length=model_args.embedder_passage_max_length,
         )
-        embedder.model.config._name_or_path = model_args.embedder_name_or_path
+        if embedder_infer_mode is None:
+            embedder = base_embedder
+            embedder.model.config._name_or_path = model_args.embedder_name_or_path
+            
+        else:
+            embedder_engine_args=AbsInferenceArguments(
+                model_name_or_path=model_args.embedder_name_or_path,
+                onnx_model_path=model_args.embedder_onnx_model_path,
+                trt_model_path=model_args.embedder_trt_model_path,
+                infer_mode=model_args.embedder_infer_mode,
+                infer_device=model_args.devices,
+                infer_batch_size=model_args.embedder_batch_size
+            )
+            
+            embedder = BaseEmbedderInferenceEngine(embedder_engine_args, model=base_embedder)
+            embedder.model.model.config._name_or_path = model_args.embedder_name_or_path
+        
+        
         reranker = None
         if model_args.reranker_name_or_path is not None:
-            reranker = TextReranker(
+            base_reranker = TextReranker(
                 model_name_or_path=model_args.reranker_name_or_path,
                 model_class=model_args.reranker_model_class,
                 peft_path=model_args.reranker_peft_path,
@@ -87,7 +105,25 @@ class TextRetrievalEvalRunner(AbsEvalRunner):
                 query_max_length=model_args.reranker_query_max_length,
                 max_length=model_args.reranker_max_length,
             )
-            reranker.model.config._name_or_path = model_args.reranker_name_or_path
+            
+            reranker_infer_mode = model_args.reranker_infer_mode
+            if reranker_infer_mode is None:
+                reranker = base_reranker
+                reranker.model.config._name_or_path = model_args.reranker_name_or_path
+            
+            else:
+                reranker_engine_args=AbsInferenceArguments(
+                    model_name_or_path=model_args.reranker_name_or_path,
+                    onnx_model_path=model_args.reranker_onnx_model_path,
+                    trt_model_path=model_args.reranker_trt_model_path,
+                    infer_mode=model_args.reranker_infer_mode,
+                    infer_device=model_args.devices,
+                    infer_batch_size=model_args.reranker_batch_size
+                )
+            
+                reranker = BaseRerankerInferenceEngine(reranker_engine_args, model=base_reranker)
+                reranker.model.model.config._name_or_path = model_args.reranker_name_or_path
+            
         return embedder, reranker
 
     def load_retriever_and_reranker(self) -> Tuple[TextRetrievalEvalDenseRetriever, Union[TextRetrievalEvalReranker, None]]:

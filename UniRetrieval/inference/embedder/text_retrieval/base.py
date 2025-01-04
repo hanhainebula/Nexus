@@ -416,7 +416,8 @@ class NormalSession():
             name='embeddings'
         )]
 
-    def run(self, output_names, input_feed, batch_size=10, run_options=None):
+    def run(self, output_names, input_feed, batch_size=None, run_options=None):
+            
         sentences=input_feed['sentences']            
         embeddings = self.model.encode(sentences, batch_size=batch_size)
         
@@ -429,11 +430,15 @@ class NormalSession():
 
 
 class BaseEmbedderInferenceEngine(InferenceEngine):
-    def __init__(self, infer_args: AbsInferenceArguments):
+    def __init__(self, infer_args: AbsInferenceArguments, model:BaseEmbedder=None):
         super().__init__(infer_args)
         # normal model
-        self.load_model()
+        if not model:
+            self.load_model()
+        else:
+            self.model=model
         # session
+        self.batch_size= self.config['infer_batch_size']
         self.session = self.get_inference_session()
         
     def load_model(self, use_fp16=False):
@@ -529,8 +534,12 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         else:
             raise ValueError(f"Unsupported session type: {session_type}")
 
-    def _inference_tensorrt(self, inputs, normalize=True, batch_size=10, *args, **kwargs):
+    def _inference_tensorrt(self, inputs, normalize=True, batch_size=None, *args, **kwargs):
         # prepaer inputs first
+        
+        if not batch_size:
+            batch_size = self.batch_size
+        
         if isinstance(inputs, str):
             inputs=[inputs]
             
@@ -589,7 +598,10 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         
         return all_outputs
 
-    def _inference_onnx(self, inputs, normalize = True, batch_size = 10, *args, **kwargs):
+    def _inference_onnx(self, inputs, normalize = True, batch_size = None, *args, **kwargs):
+        if not batch_size:
+            batch_size = self.batch_size
+            
         if isinstance(inputs, str):
             inputs=[inputs]
             
@@ -617,13 +629,28 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         
         return cls_emb
 
-    def _inference_normal(self, inputs, *args, **kwargs):
+    def _inference_normal(self, inputs,batch_size = None, *args, **kwargs):
+        if not batch_size:
+            batch_size = self.batch_size
+            
         input_feed = {self.session.get_inputs()[0].name: inputs}
 
-        outputs = self.session.run([self.session.get_outputs()[0].name], input_feed)
+        outputs = self.session.run([self.session.get_outputs()[0].name], input_feed, batch_size=batch_size)
+        
         embeddings = outputs[0]
         return embeddings
 
+    def encode_query(self,
+        inputs: Union[List[str], List[Tuple[str, str]], pd.DataFrame, Any],
+        *args,
+        **kwargs):
+        return self.inference(inputs, *args, **kwargs)
+    
+    def encode_info(self,
+        inputs: Union[List[str], List[Tuple[str, str]], pd.DataFrame, Any],
+        *args,
+        **kwargs):
+        return self.inference(inputs, *args, **kwargs)
 
 if __name__=='__main__':
     import pdb
