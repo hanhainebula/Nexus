@@ -389,8 +389,9 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         else:
             self.model=model
         # session
-        self.session = self.get_inference_session()
         self.device = self.config['infer_device']
+        self.batch_size = self.config['infer_batch_size']
+        self.session = self.get_inference_session()
         
     def load_model(self, use_fp16=False):
         self.model = BaseReranker(model_name_or_path=self.config["model_name_or_path"],use_fp16=use_fp16, batch_size=self.config['infer_batch_size'], devices=self.config['infer_device'])
@@ -452,12 +453,9 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         )
         print(f"Model has been converted to ONNX and saved at {onnx_model_path}")
 
-    def convert_to_tensorrt(self, onnx_model_path: str= None, trt_model_path: str = None):
-        # use trtexec
-        if not onnx_model_path or not trt_model_path:
-            onnx_model_path = self.config['onnx_model_path']
-            trt_model_path = self.config['trt_model_path']
-            
+    
+    @classmethod
+    def convert_to_tensorrt(cls, onnx_model_path: str = None, trt_model_path: str = None, batch_size=16, trt_path: str = None):
         if not os.path.isfile(onnx_model_path):
             raise FileNotFoundError(f"ONNX model not exists: {onnx_model_path}")
         
@@ -465,16 +463,21 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         if not os.path.exists(trt_save_dir):
             os.makedirs(trt_save_dir)
 
+        if trt_path:
+            os.environ['LD_LIBRARY_PATH'] = f"{os.environ.get('LD_LIBRARY_PATH', '')}:{trt_path}/lib"
+            os.environ['PATH'] = f"{os.environ.get('PATH', '')}:{trt_path}/bin"
+
         trtexec_cmd = (
             f"trtexec --onnx={onnx_model_path} --saveEngine={trt_model_path} "
             f"--minShapes=input_ids:1x1,attention_mask:1x1 "
-            f"--optShapes=input_ids:{self.batch_size}x512,attention_mask:{self.batch_size}x512 "
-            f"--maxShapes=input_ids:{self.batch_size}x512,attention_mask:{self.batch_size}x512 "
+            f"--optShapes=input_ids:{batch_size}x512,attention_mask:{batch_size}x512 "
+            f"--maxShapes=input_ids:{batch_size}x512,attention_mask:{batch_size}x512 "
             "--verbose"
         )
 
+        # Run trtexec command
         try:
-            result = subprocess.run(trtexec_cmd, check=True, capture_output=True, text=True)
+            result = subprocess.run(trtexec_cmd, shell=True, check=True, capture_output=True, text=True)
             print("DONE!")
             print(result.stdout)
         except subprocess.CalledProcessError as e:
@@ -514,7 +517,12 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         else:
             raise ValueError(f"Unsupported session type: {session_type}")
 
-    def _inference_tensorrt(self, sentence_pairs, batch_size = 16, normalize = True, *args, **kwargs):
+    def _inference_tensorrt(self, sentence_pairs, batch_size = None, normalize = True, *args, **kwargs):
+        
+        if not batch_size:
+            batch_size = self.batch_size
+        
+        
         if not isinstance(sentence_pairs, list):
             sentence_pairs=[sentence_pairs]
 
@@ -574,7 +582,11 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         all_scores = [float(score) for score in all_scores]
         return all_scores
     
-    def _inference_onnx(self, sentence_pairs, batch_size = 16, normalize = True,  *args, **kwargs):
+    def _inference_onnx(self, sentence_pairs, batch_size = None, normalize = True,  *args, **kwargs):
+        
+        if not batch_size:
+            batch_size = self.batch_size
+        
         self.tokenizer=self.model.tokenizer   
         if not isinstance(sentence_pairs, list):
             sentence_pairs=[sentence_pairs]
@@ -601,10 +613,13 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
         return all_scores
 
-    def _inference_normal(self, inputs, normalize=True, batch_size=16, *args, **kwargs):
+    def _inference_normal(self, inputs, normalize=True, batch_size=None, *args, **kwargs):
         input_feed = {self.session.get_inputs()[0].name: inputs}
 
-        outputs = self.session.run([self.session.get_outputs()[0].name], batch_size = batch_size, normalize=normalize,input_feed=input_feed)
+        if not batch_size:
+            batch_size = self.batch_size
+
+        outputs = self.session.run([self.session.get_outputs()[0].name], batch_size = batch_size, normalize = normalize,input_feed=input_feed)
         scores = outputs
         return scores
     
@@ -634,6 +649,8 @@ if __name__=='__main__':
     
     # 1. test conver_to_onnx
     # BaseRerankerInferenceEngine.convert_to_onnx(args.model_name_or_path, args.onnx_model_path)
+    
+    
     qa_pairs = [
         ("What is the capital of France?", "Paris is the capital and most populous city of France."),
         ("Who wrote 'Pride and Prejudice'?", "'Pride and Prejudice' was written by Jane Austen."),

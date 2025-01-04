@@ -58,7 +58,7 @@ training_args="\
 cd $BASE_DIR
 
 cmd="accelerate launch --config_file $ACCELERATE_CONFIG \
-    eval_scripts/training/text_retrieval/embedder/training.py \
+    UniRetrieval/training/embedder/text_retrieval/__main__.py \
     $model_args \
     $data_args \
     $training_args \

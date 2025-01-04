@@ -465,6 +465,10 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         return ort.InferenceSession(onnx_model_path, providers=providers)
 
     def get_trt_session(self) -> trt.ICudaEngine:
+        
+        if not os.path.exists(self.config['trt_model_path']):
+            print(f'Tensorrt model not exists, please first create tensorrt from onnx')
+        
         device=self.config['infer_device']
         if not isinstance(device, int):
             device=0
@@ -487,7 +491,6 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         tokenizer=base_model.tokenizer
         dummy_input = tokenizer("This is a dummy input", return_tensors="pt", padding=True)
         dummy_input = (torch.LongTensor(dummy_input['input_ids']).view(1, -1), torch.LongTensor(dummy_input['attention_mask']).view(1, -1), torch.LongTensor(dummy_input['token_type_ids']).view(1, -1))
-        print(dummy_input[0].shape)
         if use_fp16:
             model = model.half()  # 将模型权重转换为 FP16
             dummy_input = {key: value.half() for key, value in dummy_input.items()}  # 将输入数据转换为 FP16
@@ -503,12 +506,8 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         )
         print(f"Model has been converted to ONNX and saved at {onnx_model_path}")
 
-    def convert_to_tensorrt(self, onnx_model_path: str= None, trt_model_path: str = None):
-        # use trtexec
-        if not onnx_model_path or not trt_model_path:
-            onnx_model_path = self.config['onnx_model_path']
-            trt_model_path = self.config['trt_model_path']
-            
+    @classmethod
+    def convert_to_tensorrt(cls, onnx_model_path: str = None, trt_model_path: str = None, batch_size=16, trt_path: str = None):
         if not os.path.isfile(onnx_model_path):
             raise FileNotFoundError(f"ONNX model not exists: {onnx_model_path}")
         
@@ -516,16 +515,21 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         if not os.path.exists(trt_save_dir):
             os.makedirs(trt_save_dir)
 
+        if trt_path:
+            os.environ['LD_LIBRARY_PATH'] = f"{os.environ.get('LD_LIBRARY_PATH', '')}:{trt_path}/lib"
+            os.environ['PATH'] = f"{os.environ.get('PATH', '')}:{trt_path}/bin"
+
         trtexec_cmd = (
             f"trtexec --onnx={onnx_model_path} --saveEngine={trt_model_path} "
             f"--minShapes=input_ids:1x1,attention_mask:1x1,token_type_ids:1x1 "
-            f"--optShapes=input_ids:{self.batch_size}x512,attention_mask:{self.batch_size}x512,token_type_ids:{self.batch_size}x512 "
-            f"--maxShapes=input_ids:{self.batch_size}x512,attention_mask:{self.batch_size}x512,token_type_ids:{self.batch_size}x512 "
+            f"--optShapes=input_ids:{batch_size}x512,attention_mask:{batch_size}x512,token_type_ids:{batch_size}x512 "
+            f"--maxShapes=input_ids:{batch_size}x512,attention_mask:{batch_size}x512,token_type_ids:{batch_size}x512 "
             "--verbose"
         )
 
+        # Run trtexec command
         try:
-            result = subprocess.run(trtexec_cmd, check=True, capture_output=True, text=True)
+            result = subprocess.run(trtexec_cmd, shell=True, check=True, capture_output=True, text=True)
             print("DONE!")
             print(result.stdout)
         except subprocess.CalledProcessError as e:
@@ -734,6 +738,10 @@ if __name__=='__main__':
     ]
     # 1. convert model to onnx
     # BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
+    
+    BaseEmbedderInferenceEngine.convert_to_tensorrt(args.onnx_model_path, args.trt_model_path, batch_size=16, trt_path='/data2/home/angqing/tensorrt/TensorRT-10.7.0.23')
+    pdb.set_trace()
+    
     # 2. test normal session
     args.infer_mode='normal'
     inference_engine=BaseEmbedderInferenceEngine(args)
