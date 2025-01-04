@@ -3,7 +3,7 @@ sys.path.append('.')
 
 import gzip
 import redis
-from inference.feature_insert.protos import recflow_pb2
+from examples.recommendation.inference.feature_insert.protos import recflow_pb2
 import numpy as np
 import pandas as pd  
 from tqdm import tqdm
@@ -13,7 +13,7 @@ import yaml
 r = redis.Redis(host='localhost', port=6379, db=0)
 
 # Item
-test_video_info = pd.read_feather('./inference/feature_data/recflow/realshow_test_video_info.feather')
+test_video_info = pd.read_feather('./examples/recommendation/inference/feature_data/recflow/test_video_info.feather')
 for row in tqdm(test_video_info.itertuples(), total=len(test_video_info)):
 
     # 0. Create a message object
@@ -35,7 +35,7 @@ for row in tqdm(test_video_info.itertuples(), total=len(test_video_info)):
 print("Item features are stored in Redis.")
 
 # User
-test_user_info = np.load('./inference/feature_data/recflow/test_user_info.npz')['arr_0']
+test_user_info = np.load('./examples/recommendation/inference/feature_data/recflow/test_user_info.npz')['arr_0']
 for row in tqdm(test_user_info):
 
     # 0. Create a message object 
@@ -49,7 +49,7 @@ for row in tqdm(test_user_info):
     user_timestamp.province = row[6]
     
     for behavior in np.split(row[7:], len(row[7:]) // 6):
-        item = user_timestamp.seq_effective_50.add()
+        item = user_timestamp.user_seq_effective_50.add()
         item.video_id = behavior[0]
         item.author_id = behavior[1]
         item.category_level_two = behavior[2]
@@ -75,7 +75,7 @@ for col in test_video_info.columns:
     feat_dict[col.strip(' ')] = {}
     feat_dict[col.strip(' ')]['key_temp'] = 'recflow:item:{video_id}'
     feat_dict[col.strip(' ')]['field'] = col.strip(' ')
-for col in ['request_id', 'user_id', 'request_timestamp', 'device_id', 'age', 'gender', 'province', 'seq_effective_50']:
+for col in ['request_id', 'user_id', 'request_timestamp', 'device_id', 'age', 'gender', 'province', 'user_seq_effective_50']:
     feat_dict[col.strip(' ')] = {}
     feat_dict[col.strip(' ')]['key_temp'] = 'recflow:user_timestamp:{user_id}_{request_timestamp}'
     feat_dict[col.strip(' ')]['field'] = col.strip(' ')
@@ -86,5 +86,5 @@ final_dict['key_temp2proto'] = {
 }
 
 # save dict as yaml 
-with open('./inference/feature_insert/feature_cache_configs/recflow_feature_cache_config.yaml', 'w') as file:
+with open('./examples/recommendation/inference/feature_insert/feature_cache_configs/recflow_feature_cache_config.yaml', 'w') as file:
     yaml.dump(final_dict, file, default_flow_style=False, allow_unicode=True, sort_keys=False)
