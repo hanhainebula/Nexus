@@ -3,10 +3,10 @@ EMBEDDER=/data1/home/recstudio/angqing/models/bge-base-zh-v1.5
 RERANKER=/data1/home/recstudio/angqing/models/bge-reranker-base
 embedder_infer_mode=onnx
 reranker_infer_mode=onnx
-embedder_onnx_path=
-reranker_onnx_path=
-embedder_trt_path=
-reranker_trt_path=
+embedder_onnx_path=$EMBEDDER/onnx/model.onnx
+reranker_onnx_path=$RERANKER/onnx/model.onnx
+embedder_trt_path=$EMBEDDER/trt/model.trt
+reranker_trt_path=$RERANKER/trt/model.trt
 
 
 cd $BASE_DIR

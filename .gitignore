@@ -12,3 +12,7 @@ examples/recommendation/inference/inference_data/recflow/*
 .vscode/
 saves/
 */saves/
+
+checkpoints/
+eval_scripts/
+note
