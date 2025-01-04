@@ -1,6 +1,6 @@
 from transformers import HfArgumentParser
 
-from . import TextRetrievalEvalArgs, TextRetrievalEvalModelArgs, TextRetrievalEvalRunner
+from UniRetrieval.evaluation.text_retrieval import TextRetrievalEvalArgs, TextRetrievalEvalModelArgs, TextRetrievalEvalRunner
 
 
 def main():

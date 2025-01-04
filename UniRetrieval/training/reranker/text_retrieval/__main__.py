@@ -1,17 +1,16 @@
 from transformers import HfArgumentParser
 
 from UniRetrieval.training.reranker.text_retrieval import *
-from .runner import EncoderOnlyRerankerRunner
 
 
 def main():
-    parser = HfArgumentParser((AbsTextRerankerModelArguments, AbsTextRerankerDataArguments, AbsTextRerankerTrainingArguments))
+    parser = HfArgumentParser((TextRerankerModelArguments, TextRerankerDataArguments, TextRerankerTrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    model_args: AbsTextRerankerModelArguments
-    data_args: AbsTextRerankerDataArguments
-    training_args: AbsTextRerankerTrainingArguments
+    model_args: TextRerankerModelArguments
+    data_args: TextRerankerDataArguments
+    training_args: TextRerankerTrainingArguments
 
-    runner = EncoderOnlyRerankerRunner(
+    runner = TextRerankerRunner(
         model_args=model_args,
         data_args=data_args,
         training_args=training_args

@@ -1,7 +1,10 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Optional
 import os
-from UniRetrieval.abc.evaluation import AbsEvalArguments, AbsEvalDataLoaderArguments
+
+from UniRetrieval.abc.arguments import AbsArguments
+from UniRetrieval.abc.evaluation import AbsEvalArguments
+
 
 @dataclass
 class TextRetrievalEvalArgs(AbsEvalArguments):
@@ -32,9 +35,6 @@ class TextRetrievalEvalArgs(AbsEvalArguments):
     )
     corpus_embd_save_dir: str = field(
         default=None, metadata={"help": "Path to save corpus embeddings. If None, embeddings are not saved."}
-    )
-    output_dir: str = field(
-        default="./search_results", metadata={"help": "Path to save results."}
     )
     search_top_k: int = field(
         default=1000, metadata={"help": "Top k for retrieving."}
@@ -67,16 +67,14 @@ class TextRetrievalEvalArgs(AbsEvalArguments):
         metadata={"help": "The metrics to evaluate. Default: ['ndcg_at_10', 'recall_at_10']", "nargs": "+"}
     )
 
+
 @dataclass
-class TextRetrievalEvalModelArgs():
+class TextRetrievalEvalModelArgs(AbsArguments):
     """
     Base class for model arguments during evaluation.
     """
     embedder_name_or_path: str = field(
         metadata={"help": "The embedder name or path.", "required": True}
-    )
-    embedder_model_class: Optional[str] = field(
-        default=None, metadata={"help": "The embedder model class. Available classes: ['encoder-only-base', 'encoder-only-m3', 'decoder-only-base', 'decoder-only-icl']. Default: None. For the custom model, you need to specifiy the model class.", "choices": ["encoder-only-base", "encoder-only-m3", "decoder-only-base", "decoder-only-icl"]}
     )
     normalize_embeddings: bool = field(
         default=True, metadata={"help": "whether to normalize the embeddings"}
@@ -96,23 +94,11 @@ class TextRetrievalEvalModelArgs():
     query_instruction_format_for_retrieval: str = field(
         default="{}{}", metadata={"help": "Format for query instruction"}
     )
-    examples_for_task: Optional[str] = field(
-        default=None, metadata={"help": "Examples for task"}
-    )
-    examples_instruction_format: str = field(
-        default="{}{}", metadata={"help": "Format for examples instruction"}
-    )
     trust_remote_code: bool = field(
         default=False, metadata={"help": "Trust remote code"}
     )
     reranker_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "The reranker name or path."}
-    )
-    reranker_model_class: Optional[str] = field(
-        default=None, metadata={"help": "The reranker model class. Available classes: ['encoder-only-base', 'decoder-only-base', 'decoder-only-layerwise', 'decoder-only-lightweight']. Default: None. For the custom model, you need to specify the model class.", "choices": ["encoder-only-base", "decoder-only-base", "decoder-only-layerwise", "decoder-only-lightweight"]}
-    )
-    reranker_peft_path: Optional[str] = field(
-        default=None, metadata={"help": "The reranker peft path."}
     )
     use_bf16: bool = field(
         default=False, metadata={"help": "whether to use bf16 for inference"}
@@ -157,15 +143,6 @@ class TextRetrievalEvalModelArgs():
     prompt: Optional[str] = field(
         default=None, metadata={"help": "The prompt for the reranker."}
     )
-    cutoff_layers: List[int] = field(
-        default=None, metadata={"help": "The output layers of layerwise/lightweight reranker."}
-    )
-    compress_ratio: int = field(
-        default=1, metadata={"help": "The compress ratio of lightweight reranker."}
-    )
-    compress_layers: Optional[int] = field(
-        default=None, metadata={"help": "The compress layers of lightweight reranker.", "nargs": "+"}
-    )
     embedder_infer_mode: str = field(
         default=None, metadata={'help':'inference mode of embedder', 'choices':['normal','onnx', 'tensorrt']}
     )
@@ -183,7 +160,4 @@ class TextRetrievalEvalModelArgs():
     )
     reranker_trt_model_path: str = field(
         default=None, metadata={"help" : "reranker trt model path"}
-    )    
-
-    
-    
+    )

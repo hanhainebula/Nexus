@@ -4,16 +4,16 @@ from UniRetrieval.training.embedder.text_retrieval import *
 
 def main():
     parser = HfArgumentParser((
-        EncoderOnlyEmbedderModelArguments,
-        EncoderOnlyEmbedderDataArguments,
-        EncoderOnlyEmbedderTrainingArguments
+        TextEmbedderModelArguments,
+        TextEmbedderDataArguments,
+        TextEmbedderTrainingArguments
     ))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    model_args: EncoderOnlyEmbedderModelArguments
-    data_args: EncoderOnlyEmbedderDataArguments
-    training_args: EncoderOnlyEmbedderTrainingArguments
+    model_args: TextEmbedderModelArguments
+    data_args: TextEmbedderDataArguments
+    training_args: TextEmbedderTrainingArguments
 
-    runner = EncoderOnlyEmbedderRunner(
+    runner = TextEmbedderRunner(
         model_args=model_args,
         data_args=data_args,
         training_args=training_args

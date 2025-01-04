@@ -1,13 +1,12 @@
 from transformers import PreTrainedModel, AutoTokenizer
 import logging
-from torch import nn, Tensor
-from typing import Dict, Optional, List, Union
+from torch import Tensor
+from typing import Optional
 import torch
 from dataclasses import dataclass
-# from UniRetrieval.training.text_retrieval.abc.reranker import AbsRerankerModel
+
 from UniRetrieval.abc.training.reranker import AbsRerankerModel, RerankerOutput
 from UniRetrieval.modules.loss import CrossEntropyLoss, KL_Div_Loss
-from .arguments import AbsTextRerankerModelArguments
 
 logger = logging.getLogger(__name__)
 

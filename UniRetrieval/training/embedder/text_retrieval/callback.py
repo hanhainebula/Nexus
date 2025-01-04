@@ -5,8 +5,8 @@ from transformers import (
     TrainerControl
 )
 
-from .arguments import AbsTextEmbedderTrainingArguments
-from . datasets import AbsEmbedderSameDatasetTrainDataset
+from .arguments import TextEmbedderTrainingArguments
+from .dataset import AbsEmbedderSameDatasetTrainDataset
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class EmbedderTrainerCallbackForDataRefresh(TrainerCallback):
 
     def on_epoch_end(
         self,
-        args: AbsTextEmbedderTrainingArguments,
+        args: TextEmbedderTrainingArguments,
         state: TrainerState,
         control: TrainerControl,
         **kwargs

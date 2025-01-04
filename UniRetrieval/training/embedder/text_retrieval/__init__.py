@@ -1,18 +1,18 @@
 from .arguments import (
-    AbsTextEmbedderModelArguments as EncoderOnlyEmbedderModelArguments,
-    AbsTextEmbedderDataArguments as EncoderOnlyEmbedderDataArguments,
-    AbsTextEmbedderTrainingArguments as EncoderOnlyEmbedderTrainingArguments,
+    TextEmbedderModelArguments,
+    TextEmbedderDataArguments,
+    TextEmbedderTrainingArguments,
 )
 
-from .modeling import BiEncoderOnlyEmbedderModel
-from .trainer import EncoderOnlyEmbedderTrainer
-from .runner import EncoderOnlyEmbedderRunner
+from .modeling import BiTextEmbedderModel
+from .trainer import TextEmbedderTrainer
+from .runner import TextEmbedderRunner
 
 __all__ = [
-    'EncoderOnlyEmbedderModelArguments',
-    'EncoderOnlyEmbedderDataArguments',
-    'EncoderOnlyEmbedderTrainingArguments',
-    'BiEncoderOnlyEmbedderModel',
-    'EncoderOnlyEmbedderTrainer',
-    'EncoderOnlyEmbedderRunner',
+    'TextEmbedderModelArguments',
+    'TextEmbedderDataArguments',
+    'TextEmbedderTrainingArguments',
+    'BiTextEmbedderModel',
+    'TextEmbedderTrainer',
+    'TextEmbedderRunner',
 ]

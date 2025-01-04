@@ -2,13 +2,12 @@ import os
 import torch
 import logging
 from typing import Optional
-from transformers.trainer import Trainer
 from UniRetrieval.abc.training.embedder import AbsEmbedderTrainer
 
 logger = logging.getLogger(__name__)
 
 
-class EncoderOnlyEmbedderTrainer(AbsEmbedderTrainer):
+class TextEmbedderTrainer(AbsEmbedderTrainer):
     """
     Trainer class for base encoder models.
     """

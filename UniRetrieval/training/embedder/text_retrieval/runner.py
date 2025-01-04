@@ -1,41 +1,49 @@
-import logging
 import os
+import logging
+from typing import Optional
+
+import torch
 from transformers import (
     AutoModel, AutoConfig,
-    AutoTokenizer
+    AutoTokenizer,
+    set_seed
 )
-from transformers import set_seed
-from UniRetrieval.abc.training.embedder import AbsEmbedderRunner
-from . import EncoderOnlyEmbedderModelArguments, EncoderOnlyEmbedderDataArguments, EncoderOnlyEmbedderTrainingArguments
-from .datasets import AbsTextEmbedderTrainDataset, AbsTextEmbedderCollator, AbsEmbedderSameDatasetTrainDataset, AbsEmbedderSameDatasetCollator
+
+from UniRetrieval.abc.training.embedder import (
+    AbsEmbedderRunner, AbsEmbedderModel, AbsEmbedderTrainDataset,
+    AbsEmbedderTrainer
+)
+
+from . import TextEmbedderModelArguments, TextEmbedderDataArguments, TextEmbedderTrainingArguments
+from .dataset import AbsTextEmbedderTrainDataset, AbsTextEmbedderCollator, AbsEmbedderSameDatasetTrainDataset, AbsEmbedderSameDatasetCollator
 from .callback import EmbedderTrainerCallbackForDataRefresh
-from .modeling import BiEncoderOnlyEmbedderModel
-from .trainer import EncoderOnlyEmbedderTrainer
-from . arguments import BiEncoderOnlyEmbedderModelArguments
+from .modeling import BiTextEmbedderModel
+from .trainer import TextEmbedderTrainer
+from . arguments import WrappedTextEmbedderModelArguments
 
 logger = logging.getLogger(__name__)
 
 
-class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
+class TextEmbedderRunner(AbsEmbedderRunner):
     """
     Finetune Runner for base embedding models.
     """
     
     def __init__(
         self,
-        model_args: EncoderOnlyEmbedderModelArguments,
-        data_args: EncoderOnlyEmbedderDataArguments,
-        training_args: EncoderOnlyEmbedderTrainingArguments,    
-        model=None,
-        dataset=None,
-        trainer=None,
-        loss_function=None,
-        score_function=None
+        model_args: TextEmbedderModelArguments,
+        data_args: TextEmbedderDataArguments,
+        training_args: TextEmbedderTrainingArguments,    
+        model: Optional[AbsEmbedderModel] = None,
+        train_dataset: Optional[AbsEmbedderTrainDataset] = None,
+        trainer: Optional[AbsEmbedderTrainer] = None,
+        loss_function: Optional[torch.nn.Module] = None,
+        score_function: Optional[torch.nn.Module] = None
     ):
         self.model_args = model_args
         self.data_args = data_args
         self.training_args = training_args
-        self.encoder_only_model_args=BiEncoderOnlyEmbedderModelArguments(
+        self.wrapped_model_args = WrappedTextEmbedderModelArguments(
             negatives_cross_device=self.training_args.negatives_cross_device,
             temperature=self.training_args.temperature,
             sub_batch_size=self.training_args.sub_batch_size,
@@ -79,13 +87,11 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         self.score_function = score_function
         self.model = model if model is not None else self.load_model()
         self.tokenizer=self.model.tokenizer
-        self.train_dataset = dataset if dataset is not None else self.load_dataset()
+        self.train_dataset = train_dataset if train_dataset is not None else self.load_dataset()
         self.data_collator = self.load_data_collator()
         self.trainer = trainer if trainer is not None else self.load_trainer()
 
-
-    
-    def load_model(self) -> BiEncoderOnlyEmbedderModel:
+    def load_model(self) -> BiTextEmbedderModel:
         """Load tokenizer and model.
 
         Returns:
@@ -114,10 +120,10 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
         )
         logger.info('Config: %s', config)
 
-        model = BiEncoderOnlyEmbedderModel(
+        model = BiTextEmbedderModel(
             base_model,
             tokenizer=tokenizer,
-            model_args=self.encoder_only_model_args,
+            model_args=self.wrapped_model_args,
             loss_function=self.loss_function,
             score_function=self.score_function
         )
@@ -133,14 +139,14 @@ class EncoderOnlyEmbedderRunner(AbsEmbedderRunner):
                     
         return model
 
-    def load_trainer(self) -> EncoderOnlyEmbedderTrainer:
+    def load_trainer(self) -> TextEmbedderTrainer:
         """Load the trainer.
 
         Returns:
             EncoderOnlyEmbedderTrainer: Loaded trainer instance.
         """
     
-        trainer = EncoderOnlyEmbedderTrainer(
+        trainer = TextEmbedderTrainer(
             model=self.model,
             args=self.training_args,
             train_dataset=self.train_dataset,

@@ -10,9 +10,8 @@ from transformers import (
     DataCollatorWithPadding,
     BatchEncoding
 )
-from typing import List
 
-from .arguments import AbsTextRerankerDataArguments
+from .arguments import TextRerankerDataArguments
 from UniRetrieval.abc.training.reranker import AbsRerankerTrainDataset, AbsRerankerCollator
 
 logger = logging.getLogger(__name__)
@@ -27,7 +26,7 @@ class AbsTextRerankerTrainDataset(AbsRerankerTrainDataset):
     """
     def __init__(
         self,
-        args: AbsTextRerankerDataArguments,
+        args: TextRerankerDataArguments,
         tokenizer: PreTrainedTokenizer
     ):
         self.args = args

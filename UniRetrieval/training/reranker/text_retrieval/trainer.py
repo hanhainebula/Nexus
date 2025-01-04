@@ -4,12 +4,11 @@ import logging
 from typing import Optional
 
 from UniRetrieval.abc.training.reranker import AbsRerankerTrainer
-from transformers.trainer import Trainer
 
 logger = logging.getLogger(__name__)
 
 
-class EncoderOnlyRerankerTrainer(AbsRerankerTrainer):
+class TextRerankerTrainer(AbsRerankerTrainer):
     """
     Trainer class for encoder only base reranker models.
     """
@@ -36,6 +35,3 @@ class EncoderOnlyRerankerTrainer(AbsRerankerTrainer):
 
         # Good practice: save your training arguments together with the trained model
         torch.save(self.args, os.path.join(output_dir, "training_args.bin"))
-
-    
-    

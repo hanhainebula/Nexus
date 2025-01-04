@@ -1,18 +1,18 @@
 from .arguments import (
-    AbsTextRerankerModelArguments,
-    AbsTextRerankerDataArguments,
-    AbsTextRerankerTrainingArguments
+    TextRerankerModelArguments,
+    TextRerankerDataArguments,
+    TextRerankerTrainingArguments
 )
 
 from .modeling import CrossEncoderModel
-from .runner import EncoderOnlyRerankerRunner
-from .trainer import EncoderOnlyRerankerTrainer
+from .runner import TextRerankerRunner
+from .trainer import TextRerankerTrainer
 
 __all__ = [
     "CrossEncoderModel",
-    "EncoderOnlyRerankerRunner",
-    "EncoderOnlyRerankerTrainer",
-    "AbsTextRerankerModelArguments",
-    "AbsTextRerankerDataArguments",
-    "AbsTextRerankerTrainingArguments"
+    "TextRerankerRunner",
+    "TextRerankerTrainer",
+    "TextRerankerModelArguments",
+    "TextRerankerDataArguments",
+    "TextRerankerTrainingArguments"
 ]

@@ -6,14 +6,15 @@ import datasets
 import numpy as np
 import torch.distributed as dist
 from dataclasses import dataclass
-from torch.utils.data import Dataset
 from transformers import (
     PreTrainedTokenizer, 
     DataCollatorWithPadding,
 )
 
-from .arguments import AbsTextEmbedderDataArguments
 from UniRetrieval.abc.training.embedder import AbsEmbedderTrainDataset, AbsEmbedderCollator
+
+from .arguments import TextEmbedderDataArguments
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class AbsTextEmbedderTrainDataset(AbsEmbedderTrainDataset):
     """
     def __init__(
         self,
-        args: AbsTextEmbedderDataArguments,
+        args: TextEmbedderDataArguments,
         tokenizer: PreTrainedTokenizer
     ):
         self.args = args
@@ -231,12 +232,7 @@ class AbsTextEmbedderCollator(AbsEmbedderCollator, DataCollatorWithPadding):
                     pad_to_multiple_of=self.pad_to_multiple_of,
                     return_tensors=self.return_tensors
                 ))
-        # return {
-        #     "queries": q_collated,
-        #     "passages": d_collated,
-        #     "teacher_scores": teacher_scores,
-        #     "no_in_batch_neg_flag": False
-        # }
+        
         return q_collated, d_collated, teacher_scores, False
 
 
@@ -253,7 +249,7 @@ class AbsEmbedderSameDatasetTrainDataset(AbsTextEmbedderTrainDataset):
     """
     def __init__(
         self,
-        args: AbsTextEmbedderDataArguments,
+        args: TextEmbedderDataArguments,
         default_batch_size: int,
         seed: int,
         tokenizer: PreTrainedTokenizer,
@@ -587,11 +583,5 @@ class AbsEmbedderSameDatasetCollator(DataCollatorWithPadding):
         if isinstance(teacher_scores, list) and len(teacher_scores) == 0:
             teacher_scores = None
 
-        # return {
-        #     "queries": q_collated,
-        #     "passages": d_collated,
-        #     "teacher_scores": teacher_scores,
-        #     "no_in_batch_neg_flag": no_in_batch_neg_flag
-        # }
         return q_collated, d_collated, teacher_scores, no_in_batch_neg_flag
 

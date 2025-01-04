@@ -1,6 +1,3 @@
-"""
-Adapted from https://github.com/AIR-Bench/AIR-Bench/blob/0.1.0/air_benchmark/evaluation_utils/evaluator.py
-"""
 import json
 import logging
 import os

@@ -2,10 +2,9 @@ import os
 import logging
 import datasets
 import subprocess
-from abc import ABC, abstractmethod
 from typing import List, Optional, Union
 
-from UniRetrieval.abc.evaluation import AbsEvalDataLoader, AbsEvalDataLoaderArguments
+from UniRetrieval.abc.evaluation import AbsEvalDataLoader
 logger = logging.getLogger(__name__)
 
 
@@ -44,12 +43,11 @@ class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
         """
         return []
 
-    @abstractmethod
     def available_splits(self, dataset_name: Optional[str] = None) -> List[str]:
         """
         Returns: List[str]: Available splits in the dataset.
         """
-        pass
+        return ["test"]
 
     def check_dataset_names(self, dataset_names: Union[str, List[str]]) -> List[str]:
         """Check the validity of dataset names
@@ -420,10 +418,3 @@ class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
             raise FileNotFoundError(f"Failed to unzip file {zip_file_path}")
 
         return file_path
-
-
-    def available_dataset_names(self) -> List[str]:
-        return []
-
-    def available_splits(self, dataset_name: Optional[str] = None) -> List[str]:
-        return ["test"]

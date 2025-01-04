@@ -1,18 +1,18 @@
 import logging
 
 import torch
-from torch import nn, Tensor
+from torch import Tensor
 from transformers import AutoModel, AutoTokenizer
 import torch.distributed as dist
 import torch.nn.functional as F
 from dataclasses import dataclass
-from typing import Dict, Optional, List, Union
+from typing import Optional
 
 from UniRetrieval.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
 from UniRetrieval.modules.loss import CrossEntropyLoss, KL_Div_Loss, m3_KDLoss
 from UniRetrieval.modules.score import IP_text_retrieval
-from . import EncoderOnlyEmbedderModelArguments
-from .arguments import BiEncoderOnlyEmbedderModelArguments
+
+from .arguments import WrappedTextEmbedderModelArguments
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class TextEmbedderOutput(EmbedderOutput):
     loss: Optional[Tensor] = None
     scores: Optional[Tensor] = None
 
-class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
+class BiTextEmbedderModel(AbsEmbedderModel):
     """Embedder class for encoder only model.
 
     Args:
@@ -43,7 +43,7 @@ class BiEncoderOnlyEmbedderModel(AbsEmbedderModel):
     def __init__(
         self,
         base_model: AutoModel,
-        model_args: BiEncoderOnlyEmbedderModelArguments,
+        model_args: WrappedTextEmbedderModelArguments,
         tokenizer: AutoTokenizer = None,
         loss_function = None,
         score_function = None,

@@ -1,51 +1,18 @@
-from UniRetrieval.abc.training.embedder import AbsEmbedderModelArguments, AbsEmbedderDataArguments, AbsEmbedderTrainingArguments
-from UniRetrieval.abc.training.arguments import AbsModelArguments
 import os
 from typing import Optional
 from dataclasses import dataclass, field
 
-from transformers import TrainingArguments
+from UniRetrieval.abc.training.embedder import AbsEmbedderModelArguments, AbsEmbedderDataArguments, AbsEmbedderTrainingArguments
+from UniRetrieval.abc.training.arguments import AbsModelArguments
 
-@dataclass
-class BiEncoderOnlyEmbedderModelArguments(AbsModelArguments):
-    """
-    class for BiEncoderOnlyEmbedderModel
-    """
-    negatives_cross_device: bool = field(
-        default=False,
-        metadata={"help": "Whether to use negatives from other devices."}
-    )
-    temperature: float = field(
-        default=1.0,
-        metadata={"help": "Temperature for the softmax function."}
-    )
-    sub_batch_size: int = field(
-        default=-1,
-        metadata={"help": "Size of sub-batches for processing."}
-    )
-    kd_loss_type: str = field(
-        default="kl_div",
-        metadata={"help": "Type of knowledge distillation loss to use."}
-    )
-    sentence_pooling_method: str = field(
-        default="cls",
-        metadata={"help": "Method for pooling sentence embeddings."}
-    )
-    normalize_embeddings: bool = field(
-        default=False,
-        metadata={"help": "Whether to normalize embeddings."}
-    )
 
 # for runner
 @dataclass
-class AbsTextEmbedderModelArguments(AbsEmbedderModelArguments):
+class TextEmbedderModelArguments(AbsEmbedderModelArguments):
     """
     Abstract class for model arguments.
     """
 
-    model_name_or_path: str = field(
-        metadata={"help": "The model checkpoint for initialization."}
-    )
     config_name: str = field(
         default=None,
         metadata={"help": "Pretrained config name or path if not the same as model_name."}
@@ -69,7 +36,7 @@ class AbsTextEmbedderModelArguments(AbsEmbedderModelArguments):
 
 
 @dataclass
-class AbsTextEmbedderDataArguments(AbsEmbedderDataArguments):
+class TextEmbedderDataArguments(AbsEmbedderDataArguments):
     train_group_size: int = field(default=8)
 
     query_max_len: int = field(
@@ -134,7 +101,7 @@ class AbsTextEmbedderDataArguments(AbsEmbedderDataArguments):
     )
 
 @dataclass
-class AbsTextEmbedderTrainingArguments(AbsEmbedderTrainingArguments):
+class TextEmbedderTrainingArguments(AbsEmbedderTrainingArguments):
     negatives_cross_device: bool = field(default=False, metadata={"help": "share negatives across devices"})
     temperature: Optional[float] = field(default=0.02, metadata={"help": "temperature used for similarity score"})
     fix_position_embedding: bool = field(default=False, metadata={"help": "Freeze the parameters of position embeddings"})
@@ -142,5 +109,34 @@ class AbsTextEmbedderTrainingArguments(AbsEmbedderTrainingArguments):
     normalize_embeddings: bool = field(default=True, metadata={"help": "whether to normalize the embeddings"})
     sub_batch_size: Optional[int] = field(default=None, metadata={"help": "sub batch size for training"})
     kd_loss_type: str = field(default='kl_div', metadata={"help": "the loss type for knowledge distillation. Available options: kl_div, m3_kd_loss. Default: kl_div.", "choices": ['kl_div', 'm3_kd_loss']})
-    
-    
+
+
+@dataclass
+class WrappedTextEmbedderModelArguments(AbsModelArguments):
+    """
+    class for BiTextEmbedderModel
+    """
+    negatives_cross_device: bool = field(
+        default=False,
+        metadata={"help": "Whether to use negatives from other devices."}
+    )
+    temperature: float = field(
+        default=1.0,
+        metadata={"help": "Temperature for the softmax function."}
+    )
+    sub_batch_size: int = field(
+        default=-1,
+        metadata={"help": "Size of sub-batches for processing."}
+    )
+    kd_loss_type: str = field(
+        default="kl_div",
+        metadata={"help": "Type of knowledge distillation loss to use."}
+    )
+    sentence_pooling_method: str = field(
+        default="cls",
+        metadata={"help": "Method for pooling sentence embeddings."}
+    )
+    normalize_embeddings: bool = field(
+        default=False,
+        metadata={"help": "Whether to normalize embeddings."}
+    )

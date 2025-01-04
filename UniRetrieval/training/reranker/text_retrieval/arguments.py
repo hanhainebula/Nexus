@@ -2,12 +2,11 @@ import os
 from typing import Optional
 from dataclasses import dataclass, field
 
-from transformers import TrainingArguments
 from UniRetrieval.abc.training.reranker import AbsRerankerDataArguments, AbsRerankerModelArguments, AbsRerankerTrainingArguments
 
 
 @dataclass
-class AbsTextRerankerModelArguments(AbsRerankerModelArguments):
+class TextRerankerModelArguments(AbsRerankerModelArguments):
     """
     Abstract class for reranker model arguments.
     """
@@ -31,22 +30,14 @@ class AbsTextRerankerModelArguments(AbsRerankerModelArguments):
         default=False,
         metadata={"help": "Trust remote code"}
     )
-    model_type: str = field(
-        default='encoder',
-        metadata={"help": "Type of finetune, ['encoder', 'decoder']"}
-    )
     token: str = field(
         default_factory=lambda: os.getenv('HF_TOKEN', None),
         metadata={"help": "The token to use when accessing the model."}
     )
-    # finetune_type: str = field(
-    #     default='sratch',
-    #     metadata={"help": "Type of finetune, ['sratch', 'finetune']"}
-    # )
 
 
 @dataclass
-class AbsTextRerankerDataArguments(AbsRerankerDataArguments):
+class TextRerankerDataArguments(AbsRerankerDataArguments):
     """
     Abstract class for reranker data arguments.
     """
@@ -120,12 +111,12 @@ class AbsTextRerankerDataArguments(AbsRerankerDataArguments):
         default='\n', metadata={"help": "The sep token for LLM reranker to discriminate between query and passage"}
     )
 
-    # def __post_init__(self):
-    #     for train_dir in self.train_data:
-    #         if not os.path.exists(train_dir):
-    #             raise FileNotFoundError(f"cannot find file: {train_dir}, please set a true path")
+    def __post_init__(self):
+        for train_dir in self.train_data:
+            if not os.path.exists(train_dir):
+                raise FileNotFoundError(f"cannot find file: {train_dir}, please set a true path")
 
 
 @dataclass
-class AbsTextRerankerTrainingArguments(AbsRerankerTrainingArguments):
-    sub_batch_size: Optional[int] = field(default=None, metadata={"help": "sub batch size for training, not implemented yet"})
+class TextRerankerTrainingArguments(AbsRerankerTrainingArguments):
+    pass
