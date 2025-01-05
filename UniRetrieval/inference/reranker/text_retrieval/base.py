@@ -11,7 +11,6 @@ from dataclasses import field, dataclass
 import pdb
 import tensorrt as trt
 import pycuda.driver as cuda
-import pycuda.autoinit
 import onnx
 import onnxruntime as ort
 
@@ -60,7 +59,8 @@ class BaseReranker(AbsReranker):
         max_length: int = 512,
         normalize: bool = False,
         **kwargs: Any,
-    ):
+    ):  
+        import pycuda.autoinit
         self.model_name_or_path = model_name_or_path
         self.use_fp16 = use_fp16
         self.query_instruction_for_rerank = query_instruction_for_rerank
@@ -384,6 +384,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
     def __init__(self, infer_args: AbsInferenceArguments, model: BaseReranker = None):
         super().__init__(infer_args)
         # normal model
+        import pycuda.autoinit
         if not model:
             self.load_model()
         else:

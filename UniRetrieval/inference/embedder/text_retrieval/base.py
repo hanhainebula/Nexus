@@ -13,7 +13,6 @@ from transformers import AutoModel, AutoTokenizer
 from dataclasses import dataclass, field
 from UniRetrieval.abc.inference import AbsEmbedder, InferenceEngine, AbsInferenceArguments
 import pycuda.driver as cuda
-import pycuda.autoinit
 
 class BaseEmbedder(AbsEmbedder):
     """
@@ -65,6 +64,7 @@ class BaseEmbedder(AbsEmbedder):
         **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
+        import pycuda.autoinit
         query_instruction_format = query_instruction_format.replace('\\n', '\n')
         self.model_name_or_path = model_name_or_path
         self.normalize_embeddings = normalize_embeddings
@@ -437,6 +437,7 @@ class NormalSession():
 class BaseEmbedderInferenceEngine(InferenceEngine):
     def __init__(self, infer_args: AbsInferenceArguments, model:BaseEmbedder=None):
         super().__init__(infer_args)
+        import pycuda.autoinit
         # normal model
         if not model:
             self.load_model()
