@@ -5,13 +5,13 @@
     export WANDB_MODE=disabled
 
 
-    BASE_DIR='/data1/home/recstudio/angqing/UniRetrieval'
+    BASE_DIR='/data1/home/recstudio/angqing/InfoNexus'
 
     MODEL_NAME_OR_PATH='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5'
-    TRAIN_DATA="/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
-    CKPT_SAVE_DIR='/data1/home/recstudio/angqing/UniRetrieval/checkpoints'
-    DEEPSPEED_DIR='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/ds_stage0.json'
-    ACCELERATE_CONFIG='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
+    TRAIN_DATA="/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
+    CKPT_SAVE_DIR='/data1/home/recstudio/angqing/InfoNexus/checkpoints'
+    DEEPSPEED_DIR='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/ds_stage0.json'
+    ACCELERATE_CONFIG='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
     # set large epochs and small batch size for testing
     num_train_epochs=2
     per_device_train_batch_size=16
@@ -62,7 +62,7 @@
     cd $BASE_DIR
 
     cmd="accelerate launch --config_file $ACCELERATE_CONFIG \
-        UniRetrieval/training/embedder/text_retrieval/__main__.py \
+        InfoNexus/training/embedder/text_retrieval/__main__.py \
         $model_args \
         $data_args \
         $training_args \
@@ -75,13 +75,13 @@
     ```bash
     export WANDB_MODE=disabled
 
-    BASE_DIR='/data1/home/recstudio/angqing/UniRetrieval'
+    BASE_DIR='/data1/home/recstudio/angqing/InfoNexus'
 
     MODEL_NAME_OR_PATH='/data2/OpenLLMs/bge-reranker-base'
-    TRAIN_DATA="/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
-    CKPT_SAVE_DIR='/data2/home/angqing/code/UniRetrieval/checkpoints/test_reranker'
-    DEEPSPEED_DIR='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/ds_stage0.json'
-    ACCELERATE_CONFIG='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
+    TRAIN_DATA="/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
+    CKPT_SAVE_DIR='/data2/home/angqing/code/InfoNexus/checkpoints/test_reranker'
+    DEEPSPEED_DIR='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/ds_stage0.json'
+    ACCELERATE_CONFIG='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
 
 
     # set large epochs and small batch size for testing
@@ -131,7 +131,7 @@
     cd $BASE_DIR
 
     cmd="accelerate launch --config_file $ACCELERATE_CONFIG \
-        UniRetrieval/training/reranker/text_retrieval/__main__.py \
+        InfoNexus/training/reranker/text_retrieval/__main__.py \
         $model_args \
         $data_args \
         $training_args \
@@ -163,7 +163,7 @@ Detailed scripts are in ./training
         ```python
         # 1. not use inference engine
         # TODO pesudo import, should change
-        from UniRetrieval import TextEmbedder, AbsInferenceArguments, BaseEmbedderInferenceEngine
+        from InfoNexus import TextEmbedder, AbsInferenceArguments, BaseEmbedderInferenceEngine
 
         sentences = [
             "The quick brown fox jumps over the lazy dog.",
@@ -202,7 +202,7 @@ Detailed scripts are in ./training
         Convert pytorch model to onnx first.
 
         ```python
-        from UniRetrieval import AbsInferenceArguments, BaseEmbedderInferenceEngine
+        from InfoNexus import AbsInferenceArguments, BaseEmbedderInferenceEngine
         model_path='/data2/OpenLLMs/bge-base-zh-v1.5'
         onnx_model_path='/data2/OpenLLMs/bge-base-zh-v1.5/onnx/model.onnx'
 
@@ -261,7 +261,7 @@ Detailed scripts are in ./training
 
         2. Inference with TensorRT
             ```python
-            from UniRetrieval import AbsInferenceArguments, BaseEmbedderInferenceEngine
+            from InfoNexus import AbsInferenceArguments, BaseEmbedderInferenceEngine
 
 
             # trt path is path to TensorRT you have downloaded.
@@ -312,7 +312,7 @@ Detailed scripts are in ./training
 
         ```python
         # 1. not use inference engine
-        from UniRetrieval import TextReranker, AbsInferenceArguments, BaseRerankerInferenceEngine
+        from InfoNexus import TextReranker, AbsInferenceArguments, BaseRerankerInferenceEngine
 
         # inputs should be Union[Tuple, List[Tuple]]
         qa_pairs = [
@@ -351,7 +351,7 @@ Detailed scripts are in ./training
         Convert pytorch model to onnx first.
 
         ```python
-        from UniRetrieval import AbsInferenceArguments, BaseRerankerInferenceEngine
+        from InfoNexus import AbsInferenceArguments, BaseRerankerInferenceEngine
         model_path='/data2/OpenLLMs/bge-reranker-base'
         onnx_model_path='/data2/OpenLLMs/bge-reranker-base/onnx/model.onnx'
 
@@ -409,7 +409,7 @@ Detailed scripts are in ./training
         
         2. Inference with TensorRT
             ```python
-            from UniRetrieval import AbsInferenceArguments, BaseRerankerInferenceEngine
+            from InfoNexus import AbsInferenceArguments, BaseRerankerInferenceEngine
 
             # trt path is path to TensorRT you have downloaded.
             trt_path='/data2/home/angqing/tensorrt/TensorRT-10.7.0.23'
@@ -452,7 +452,7 @@ Detailed scripts are in ./training
 ## Eval
 
 ```bash
-BASE_DIR=/data1/home/recstudio/angqing/UniRetrieval
+BASE_DIR=/data1/home/recstudio/angqing/InfoNexus
 EMBEDDER=/data1/home/recstudio/angqing/models/bge-base-zh-v1.5
 RERANKER=/data1/home/recstudio/angqing/models/bge-reranker-base
 embedder_infer_mode=onnx
@@ -466,7 +466,7 @@ reranker_trt_path=$RERANKER/trt/model.trt
 cd $BASE_DIR
 
 
-python -m UniRetrieval.evaluation.text_retrieval.airbench \
+python -m InfoNexus.evaluation.text_retrieval.airbench \
     --benchmark_version AIR-Bench_24.05 \
     --task_types qa \
     --domains arxiv \

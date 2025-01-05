@@ -1,6 +1,6 @@
 export WANDB_MODE=disabled
 
-train_data='/data2/home/angqing/code/UniRetrieval/examples/text_retrieval/example_data/fiqa.jsonl'
+train_data='/data2/home/angqing/code/InfoNexus/examples/text_retrieval/example_data/fiqa.jsonl'
 
 # set large epochs and small batch size for testing
 num_train_epochs=2
@@ -31,7 +31,7 @@ data_args="\
 "
 
 training_args="\
-    --output_dir /data2/home/angqing/code/UniRetrieval/checkpoints/test_embedder \
+    --output_dir /data2/home/angqing/code/InfoNexus/checkpoints/test_embedder \
     --overwrite_output_dir \
     --learning_rate 1e-5 \
     --fp16 \
@@ -40,7 +40,7 @@ training_args="\
     --dataloader_drop_last True \
     --warmup_ratio 0.1 \
     --gradient_checkpointing \
-    --deepspeed /data2/home/angqing/code/UniRetrieval/examples/text_retrieval/training/ds_stage0.json \
+    --deepspeed /data2/home/angqing/code/InfoNexus/examples/text_retrieval/training/ds_stage0.json \
     --logging_steps 1 \
     --save_steps 100 \
     --negatives_cross_device \
@@ -51,10 +51,10 @@ training_args="\
 "
 
 
-cd /data2/home/angqing/code/UniRetrieval
+cd /data2/home/angqing/code/InfoNexus
 
 cmd="torchrun --nproc_per_node $num_gpus \
-    -m UniRetrieval.training.embedder.text_retrieval \
+    -m InfoNexus.training.embedder.text_retrieval \
     $model_args \
     $data_args \
     $training_args \

@@ -1,6 +1,6 @@
 export WANDB_MODE=disabled
 
-train_data='/data2/home/angqing/code/UniRetrieval/examples/text_retrieval/example_data/fiqa.jsonl'
+train_data='/data2/home/angqing/code/InfoNexus/examples/text_retrieval/example_data/fiqa.jsonl'
 
 # set large epochs and small batch size for testing
 num_train_epochs=2
@@ -31,7 +31,7 @@ data_args="\
 "
 
 training_args="\
-    --output_dir /data2/home/angqing/code/UniRetrieval/checkpoints/test_reranker \
+    --output_dir /data2/home/angqing/code/InfoNexus/checkpoints/test_reranker \
     --overwrite_output_dir \
     --learning_rate 6e-5 \
     --fp16 \
@@ -42,13 +42,13 @@ training_args="\
     --warmup_ratio 0.1 \
     --gradient_checkpointing \
     --weight_decay 0.01 \
-    --deepspeed /data2/home/angqing/code/UniRetrieval/examples/text_retrieval/training/ds_stage0.json \
+    --deepspeed /data2/home/angqing/code/InfoNexus/examples/text_retrieval/training/ds_stage0.json \
     --logging_steps 1 \
     --save_steps 100 \
 "
-cd /data2/home/angqing/code/UniRetrieval
+cd /data2/home/angqing/code/InfoNexus
 cmd="torchrun --nproc_per_node $num_gpus \
-    -m UniRetrieval.training.reranker.text_retrieval \
+    -m InfoNexus.training.reranker.text_retrieval \
     $model_args \
     $data_args \
     $training_args \

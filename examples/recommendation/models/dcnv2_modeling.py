@@ -1,10 +1,10 @@
 import torch
 from dataclasses import dataclass, field
 
-from UniRetrieval.training.reranker.recommendation.runner import RankerRunner
-from UniRetrieval.training.reranker.recommendation.arguments import ModelArguments
-from UniRetrieval.training.reranker.recommendation.modeling import BaseRanker
-from UniRetrieval.modules import AverageAggregator, LambdaModule, MLPModule, HStackModule, CrossNetwork
+from InfoNexus.training.reranker.recommendation.runner import RankerRunner
+from InfoNexus.training.reranker.recommendation.arguments import ModelArguments
+from InfoNexus.training.reranker.recommendation.modeling import BaseRanker
+from InfoNexus.modules import AverageAggregator, LambdaModule, MLPModule, HStackModule, CrossNetwork
 # from rs4industry.model.ranker import BaseRanker
 # from rs4industry.model.module import MLPModule, LambdaModule, AverageAggregator, CrossNetwork, HStackModule
 

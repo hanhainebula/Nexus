@@ -1,4 +1,4 @@
-BASE_DIR=/data1/home/recstudio/angqing/UniRetrieval
+BASE_DIR=/data1/home/recstudio/angqing/InfoNexus
 EMBEDDER=/data1/home/recstudio/angqing/models/bge-base-zh-v1.5
 RERANKER=/data1/home/recstudio/angqing/models/bge-reranker-base
 embedder_infer_mode=onnx
@@ -12,7 +12,7 @@ reranker_trt_path=$RERANKER/trt/model.trt
 cd $BASE_DIR
 
 
-python -m UniRetrieval.evaluation.text_retrieval.airbench \
+python -m InfoNexus.evaluation.text_retrieval.airbench \
     --benchmark_version AIR-Bench_24.05 \
     --task_types qa \
     --domains arxiv \

@@ -1,6 +1,6 @@
 {
-    "dataset_path": "/data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/config/data/recflow_retriever.json", 
-    "eval_output_dir": "/data1/home/recstudio/haoran/UniRetrieval/saves/recommender_results/eval",
+    "dataset_path": "/data1/home/recstudio/haoran/InfoNexus/examples/recommendation/config/data/recflow_retriever.json", 
+    "eval_output_dir": "/data1/home/recstudio/haoran/InfoNexus/saves/recommender_results/eval",
     "cutoffs": [1, 5, 10],
     "metrics": ["ndcg", "recall", "auc"],
     "eval_batch_size": 100

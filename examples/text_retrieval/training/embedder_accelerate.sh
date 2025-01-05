@@ -1,13 +1,13 @@
 export WANDB_MODE=disabled
 
 
-BASE_DIR='/data1/home/recstudio/angqing/UniRetrieval'
+BASE_DIR='/data1/home/recstudio/angqing/InfoNexus'
 
 MODEL_NAME_OR_PATH='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5'
-TRAIN_DATA="/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
-CKPT_SAVE_DIR='/data1/home/recstudio/angqing/UniRetrieval/checkpoints'
-DEEPSPEED_DIR='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/ds_stage0.json'
-ACCELERATE_CONFIG='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
+TRAIN_DATA="/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
+CKPT_SAVE_DIR='/data1/home/recstudio/angqing/InfoNexus/checkpoints'
+DEEPSPEED_DIR='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/ds_stage0.json'
+ACCELERATE_CONFIG='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
 # set large epochs and small batch size for testing
 num_train_epochs=2
 per_device_train_batch_size=16
@@ -58,7 +58,7 @@ training_args="\
 cd $BASE_DIR
 
 cmd="accelerate launch --config_file $ACCELERATE_CONFIG \
-    UniRetrieval/training/embedder/text_retrieval/__main__.py \
+    InfoNexus/training/embedder/text_retrieval/__main__.py \
     $model_args \
     $data_args \
     $training_args \
