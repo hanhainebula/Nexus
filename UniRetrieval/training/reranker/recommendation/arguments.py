@@ -21,6 +21,8 @@ class TrainingArguments(AbsRerankerTrainingArguments):
     
     checkpoint_best_ckpt: bool = True   # if true, save best model in earystop callback
     checkpoint_steps: int = 1000    # if none, save model per epoch; else save model by steps
+    
+    optimizer: str = "adam"
 
 @dataclass
 class ModelArguments(AbsRerankerModelArguments):
