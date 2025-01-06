@@ -53,7 +53,7 @@ class RecommenderEvalModelArgs(AbsModelArguments):
     """
     Base class for model arguments during evaluation.
     """        
-    retriever_ckpt_path: str = ""
+    retriever_ckpt_path: str = None
     ranker_ckpt_path: str = None
     
         

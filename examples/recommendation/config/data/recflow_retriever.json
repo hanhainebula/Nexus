@@ -10,9 +10,6 @@
     "context_features": ["user_id", "device_id", "age", "gender", "province"],
     "item_features": ["video_id", "author_id", "category_level_two", "upload_type", "category_level_one"],
     "labels": ["like"],
-    "filter_settings": {
-        "like": ["==1"]
-    },
     "item_info": {
         "url": "hdfs://node1:8020/recstudio/recflow/others/video_info.pkl",
         "key": "video_id",
@@ -30,6 +27,7 @@
         }
     ],
     "stats": {
+        "request_id": 9370581,
         "user_id": 42472,
         "device_id": 42561,
         "age": 8,
@@ -42,7 +40,7 @@
         "upload_type": 40
     },
     "train_period": {
-        "start_date": "2024-02-06",
+        "start_date": "2024-02-01",
         "end_date": "2024-02-08"
     },
     "test_period": {

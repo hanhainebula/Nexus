@@ -14,8 +14,8 @@ if __name__ == '__main__':
 
     rank_inference_engine = TDERerankerInferenceEngine(config)
         
-    infer_df = pd.read_feather('/data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/inference/inference_data/recflow/recflow_infer_data.feather')
-    item_df = pd.read_feather('/data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/inference/inference_data/recflow/realshow_test_video_info.feather')
+    infer_df = pd.read_feather('/data1/home/recstudio/haoran/InfoNexus/examples/recommendation/inference/inference_data/recflow/recflow_infer_data.feather')
+    item_df = pd.read_feather('/data1/home/recstudio/haoran/InfoNexus/examples/recommendation/inference/inference_data/recflow/realshow_test_video_info.feather')
     all_item_ids = np.array(item_df['video_id'])
     for batch_idx in range(10):
         print(f"This is batch {batch_idx}")

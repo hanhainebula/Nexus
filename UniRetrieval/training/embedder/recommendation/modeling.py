@@ -143,6 +143,8 @@ class BaseRetriever(AbsEmbedderModel):
         output_dict = output.to_dict()
         labels = batch[self.flabel]
         output_dict['label'] = labels
+        
+
         loss = self.loss_function(**output_dict)
         if isinstance(loss, dict):
             return loss

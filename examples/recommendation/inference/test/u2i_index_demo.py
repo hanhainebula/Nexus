@@ -1,7 +1,7 @@
 import numpy as np
 import faiss
 import torch
-file_path = '/data1/home/recstudio/haoran/UniRetrieval/saves/recommender_results/mlp_retriever/item_vectors.pt'
+file_path = '/data1/home/recstudio/haoran/InfoNexus/saves/recommender_results/mlp_retriever/item_vectors.pt'
 data = torch.load(file_path,map_location=torch.device('cpu'))
 print(data)
 item_vectors = data['item_vectors']  # NxD
@@ -16,7 +16,7 @@ quantizer = faiss.IndexFlatIP(embedding_dim)
 index = faiss.IndexIVFFlat(quantizer, embedding_dim, 100, faiss.METRIC_INNER_PRODUCT)
 index.train(item_embeddings)
 index.add(item_embeddings)
-index_path = '/data1/home/recstudio/haoran/UniRetrieval/saves/recommender_results/mlp_retriever/faiss_item_ivf2.index'
+index_path = '/data1/home/recstudio/haoran/InfoNexus/saves/recommender_results/mlp_retriever/faiss_item_ivf2.index'
 faiss.write_index(index, index_path)
-item_ids_path = '/data1/home/recstudio/haoran/UniRetrieval/saves/recommender_results/mlp_retriever/item_ids.npy'
+item_ids_path = '/data1/home/recstudio/haoran/InfoNexus/saves/recommender_results/mlp_retriever/item_ids.npy'
 np.save(item_ids_path,item_ids.numpy())

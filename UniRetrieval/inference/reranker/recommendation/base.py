@@ -32,7 +32,6 @@ import numpy as np
 
 import tensorrt as trt
 import pycuda.driver as cuda
-import pycuda.autoinit
 
 # from inference.inference.inference_engine import InferenceEngine
 from UniRetrieval.inference.utils import gen_item_index, gen_i2i_index
@@ -65,7 +64,7 @@ import onnxruntime as ort
 
 import tensorrt as trt
 import pycuda.driver as cuda
-import pycuda.autoinit
+
 
 from loguru import logger
 
@@ -73,7 +72,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
     def __init__(self, config: dict) -> None:
         # super().__init__(config)
-
+        import pycuda.autoinit
         # load config 
         self.config = config
         with open(os.path.join(config['model_ckpt_path'], 'model_config.json'), 'r', encoding='utf-8') as f:
