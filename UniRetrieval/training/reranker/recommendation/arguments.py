@@ -36,6 +36,16 @@ class ModelArguments(AbsRerankerModelArguments):
     batch_norm: bool = True
     model_name_or_path: str = ''
     
+    @staticmethod
+    def from_dict(d: dict):
+        arg = ModelArguments()
+        for k, v in d.items():
+            setattr(arg, k, v)
+        return arg
+    
+    def to_dict(self):
+        return self.__dict__
+    
 
 REQUIRED_DATA_CONFIG = [
     "name",

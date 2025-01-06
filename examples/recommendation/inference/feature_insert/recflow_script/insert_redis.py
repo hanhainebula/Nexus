@@ -13,7 +13,7 @@ import yaml
 r = redis.Redis(host='localhost', port=6379, db=0)
 
 # Item
-test_video_info = pd.read_feather('./examples/recommendation/inference/feature_data/recflow/test_video_info.feather')
+test_video_info = pd.read_feather('./examples/recommendation/inference/feature_data/recflow/realshow_test_video_info.feather')
 for row in tqdm(test_video_info.itertuples(), total=len(test_video_info)):
 
     # 0. Create a message object

@@ -62,3 +62,67 @@ class MultiFeatEmbedding(torch.nn.Module):
         elif self.stack_embeddings:
             outputs = torch.stack([outputs[f] for f in outputs], dim=-2) # [*, num_features, embedding_dim]
         return outputs
+
+
+class TDEMultiFeatEmbedding(torch.nn.Module):
+
+    def __init__(self, multi_feat_embedding: MultiFeatEmbedding, tde_table_configs: Dict, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        from torchrec import EmbeddingCollection, EmbeddingConfig
+
+        self.multi_feat_embedding = multi_feat_embedding
+        self.features = self.multi_feat_embedding.feat2number.keys()
+        
+        for k, table_config in tde_table_configs.items():
+            if k in self.multi_feat_embedding.feat2embedding:
+                self.add_module(f"table_{k}", EmbeddingCollection(tables=[EmbeddingConfig(**table_config)], device=torch.device("meta")))
+        
+        for k, table_config in tde_table_configs.items():
+            for feat in table_config['feature_names']:
+                if feat in self.multi_feat_embedding.feat2embedding:
+                    self.multi_feat_embedding.feat2embedding.pop(feat)
+        
+
+    def forward(self, batch:dict, strict=True) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+        from torchrec import JaggedTensor, KeyedJaggedTensor
+        
+        # raw multi_feat_embedding layer
+        outputs = {}
+        if strict:
+            for feat in self.features:
+                if hasattr(self, f'table_{feat}'):
+                    if batch[feat].dim() == 1:
+                        feat_jt = JaggedTensor.from_dense([batch[feat]])
+                    elif batch[feat].dim() >= 2:
+                        feat_jt = JaggedTensor.from_dense(list(batch[feat]))
+                    else:
+                        raise ValueError(f"Invalid dimension of {feat}: {batch[feat].dim()}")
+                    outputs[feat] = getattr(self, f'table_{feat}')(
+                        KeyedJaggedTensor.from_jt_dict({feat : feat_jt}))[feat].to_padded_dense()
+                    if outputs[feat].shape[0] == 1:
+                        outputs[feat] = outputs[feat].squeeze(0)
+                else:
+                    outputs[feat] = self.multi_feat_embedding.feat2embedding[feat](batch[feat])
+        else:
+            for feat, _ in batch.items():
+                if feat in self.multi_feat_embedding.feat2embedding or hasattr(self, f'table_{feat}'):
+                    if hasattr(self, f'table_{feat}'):
+                        if batch[feat].dim() == 1:
+                            feat_jt = JaggedTensor.from_dense([batch[feat]])
+                        elif batch[feat].dim() >= 2:
+                            feat_jt = JaggedTensor.from_dense(list(batch[feat]))
+                        else:
+                            raise ValueError(f"Invalid dimension of {feat}: {batch[feat].dim()}")
+                        outputs[feat] = getattr(self, f'table_{feat}')(
+                            KeyedJaggedTensor.from_jt_dict({feat : feat_jt}))[feat].to_padded_dense()
+                        if outputs[feat].shape[0] == 1:
+                            outputs[feat] = outputs[feat].squeeze(0)
+                    else:
+                        outputs[feat] = self.multi_feat_embedding.feat2embedding[feat](batch[feat])
+        
+        if self.multi_feat_embedding.concat_embeddings:
+            outputs = torch.cat([outputs[f] for f in outputs], dim=-1)  # [*, num_features * embedding_dim]
+        elif self.multi_feat_embedding.stack_embeddings:
+            outputs = torch.stack([outputs[f] for f in outputs], dim=-2) # [*, num_features, embedding_dim]
+        return outputs
