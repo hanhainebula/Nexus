@@ -2,6 +2,7 @@ __pycache__/
 */__pycache__/
 *old.py
 *old.json
+*old.ipynb
 recommender_results/
 */recommender_results/
 UniRetrieval.egg-info/

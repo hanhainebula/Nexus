@@ -40,10 +40,12 @@ class RecommenderEvalRunner(AbsEvalRunner):
         logger.info(f"Loaded evaluator.")
         
     def load_retriever_and_ranker(self, model_args: RecommenderEvalModelArgs) -> Tuple[BaseRetriever, Union[BaseRanker, None]]:
-        retriever = BaseRetriever.from_pretrained(model_args.retriever_ckpt_path)
-        checkpoint = torch.load(os.path.join(model_args.retriever_ckpt_path, 'model.pt'), map_location=torch.device('cpu'))
-        retriever.load_state_dict(checkpoint)
-        retriever.eval()
+        retriever = None
+        if model_args.retriever_ckpt_path is not None:
+            retriever = BaseRetriever.from_pretrained(model_args.retriever_ckpt_path)
+            checkpoint = torch.load(os.path.join(model_args.retriever_ckpt_path, 'model.pt'), map_location=torch.device('cpu'))
+            retriever.load_state_dict(checkpoint)
+            retriever.eval()
     
         ranker = None
         if model_args.ranker_ckpt_path is not None:
@@ -51,6 +53,9 @@ class RecommenderEvalRunner(AbsEvalRunner):
             checkpoint = torch.load(os.path.join(model_args.ranker_ckpt_path, 'model.pt'), map_location=torch.device('cpu'))
             ranker.load_state_dict(checkpoint)
             ranker.eval()
+            
+        if retriever is None and ranker is None:
+            raise ValueError("Both retriever and ranker cannot be None. At least one must be provided.")
             
         return retriever, ranker
 

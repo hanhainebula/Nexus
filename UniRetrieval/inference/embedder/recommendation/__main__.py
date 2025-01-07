@@ -7,7 +7,7 @@ import pycuda.driver as cuda
 
 
 if __name__ == '__main__':
-    infer_config_path = "/data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/inference/config/recflow_infer_retrieval_config.yaml"
+    infer_config_path = "/data1/home/recstudio/haoran/InfoNexus/examples/recommendation/inference/config/recflow_infer_retrieval_config.yaml"
 
     with open(infer_config_path, 'r') as f:
         config = yaml.safe_load(f)
@@ -17,7 +17,7 @@ if __name__ == '__main__':
     # if retriever_inference_engine.config['infer_mode'] == 'trt':
     #     cuda.Context.pop()
         
-    infer_df = pd.read_feather('/data1/home/recstudio/haoran/UniRetrieval/examples/recommendation/inference/inference_data/recflow/recflow_infer_data.feather')
+    infer_df = pd.read_feather('/data1/home/recstudio/haoran/InfoNexus/examples/recommendation/inference/inference_data/recflow/recflow_infer_data.feather')
     for batch_idx in range(10):
         print(f"This is batch {batch_idx}")
         batch_st = batch_idx * 128 

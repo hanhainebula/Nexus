@@ -7,6 +7,7 @@ from UniRetrieval.abc.training.reranker import AbsRerankerModel, RerankerOutput
 from UniRetrieval.training.reranker.recommendation.arguments import DataAttr4Model, ModelArguments
 from UniRetrieval.modules import MLPModule, LambdaModule, MultiFeatEmbedding, AverageAggregator
 from UniRetrieval.modules.arguments import get_model_cls, get_modules, split_batch
+from UniRetrieval.modules.loss import BCEWithLogitLoss
 from loguru import logger
 
 class BaseRanker(AbsRerankerModel):
@@ -69,7 +70,7 @@ class BaseRanker(AbsRerankerModel):
 
     def get_loss_function(self):
         # BCELoss is not good for autocast in distributed training, reminded by pytorch
-        return get_modules("loss", "BCEWithLogitLoss")(reduction='mean')
+        return BCEWithLogitLoss(reduction='mean')
 
 
     def compute_score(
@@ -103,9 +104,6 @@ class BaseRanker(AbsRerankerModel):
     
     def get_score_function(self):
         return self.compute_score
-    
-    def sampling(self, query, num_neg, *args, **kwargs):
-        return self.negative_sampler(query, num_neg)
         
     def forward(self, batch, cal_loss=False, *args, **kwargs) -> RerankerOutput:
         if cal_loss:
@@ -126,7 +124,8 @@ class BaseRanker(AbsRerankerModel):
             label = torch.stack(label, dim=1) # [batch_size, n_task]
         output_dict['label'] = label
         loss = self.loss_function(**output_dict)
-        
+        # print("output_dict.scores:",output_dict['scores'])
+        # print("label:",output_dict['label'])
         if isinstance(loss, dict):
             return loss
         else:

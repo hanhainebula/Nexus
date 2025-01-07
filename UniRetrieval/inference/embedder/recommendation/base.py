@@ -53,7 +53,7 @@ import onnxruntime as ort
 
 import tensorrt as trt
 import pycuda.driver as cuda
-# import pycuda.autoinit
+
 
 
 
@@ -61,7 +61,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
 
     def __init__(self, config: dict) -> None:
         # super().__init__(config)
-
+        import pycuda.autoinit
         # load config 
         self.config = config
         with open(os.path.join(config['model_ckpt_path'], 'model_config.json'), 'r', encoding='utf-8') as f:
