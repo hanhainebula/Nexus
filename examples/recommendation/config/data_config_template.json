@@ -7,9 +7,6 @@
     "item_features": ["video_id", "author_id", "category_level_two", "upload_type", "category_level_one"],
     "labels": ["like"],
     "item_batch_size": 4096,
-    "filter_settings": {
-        "like": ["==1"]
-    },
     "item_info": {
         "url": "hdfs://node1:8020/recstudio/recflow/others/video_info.pkl",
         "key": "video_id",

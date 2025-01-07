@@ -76,16 +76,12 @@ class RecommenderAbsEvaluator(AbsEvaluator):
         eval_outputs = []
         eval_total_bs = 0
         for eval_step, eval_batch in enumerate(self.eval_loader):
-            # print("eval_batch['like']:",eval_batch['like'])
             logger.info(f"Evaluation step {eval_step + 1} begins..")
             eval_batch_size = eval_batch[list(eval_batch.keys())[0]].shape[0]
             metrics = self._eval_batch(model, eval_batch, *args, **kwargs)
             eval_outputs.append((metrics, eval_batch_size))
             eval_total_bs += eval_batch_size
             logger.info(f"Evaluation step {eval_step + 1} done.")
-            # log_dict(logger, metrics)
-            # print(metrics)
-            # logger.info(", ".join(output_list))
             if eval_step > 50:
                 break
         metrics = self.eval_epoch_end(model, eval_outputs)
