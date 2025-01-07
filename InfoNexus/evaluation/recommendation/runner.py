@@ -43,14 +43,14 @@ class RecommenderEvalRunner(AbsEvalRunner):
         retriever = None
         if model_args.retriever_ckpt_path is not None:
             retriever = BaseRetriever.from_pretrained(model_args.retriever_ckpt_path)
-            checkpoint = torch.load(os.path.join(model_args.retriever_ckpt_path, 'model.pt'), map_location=torch.device('cpu'))
+            checkpoint = torch.load(os.path.join(model_args.retriever_ckpt_path, 'model.pt'), map_location=torch.device('cpu'), weights_only=True)
             retriever.load_state_dict(checkpoint)
             retriever.eval()
     
         ranker = None
         if model_args.ranker_ckpt_path is not None:
             ranker = BaseRanker.from_pretrained(model_args.ranker_ckpt_path)
-            checkpoint = torch.load(os.path.join(model_args.ranker_ckpt_path, 'model.pt'), map_location=torch.device('cpu'))
+            checkpoint = torch.load(os.path.join(model_args.ranker_ckpt_path, 'model.pt'), map_location=torch.device('cpu'), weights_only=True)
             ranker.load_state_dict(checkpoint)
             ranker.eval()
             
@@ -60,14 +60,16 @@ class RecommenderEvalRunner(AbsEvalRunner):
         return retriever, ranker
 
     def load_data_loader(self) -> RecommenderEvalDataLoader:
-        loader = RecommenderEvalDataLoader(self.eval_args)
+        loader = RecommenderEvalDataLoader(self.eval_args, self.model_args)
         return loader
 
     def load_evaluator(self) -> RecommenderAbsEvaluator:
         evaluator = RecommenderAbsEvaluator(
-            data_loader=self.data_loader.eval_loader,
+            retriever_data_loader=self.data_loader.retriever_eval_loader,
+            ranker_data_loader=self.data_loader.ranker_eval_loader,
             item_loader=self.data_loader.item_loader,
             config=self.eval_args,
+            model_config=self.model_args
         )
         return evaluator
 

@@ -1,6 +1,7 @@
 {
-    "dataset_path": "./examples/recommendation/config/data/recflow_retriever.json", 
-    "eval_output_dir": "./saves/recommender_results/eval",
+    "retriever_data_path": "/data1/home/recstudio/haoran/InfoNexus/examples/recommendation/config/data/recflow_retriever.json", 
+    "ranker_data_path": "/data1/home/recstudio/haoran/InfoNexus/examples/recommendation/config/data/recflow_ranker.json", 
+    "eval_output_dir": "/data1/home/recstudio/haoran/InfoNexus/saves/recommender_results/eval",
     "cutoffs": [500, 1000, 2000],
     "metrics": ["ndcg", "recall", "auc", "logloss"],
     "eval_batch_size": 100

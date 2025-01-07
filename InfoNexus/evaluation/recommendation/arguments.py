@@ -14,7 +14,11 @@ class RecommenderEvalArgs(AbsEvalArguments):
     """
     Base class for evaluation arguments.
     """
-    dataset_path: str = field(
+    retriever_data_path: str = field(
+        default=None,
+        metadata={}
+    )
+    ranker_data_path: str = field(
         default=None,
         metadata={}
     )
@@ -43,10 +47,8 @@ class RecommenderEvalArgs(AbsEvalArguments):
     #     default=256, metadata={"help": "Item batch size."}
     # )
     def __post_init__(self):
-        eval_data_arguments = DataArguments.from_json(self.dataset_path)
-        self.type = eval_data_arguments.type
-        self.item_info = eval_data_arguments.item_info
-        self.item_batch_size = eval_data_arguments.item_batch_size
+        retriever_eval_data_arguments = DataArguments.from_json(self.retriever_data_path)
+        self.retriever_item_batch_size = retriever_eval_data_arguments.item_batch_size
 
 @dataclass
 class RecommenderEvalModelArgs(AbsModelArguments):
