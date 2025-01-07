@@ -3,9 +3,6 @@ from typing import Dict, List, Union
 
 import torch
 import torch.distributed as dist
-
-from UniRetrieval.training.reranker.recommendation.modeling import BaseRanker
-from UniRetrieval.training.embedder.recommendation.modeling import BaseRetriever
 from UniRetrieval.modules.embedding import TDEMultiFeatEmbedding, MultiFeatEmbedding
 
 from torchrec import JaggedTensor
@@ -37,7 +34,7 @@ def init_dist():
         dist.init_process_group("nccl")
 
 
-def convert_to_tde_model(model:Union[BaseRetriever, BaseRanker]):
+def convert_to_tde_model(model:torch.nn.Module):
     for name, module in model.named_modules():
         if isinstance(module, MultiFeatEmbedding):
             model.set_submodule(

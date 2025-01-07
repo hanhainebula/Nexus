@@ -21,6 +21,8 @@ class TrainingArguments(AbsEmbedderTrainingArguments):
     
     checkpoint_best_ckpt: bool = True   # if true, save best model in earystop callback
     checkpoint_steps: int = 1000    # if none, save model per epoch; else save model by steps
+    
+    optimizer: str = "adam"
 
 @dataclass
 class ModelArguments(AbsEmbedderModelArguments):
@@ -34,6 +36,16 @@ class ModelArguments(AbsEmbedderModelArguments):
     dropout: float = 0.3
     batch_norm: bool = True
     model_name_or_path: str = ''
+    
+    @staticmethod
+    def from_dict(d: dict):
+        arg = ModelArguments()
+        for k, v in d.items():
+            setattr(arg, k, v)
+        return arg
+    
+    def to_dict(self):
+        return self.__dict__
     
 
 REQUIRED_DATA_CONFIG = [
