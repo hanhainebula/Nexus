@@ -2,6 +2,7 @@
 Adapted from https://github.com/AIR-Bench/AIR-Bench/blob/0.1.0/air_benchmark/evaluation_utils/evaluator.py
 """
 from collections import defaultdict
+from accelerate import Accelerator
 
 import json
 from loguru import logger
@@ -19,7 +20,7 @@ from UniRetrieval.abc.evaluation import AbsEvaluator
 from .datasets import RecommenderEvalDataLoader
 import torch
 from torch.utils.data import DataLoader, Dataset
-from .arguments import RecommenderEvalArgs
+from .arguments import RecommenderEvalArgs, RecommenderEvalModelArgs
 from UniRetrieval.modules.arguments import log_dict
 
 
@@ -34,17 +35,22 @@ class RecommenderAbsEvaluator(AbsEvaluator):
     """
     def __init__(
         self,
-        data_loader: DataLoader,
+        retriever_data_loader: DataLoader,
+        ranker_data_loader: DataLoader,
         item_loader: DataLoader, 
         config: RecommenderEvalArgs,
+        model_config: RecommenderEvalModelArgs,
         *args,
         **kwargs,
     ):
-        self.eval_loader = data_loader
+        self.retriever_eval_loader = retriever_data_loader
+        self.ranker_eval_loader = ranker_data_loader
         self.item_loader = item_loader
         self.item_vectors = None
         self.item_ids = None
         self.config = config
+        self.model_config = model_config
+        self.accelerator = Accelerator()
     
     def __call__(
         self,
@@ -69,13 +75,23 @@ class RecommenderAbsEvaluator(AbsEvaluator):
     @torch.no_grad()
     def evaluate(self, model:Union[BaseRetriever, BaseRanker], *args, **kwargs) -> Dict:
         model.eval()
+        model.to(self.accelerator.device)
+        model = self.accelerator.prepare(model)
         if model.model_type == "retriever":
-            logger.info(f"Updating item vectors...")
-            self.item_vectors, self.item_ids = self.update_item_vectors(model)
-            logger.info(f"Updating item vectors done...")
+            item_vector_path = os.path.join(self.model_config.retriever_ckpt_path, 'item_vectors.pt')
+            if os.path.exists(item_vector_path):
+                logger.info(f"Loading item vectors from {item_vector_path} ...")
+                item_vectors_dict = torch.load(item_vector_path)
+                self.item_vectors = item_vectors_dict['item_vectors'].to(self.accelerator.device)
+                self.item_ids = item_vectors_dict['item_ids'].to('cpu')
+            else:
+                logger.info(f"Updating item vectors...")
+                self.item_vectors, self.item_ids = self.update_item_vectors(model)
+                logger.info(f"Updating item vectors done...")
         eval_outputs = []
         eval_total_bs = 0
-        for eval_step, eval_batch in enumerate(self.eval_loader):
+        eval_loader = self.retriever_eval_loader if model.model_type == "retriever" else self.ranker_eval_loader
+        for eval_step, eval_batch in enumerate(self.accelerator.prepare(eval_loader)):
             logger.info(f"Evaluation step {eval_step + 1} begins..")
             eval_batch_size = eval_batch[list(eval_batch.keys())[0]].shape[0]
             metrics = self._eval_batch(model, eval_batch, *args, **kwargs)
@@ -84,6 +100,7 @@ class RecommenderAbsEvaluator(AbsEvaluator):
             logger.info(f"Evaluation step {eval_step + 1} done.")
             if eval_step > 50:
                 break
+        model = self.accelerator.unwrap_model(model)
         metrics = self.eval_epoch_end(model, eval_outputs)
         self._total_eval_samples = eval_total_bs
         return metrics
