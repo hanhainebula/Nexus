@@ -6,7 +6,6 @@ from typing import List, Union, Tuple
 from .arguments import RecommenderEvalArgs, RecommenderEvalModelArgs
 from .evaluator import RecommenderAbsEvaluator
 from InfoNexus.abc.evaluation import AbsEvalRunner
-# from InfoNexus.training.embedder.recommendation.datasets import 
 
 from InfoNexus.training.embedder.recommendation.modeling import BaseRetriever
 from InfoNexus.training.reranker.recommendation.modeling import BaseRanker

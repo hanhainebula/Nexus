@@ -1,3 +1,4 @@
 {
+    "ranker_ckpt_path": "./saves/recommender_results/mlp_ranker/",
     "retriever_ckpt_path": "./saves/recommender_results/mlp_retriever/"
 }
