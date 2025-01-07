@@ -9,7 +9,7 @@ import torch.distributed as dist
 
 
 from .modeling import BaseRanker
-from UniRetrieval.training.embedder.recommendation.arguments import DataAttr4Model, ModelArguments
+from UniRetrieval.training.reranker.recommendation.arguments import DataAttr4Model, ModelArguments
 from UniRetrieval.modules.arguments import get_model_cls
 
 from torch.utils.data._utils import MP_STATUS_CHECK_INTERVAL
@@ -173,12 +173,12 @@ class TDEModel(torch.nn.Module):
         
         # model class 
         if model_class_or_name is None:
-            model_class_or_name = config_dict['model_name_or_path']
+            model_class_or_name = config_dict['model_name']
         if isinstance(model_class_or_name, str):
             model_cls = get_model_cls(config_dict['model_type'], model_class_or_name)
         else:
             model_cls = model_class_or_name
-        del config_dict['model_type'], config_dict['model_name_or_path']
+        del config_dict['model_type'], config_dict['model_name']
         
         # create model         
         model = model_cls(data_config, model_config)

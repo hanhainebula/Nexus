@@ -15,6 +15,8 @@ from UniRetrieval.modules.arguments import DataAttr4Model
 from loguru import logger
 from UniRetrieval.training.embedder.recommendation.datasets import AbsRecommenderEmbedderCollator
 
+from torchrec.distributed import DistributedModelParallel
+from dynamic_embedding.wrappers import wrap_dataloader, wrap_dataset
     
 class RecommenderEvalDataLoader(AbsEvalDataLoader, DataLoader):
     def __init__(
@@ -36,3 +38,34 @@ class RecommenderEvalDataLoader(AbsEvalDataLoader, DataLoader):
             self.train_dataset.item_feat_dataset, 
             batch_size=config.item_batch_size,
         )
+        
+class TDERecommenderEvalDataLoader(AbsEvalDataLoader, DataLoader):
+    def __init__(
+        self,
+        model:DistributedModelParallel, 
+        config: RecommenderEvalArgs,
+    ):
+        self.config = config
+        self.eval_dataset: ShardedDataset = None
+        self.data_attr: DataAttr4Model = None
+        self.collator = AbsRecommenderEmbedderCollator()
+        (self.train_dataset, self.eval_dataset), self.data_attr = get_datasets(config.dataset_path)
+        
+        # eval loader 
+        self.eval_loader = DataLoader(
+            self.eval_dataset, 
+            batch_size=config.eval_batch_size,
+            collate_fn=self.collator
+        )
+        self.eval_loader = wrap_dataloader(self.eval_loader, 
+                                           model, model.module.tde_configs_dict)
+        
+        # item loader
+        item_feat_dataset = wrap_dataset(self.train_dataset.item_feat_dataset, 
+                                         model, model.module.tde_configs_dict)
+        self.item_loader = DataLoader(
+            item_feat_dataset, 
+            batch_size=config.item_batch_size,
+        )
+        self.item_loader = wrap_dataloader(self.item_loader, 
+                                           model, model.module.tde_configs_dict)

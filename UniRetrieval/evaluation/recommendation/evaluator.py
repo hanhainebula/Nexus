@@ -37,6 +37,7 @@ class RecommenderAbsEvaluator(AbsEvaluator):
         data_loader: DataLoader,
         item_loader: DataLoader, 
         config: RecommenderEvalArgs,
+        device:torch.device,
         *args,
         **kwargs,
     ):
@@ -45,6 +46,7 @@ class RecommenderAbsEvaluator(AbsEvaluator):
         self.item_vectors = None
         self.item_ids = None
         self.config = config
+        self.device = device       
     
     def __call__(
         self,
@@ -70,9 +72,11 @@ class RecommenderAbsEvaluator(AbsEvaluator):
     def evaluate(self, model:Union[BaseRetriever, BaseRanker], *args, **kwargs) -> Dict:
         model.eval()
         if model.model_type == "retriever":
-            logger.info(f"Updating item vectors...")
-            self.item_vectors, self.item_ids = self.update_item_vectors(model)
-            logger.info(f"Updating item vectors done...")
+            model.item_vectors['item_vectors'] = model.item_vectors['item_vectors'].to(self.device)
+            model.item_vectors['item_ids'] = model.item_vectors['item_ids'].to(self.device)
+            self.item_vectors = model.item_vectors['item_vectors']
+            self.item_ids = model.item_vectors['item_ids']
+            logger.info(f"Loading item vectors done...")
         eval_outputs = []
         eval_total_bs = 0
         for eval_step, eval_batch in enumerate(self.eval_loader):
@@ -99,6 +103,7 @@ class RecommenderAbsEvaluator(AbsEvaluator):
         """
         with torch.no_grad():
             model.eval()
+            batch = self._batch_to_device(batch, self.device)
             k = max(self.config.cutoffs) if self.config.cutoffs is not None else None
             if model.model_type == 'retriever':
                 outputs = model.eval_step(batch, k=k, item_vectors=self.item_vectors, *args, **kwargs)
@@ -106,6 +111,22 @@ class RecommenderAbsEvaluator(AbsEvaluator):
                 outputs = model.eval_step(batch, k=k, *args, **kwargs)
             metrics: dict = self.compute_metrics(model, outputs)
             return metrics
+        
+    def _batch_to_device(self, batch: Dict, device) -> Dict:
+        """ Move the batch to the device specified by the model's device property.
+
+        Args:
+            batch (Dict): The input batch.
+
+        Returns:
+            Dict: The moved batch.
+        """
+        for key, value in batch.items():
+            if isinstance(value, torch.Tensor):
+                batch[key] = value.to(device)
+            elif isinstance(value, dict):
+                batch[key] = self._batch_to_device(value, device)       
+        return batch 
     
     @torch.no_grad()
     def update_item_vectors(self, model:Union[BaseRetriever, BaseRanker]):

@@ -173,12 +173,12 @@ class TDEModel(torch.nn.Module):
         
         # model class 
         if model_class_or_name is None:
-            model_class_or_name = config_dict['model_name_or_path']
+            model_class_or_name = config_dict['model_name']
         if isinstance(model_class_or_name, str):
             model_cls = get_model_cls(config_dict['model_type'], model_class_or_name)
         else:
             model_cls = model_class_or_name
-        del config_dict['model_type'], config_dict['model_name_or_path']
+        del config_dict['model_type'], config_dict['model_name']
         
         # create model         
         model = model_cls(data_config, model_config)
@@ -193,8 +193,9 @@ class TDEModel(torch.nn.Module):
 
         model.load_state_dict(state_dict)
         
-        if "item_vectors" in state_dict:
-            model.item_vectors = state_dict["item_vectors"]
-            del state_dict['item_vectors']
+        item_vectors_path = os.path.join(checkpoint_dir, "item_vectors.pt")
+        if os.path.exists(item_vectors_path):
+            item_vectors = torch.load(item_vectors_path, map_location='cpu')
+            model.module.base_model.item_vectors = item_vectors
         
         return model
