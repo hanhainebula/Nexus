@@ -54,9 +54,10 @@ import tensorrt as trt
 import pycuda.driver as cuda
 from base import BaseRerankerInferenceEngine
 
-from dynamic_embedding.wrappers import TDEModel, BatchWrapper
+from dynamic_embedding.wrappers import BatchWrapper
 from torchrec.distributed import DistributedModelParallel
 
+from UniRetrieval.training.reranker.recommendation.tde_modeling import TDEModel
 
 class TDERerankerInferenceEngine(BaseRerankerInferenceEngine):
 
@@ -166,12 +167,12 @@ class TDERerankerInferenceEngine(BaseRerankerInferenceEngine):
         
         batch_outputs_idx = self.model.module.predict(
             batch_user_context_dict, batch_candidates_dict, 
-            topk=self.config['output_topk'], gpu_mem_save=True)
+            topk=self.config['output_topk'], gpu_mem_save=True) # topk idx
         # batch_outputs = batch_outputs_idx
         batch_outputs = []
         for row_idx, output_idx in enumerate(batch_outputs_idx):
             batch_outputs.append(
-                np.array(batch_candidates_df.iloc[row_idx][self.feature_config['fiid']])[output_idx.cpu()])
+                np.array(batch_candidates_df.iloc[row_idx][self.feature_config['fiid']])[output_idx.cpu()]) # get topk item id
         batch_outputs = np.stack(batch_outputs, axis=0)
         batch_ed_time = time.time()
         # print(f'batch time: {batch_ed_time - batch_st_time}s')

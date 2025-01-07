@@ -9,8 +9,10 @@ from UniRetrieval.abc.training.reranker import AbsRerankerRunner
 from UniRetrieval.modules.optimizer import get_lr_scheduler, get_optimizer
 from .arguments import TrainingArguments, ModelArguments, DataArguments, DataAttr4Model
 from .modeling import BaseRanker
+from .tde_modeling import TDEModel
 from .trainer import TDERankerTrainer
 from .datasets import AbsRecommenderRerankerCollator, ConfigProcessor, ShardedDataset
+from .runner import RankerRunner
 
 from fbgemm_gpu.split_embedding_configs import EmbOptimType
 from torchrec import EmbeddingConfig, EmbeddingBagConfig, EmbeddingCollection, EmbeddingBagCollection
@@ -24,9 +26,9 @@ from torchrec.distributed.types import ModuleSharder, ShardingType, ShardingPlan
 from torchrec.optim.keyed import CombinedOptimizer, KeyedOptimizerWrapper
 from torchrec.optim.optimizers import in_backward_optimizer_filter
 
-from dynamic_embedding.wrappers import attach_id_transformer_group, TDEModel
+from dynamic_embedding.wrappers import attach_id_transformer_group
 
-class TDERankerRunner(AbsRerankerRunner):
+class TDERankerRunner(RankerRunner):
     """
     Finetune Runner for base embedding models.
     """
@@ -54,18 +56,6 @@ class TDERankerRunner(AbsRerankerRunner):
             self.model, tde_configs_dict, tde_feature_names, tde_settings = self.load_model()
         self.data_collator = self.load_data_collator()
         self.trainer = trainer if trainer is not None else self.load_trainer(tde_configs_dict, tde_feature_names, tde_settings)
-
-    def load_dataset(self) -> Tuple[ShardedDataset, DataAttr4Model]:
-        config_processor = ConfigProcessor(self.data_args)
-        train_config, eval_config = config_processor.split_config()
-
-        train_data = ShardedDataset(train_config, shuffle=True)
-        attr = train_config.to_attr()
-        if train_data.item_feat_dataset is not None:
-            # when candidate item dataset is given, the number of items is set to the number of items in the dataset
-            # instead of the max item id in the dataset
-            attr.num_items = len(train_data.item_feat_dataset)
-        return train_data, attr
     
     def _prepare_model(self, model):
         
@@ -181,7 +171,19 @@ class TDERankerRunner(AbsRerankerRunner):
             lambda _params: get_optimizer(self.training_args.optimizer, _params,
                 self.training_args.learning_rate, self.training_args.weight_decay),
         )
-        self.optimizer = CombinedOptimizer([self.model.fused_optimizer, dense_optimizer])    
+        def get_unique_fused_optimizer(fused_optimizer, all_paths):
+            unique_optimizers = []
+            for path, optimizer in fused_optimizer.optimizers: 
+                if path in all_paths:
+                    unique_optimizers.append((path, optimizer))
+            return CombinedOptimizer(unique_optimizers)
+        
+        unique_fused_optimizer = get_unique_fused_optimizer(
+            self.model.fused_optimizer, 
+            set(list(zip(*list(self.model.module.named_modules())))[0])
+        ) # to make fused optimizer able to be prepared 
+
+        self.optimizer = CombinedOptimizer([unique_fused_optimizer, dense_optimizer])   
         
         self.lr_scheduler = get_lr_scheduler()
         # self.training_args.dataloader_num_workers = 0   # avoid multi-processing
@@ -199,7 +201,3 @@ class TDERankerRunner(AbsRerankerRunner):
         )
         
         return trainer
-
-    def load_data_collator(self) -> AbsRecommenderRerankerCollator:
-        collator = AbsRecommenderRerankerCollator()
-        return collator

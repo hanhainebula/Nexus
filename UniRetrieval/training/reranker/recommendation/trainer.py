@@ -3,15 +3,11 @@ from loguru import logger
 
 from UniRetrieval.abc.training.reranker import AbsRerankerTrainer
 
-import itertools
-import os
-from typing import Dict, List, Optional, Tuple, Union, Any, cast
-
 import torch
 import torch.optim as optim
 
 from torchrec.distributed.model_parallel import DistributedModelParallel
-from dynamic_embedding.wrappers import attach_id_transformer_group, wrap_dataloader, wrap_dataset, TDEModel
+from dynamic_embedding.wrappers import attach_id_transformer_group, wrap_dataloader, wrap_dataset
 from torchrec_dynamic_embedding.dataloader import save as tde_save 
 
 

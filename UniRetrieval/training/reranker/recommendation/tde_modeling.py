@@ -8,7 +8,7 @@ import torch
 import torch.distributed as dist
 
 
-from .modeling import BaseRetriever
+from .modeling import BaseRanker
 from UniRetrieval.training.embedder.recommendation.arguments import DataAttr4Model, ModelArguments
 from UniRetrieval.modules.arguments import get_model_cls
 
@@ -32,7 +32,7 @@ from dynamic_embedding.wrappers import attach_id_transformer_group
     
 class TDEModel(torch.nn.Module):
     
-    def __init__(self, base_model:BaseRetriever):
+    def __init__(self, base_model:BaseRanker):
         super().__init__()
         self.base_model = base_model 
         self.base_model = convert_to_tde_model(self.base_model)
@@ -76,9 +76,9 @@ class TDEModel(torch.nn.Module):
         return rank, world_size, device, backend, pg
     
     @staticmethod
-    def _prepare_model(model:BaseRetriever):
+    def _prepare_model(model:BaseRanker):
         
-        def _get_tde_configs_dict(model:BaseRetriever) -> Dict:
+        def _get_tde_configs_dict(model:BaseRanker) -> Dict:
             """Get the embedding configurations from the model.
 
             Returns:
@@ -92,7 +92,7 @@ class TDEModel(torch.nn.Module):
                     embedding_configs_dict[name] = module._embedding_configs
             return embedding_configs_dict
         
-        def _get_tde_feature_names(model:BaseRetriever) -> List[str]:
+        def _get_tde_feature_names(model:BaseRanker) -> List[str]:
             """Get the feature names from the model.
             
             Returns:

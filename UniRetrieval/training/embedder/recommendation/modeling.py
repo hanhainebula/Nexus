@@ -50,7 +50,7 @@ class BaseRetriever(AbsEmbedderModel):
         self.model_type = 'retriever'
         self.init_modules()
         
-        self.item_loader: DataLoader = item_loader
+        self.item_loader: DataLoader = item_loader # need to be prepared 
 
         self.num_items: int = self.data_config.num_items
         self.fiid: str = self.data_config.fiid  # item id field
@@ -222,7 +222,7 @@ class BaseRetriever(AbsEmbedderModel):
         Returns:
             item_feat: [B, N]
         """
-        item_feat = item_dataset.get_item_feat(item_id)
+        item_feat = item_dataset[item_id]
         return item_feat
     
     def load_config(self, config: Union[Dict, str]) -> ModelArguments:
@@ -292,7 +292,6 @@ class MLPRetriever(BaseRetriever):
     def get_query_encoder(self):
         return MLPQueryEncoder(self.data_config, self.model_config,self.item_encoder)
     
-
     def get_score_function(self):
         return InnerProductScorer()
     

@@ -12,6 +12,7 @@ from .arguments import TrainingArguments, ModelArguments, DataArguments, DataAtt
 from .modeling import BaseRetriever
 from .tde_modeling import TDEModel
 from .trainer import TDERetrieverTrainer
+from .runner import RetrieverRunner
 from .datasets import AbsRecommenderEmbedderCollator, ConfigProcessor, ShardedDataset
 
 from fbgemm_gpu.split_embedding_configs import EmbOptimType
@@ -30,7 +31,7 @@ from torchrec.distributed import DistributedModelParallel
 from dynamic_embedding.wrappers import attach_id_transformer_group, wrap_dataset
 
 
-class TDERetrieverRunner(AbsEmbedderRunner):
+class TDERetrieverRunner(RetrieverRunner):
     """
     Finetune Runner for base embedding models.
     """
@@ -59,18 +60,6 @@ class TDERetrieverRunner(AbsEmbedderRunner):
         self.data_collator = self.load_data_collator()
         self.trainer = trainer if trainer is not None else self.load_trainer(
             tde_configs_dict, tde_feature_names, tde_settings)
-
-    def load_dataset(self) -> Tuple[ShardedDataset, DataAttr4Model]:
-        config_processor = ConfigProcessor(self.data_args)
-        train_config, eval_config = config_processor.split_config()
-
-        train_data = ShardedDataset(train_config, shuffle=True, preload=False)
-        attr = train_config.to_attr()
-        if train_data.item_feat_dataset is not None:
-            # when candidate item dataset is given, the number of items is set to the number of items in the dataset
-            # instead of the max item id in the dataset
-            attr.num_items = len(train_data.item_feat_dataset)
-        return train_data, attr
     
     def _prepare_model(self, model:BaseRetriever):
         
@@ -216,7 +205,3 @@ class TDERetrieverRunner(AbsEmbedderRunner):
             optimizers=[self.optimizer, self.lr_scheduler]
         )
         return trainer
-
-    def load_data_collator(self) -> AbsRecommenderEmbedderCollator:
-        collator = AbsRecommenderEmbedderCollator()
-        return collator
