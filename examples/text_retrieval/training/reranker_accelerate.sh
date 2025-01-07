@@ -1,12 +1,12 @@
 export WANDB_MODE=disabled
 
-BASE_DIR='/data1/home/recstudio/angqing/UniRetrieval'
+BASE_DIR='/data1/home/recstudio/angqing/InfoNexus'
 
 MODEL_NAME_OR_PATH='/data2/OpenLLMs/bge-reranker-base'
-TRAIN_DATA="/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
-CKPT_SAVE_DIR='/data2/home/angqing/code/UniRetrieval/checkpoints/test_reranker'
-DEEPSPEED_DIR='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/ds_stage0.json'
-ACCELERATE_CONFIG='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
+TRAIN_DATA="/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
+CKPT_SAVE_DIR='/data2/home/angqing/code/InfoNexus/checkpoints/test_reranker'
+DEEPSPEED_DIR='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/ds_stage0.json'
+ACCELERATE_CONFIG='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
 
 
 # set large epochs and small batch size for testing
@@ -56,7 +56,7 @@ training_args="\
 cd $BASE_DIR
 
 cmd="accelerate launch --config_file $ACCELERATE_CONFIG \
-    eval_scripts/training/text_retrieval/reranker/training.py \
+    InfoNexus/training/reranker/text_retrieval/__main__.py \
     $model_args \
     $data_args \
     $training_args \

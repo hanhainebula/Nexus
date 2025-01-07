@@ -1,4 +1,3 @@
 {
-    "retriever_ckpt_path": "/data1/home/recstudio/haoran/InfoNexus/saves/recommender_results/mlp_retriever",
-    "ranker_ckpt_path": "/data1/home/recstudio/haoran/InfoNexus/saves/recommender_results/mlp_ranker"
+    "retriever_ckpt_path": "./saves/recommender_results/mlp_retriever/"
 }

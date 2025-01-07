@@ -4,13 +4,13 @@ with open("README.md", mode="r", encoding="utf-8") as readme_file:
     readme = readme_file.read()
 
 setup(
-    name='UniRetrieval',
+    name='InfoNexus',
     version='0.0.1',
     description='Toolkit for Universal Retrieval, such as text retreival, item recommendation, image retrieval, etc.',
     long_description=readme,
     long_description_content_type="text/markdown",
     author_email='liandefu@ustc.edu.cn',
-    url='https://github.com/USTCLLM/UniRetrieval',
+    url='https://github.com/USTCLLM/InfoNexus',
     packages=find_packages(),
     include_package_data=True,
     install_requires=[

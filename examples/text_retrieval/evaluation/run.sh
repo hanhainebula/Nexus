@@ -1,11 +1,18 @@
-BASE_DIR=/data1/home/recstudio/angqing/UniRetrieval
+BASE_DIR=/data1/home/recstudio/angqing/InfoNexus
 EMBEDDER=/data1/home/recstudio/angqing/models/bge-base-zh-v1.5
 RERANKER=/data1/home/recstudio/angqing/models/bge-reranker-base
+embedder_infer_mode=onnx
+reranker_infer_mode=onnx
+embedder_onnx_path=$EMBEDDER/onnx/model.onnx
+reranker_onnx_path=$RERANKER/onnx/model.onnx
+embedder_trt_path=$EMBEDDER/trt/model.trt
+reranker_trt_path=$RERANKER/trt/model.trt
+
 
 cd $BASE_DIR
 
 
-python -m UniRetrieval.evaluation.text_retrieval.airbench \
+python -m InfoNexus.evaluation.text_retrieval.airbench \
     --benchmark_version AIR-Bench_24.05 \
     --task_types qa \
     --domains arxiv \
@@ -21,4 +28,10 @@ python -m UniRetrieval.evaluation.text_retrieval.airbench \
     --devices cuda:0 \
     --model_cache_dir $BASE_DIR/examples/text_retrieval/evaluation/cache/model \
     --reranker_query_max_length 128 \
-    --reranker_max_length 512
+    --reranker_max_length 512 \
+    --embedder_infer_mode $embedder_infer_mode \
+    --reranker_infer_mode $reranker_infer_mode \
+    --embedder_onnx_model_path $embedder_onnx_path \
+    --reranker_onnx_model_path $reranker_onnx_path \
+    --embedder_trt_model_path $embedder_trt_path \
+    --reranker_trt_model_path $reranker_trt_path

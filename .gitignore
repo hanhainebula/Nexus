@@ -5,7 +5,7 @@ __pycache__/
 *old.ipynb
 recommender_results/
 */recommender_results/
-UniRetrieval.egg-info/
+InfoNexus.egg-info/
 tmp_trainer/
 build/
 examples/recommendation/inference/inference_data/recflow/*
@@ -13,3 +13,7 @@ examples/recommendation/inference/inference_data/recflow/*
 .vscode/
 saves/
 */saves/
+
+checkpoints/
+eval_scripts/
+note

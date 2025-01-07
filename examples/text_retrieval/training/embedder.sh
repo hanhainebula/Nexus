@@ -1,7 +1,11 @@
 export WANDB_MODE=disabled
 
-train_data='/data2/home/angqing/code/UniRetrieval/examples/text_retrieval/example_data/fiqa.jsonl'
+base_dir='/data2/home/angqing/code/InfoNexus'
+train_data='/data2/home/angqing/code/InfoNexus/examples/text_retrieval/example_data/fiqa.jsonl'
+model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5'
+ckpt_save_dir='/data2/home/angqing/code/InfoNexus/checkpoints/test_embedder'
 
+deepspeed='/data2/home/angqing/code/InfoNexus/examples/text_retrieval/training/ds_stage0.json'
 # set large epochs and small batch size for testing
 num_train_epochs=2
 per_device_train_batch_size=30
@@ -14,7 +18,7 @@ if [ -z "$HF_HUB_CACHE" ]; then
 fi
 
 model_args="\
-    --model_name_or_path /data2/OpenLLMs/bge-base-zh-v1.5 \
+    --model_name_or_path $model_name_or_path \
     --cache_dir $HF_HUB_CACHE \
 "
 
@@ -31,7 +35,7 @@ data_args="\
 "
 
 training_args="\
-    --output_dir /data2/home/angqing/code/UniRetrieval/checkpoints/test_embedder \
+    --output_dir $ckpt_save_dir \
     --overwrite_output_dir \
     --learning_rate 1e-5 \
     --fp16 \
@@ -40,7 +44,7 @@ training_args="\
     --dataloader_drop_last True \
     --warmup_ratio 0.1 \
     --gradient_checkpointing \
-    --deepspeed /data2/home/angqing/code/UniRetrieval/examples/text_retrieval/training/ds_stage0.json \
+    --deepspeed $deepspeed \
     --logging_steps 1 \
     --save_steps 100 \
     --negatives_cross_device \
@@ -51,10 +55,10 @@ training_args="\
 "
 
 
-cd /data2/home/angqing/code/UniRetrieval
+cd $base_dir
 
 cmd="torchrun --nproc_per_node $num_gpus \
-    -m UniRetrieval.training.embedder.text_retrieval \
+    -m InfoNexus.training.embedder.text_retrieval \
     $model_args \
     $data_args \
     $training_args \

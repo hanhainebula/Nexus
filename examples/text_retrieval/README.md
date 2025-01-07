@@ -5,13 +5,13 @@
     export WANDB_MODE=disabled
 
 
-    BASE_DIR='/data1/home/recstudio/angqing/UniRetrieval'
+    BASE_DIR='/data1/home/recstudio/angqing/InfoNexus'
 
     MODEL_NAME_OR_PATH='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5'
-    TRAIN_DATA="/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
-    CKPT_SAVE_DIR='/data1/home/recstudio/angqing/UniRetrieval/checkpoints'
-    DEEPSPEED_DIR='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/ds_stage0.json'
-    ACCELERATE_CONFIG='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
+    TRAIN_DATA="/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
+    CKPT_SAVE_DIR='/data1/home/recstudio/angqing/InfoNexus/checkpoints'
+    DEEPSPEED_DIR='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/ds_stage0.json'
+    ACCELERATE_CONFIG='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
     # set large epochs and small batch size for testing
     num_train_epochs=2
     per_device_train_batch_size=16
@@ -62,7 +62,7 @@
     cd $BASE_DIR
 
     cmd="accelerate launch --config_file $ACCELERATE_CONFIG \
-        eval_scripts/training/text_retrieval/embedder/training.py \
+        InfoNexus/training/embedder/text_retrieval/__main__.py \
         $model_args \
         $data_args \
         $training_args \
@@ -75,13 +75,13 @@
     ```bash
     export WANDB_MODE=disabled
 
-    BASE_DIR='/data1/home/recstudio/angqing/UniRetrieval'
+    BASE_DIR='/data1/home/recstudio/angqing/InfoNexus'
 
     MODEL_NAME_OR_PATH='/data2/OpenLLMs/bge-reranker-base'
-    TRAIN_DATA="/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
-    CKPT_SAVE_DIR='/data2/home/angqing/code/UniRetrieval/checkpoints/test_reranker'
-    DEEPSPEED_DIR='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/ds_stage0.json'
-    ACCELERATE_CONFIG='/data1/home/recstudio/angqing/UniRetrieval/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
+    TRAIN_DATA="/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/example_data/fiqa.jsonl"
+    CKPT_SAVE_DIR='/data2/home/angqing/code/InfoNexus/checkpoints/test_reranker'
+    DEEPSPEED_DIR='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/ds_stage0.json'
+    ACCELERATE_CONFIG='/data1/home/recstudio/angqing/InfoNexus/eval_scripts/training/text_retrieval/accelerate_config_multi.json'
 
 
     # set large epochs and small batch size for testing
@@ -131,7 +131,7 @@
     cd $BASE_DIR
 
     cmd="accelerate launch --config_file $ACCELERATE_CONFIG \
-        eval_scripts/training/text_retrieval/reranker/training.py \
+        InfoNexus/training/reranker/text_retrieval/__main__.py \
         $model_args \
         $data_args \
         $training_args \
@@ -163,17 +163,26 @@ Detailed scripts are in ./training
         ```python
         # 1. not use inference engine
         # TODO pesudo import, should change
-        from UniRetrieval import FlagModel, AbsInferenceArguments, BaseEmbedderInferenceEngine
+        from InfoNexus import TextEmbedder, AbsInferenceArguments, BaseEmbedderInferenceEngine
 
-        sentences_1='The quick brown fox jumps over the lazy dog.'
-        sentences_2='Artificial intelligence is transforming the world.'
+        sentences = [
+            "The quick brown fox jumps over the lazy dog.",
+            "Artificial intelligence is transforming the world.",
+            "The Eiffel Tower is located in Paris, France.",
+            "Python is a popular programming language.",
+            "The Great Wall of China is one of the Seven Wonders of the World.",
+            "Space exploration has led to many scientific discoveries.",
+            "Climate change is a pressing global issue.",
+            "The Mona Lisa is a famous painting by Leonardo da Vinci.",
+            "Electric cars are becoming more common.",
+            "The human brain is an incredibly complex organ."
+        ]
 
-        model = FlagModel(model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5', use_fp16=True, devices=['cuda:1','cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
-        embeddings_1 = model.encode(sentences_1)
-        embeddings_2 = model.encode(sentences_2)
-        similarity = embeddings_1 @ embeddings_2.T
-        print(similarity)
+        model = TextEmbedder(model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5', use_fp16=True, devices=['cuda:1','cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
+        emb_model= model.encode(sentences, batch_size = 5)
 
+        print(emb_model.shape)
+        print(emb_model[0]@ emb_model[1].T)
         # 2. using inference engine
         model_path='/data2/OpenLLMs/bge-base-zh-v1.5'
         args=AbsInferenceArguments(
@@ -184,21 +193,36 @@ Detailed scripts are in ./training
         )
         args.infer_mode='normal'
         inference_engine=BaseEmbedderInferenceEngine(args)
-        embeddings_1=inference_engine.inference(sentences_1, batch_size=10, normalize=True)
+        emb_normal=inference_engine.inference(sentences, batch_size=10, normalize=True)
+        print(emb_normal.shape)
+        print(emb_normal[0]@ emb_normal[1].T)
         ```
     2. ONNX
         
         Convert pytorch model to onnx first.
 
         ```python
-        # 1. convert pytorch model to ONNX
-        from UniRetrieval import AbsInferenceArguments, BaseEmbedderInferenceEngine
-        model_path='path to pytorch model'
-        onnx_model_path='path to save onnx model'
-        BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
-        
+        from InfoNexus import AbsInferenceArguments, BaseEmbedderInferenceEngine
+        model_path='/data2/OpenLLMs/bge-base-zh-v1.5'
+        onnx_model_path='/data2/OpenLLMs/bge-base-zh-v1.5/onnx/model.onnx'
+
+        # 1. Convert to onnx
+        BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=onnx_model_path)
+
         # 2. Inference with onnx session
-        sentences='The quick brown fox jumps over the lazy dog.'
+        sentences = [
+            "The quick brown fox jumps over the lazy dog.",
+            "Artificial intelligence is transforming the world.",
+            "The Eiffel Tower is located in Paris, France.",
+            "Python is a popular programming language.",
+            "The Great Wall of China is one of the Seven Wonders of the World.",
+            "Space exploration has led to many scientific discoveries.",
+            "Climate change is a pressing global issue.",
+            "The Mona Lisa is a famous painting by Leonardo da Vinci.",
+            "Electric cars are becoming more common.",
+            "The human brain is an incredibly complex organ."
+        ]
+
         args=AbsInferenceArguments(
             model_name_or_path=model_path,
             onnx_model_path=onnx_model_path,
@@ -208,12 +232,14 @@ Detailed scripts are in ./training
             infer_batch_size=16
         )
         inference_engine_onnx = BaseEmbedderInferenceEngine(args)
-        embeddings = inference_engine_onnx.inference(sentences, normalize=True)
+        emb_onnx = inference_engine_onnx.inference(sentences, normalize=True, batch_size=5)
+        print(emb_onnx.shape)
+        print(emb_onnx[0]@ emb_onnx[1].T)
         ```
         
     3. TensorRT
 
-        Please use official tool `trtexec` to convert onnx model to TensorRT first. 
+        Use official tool `trtexec` to convert onnx model to TensorRT or use our `BaseEmbedderInferenceEngine.convert_to_tensorrt` which relys on trtexec.
 
         1. Bash scripts of converting ONNX to TensorRT
             ```bash
@@ -232,25 +258,50 @@ Detailed scripts are in ./training
             # Convert ONNX to TensorRT with dynamic shapes. Please refer to official docs for detailed usage
             trtexec --onnx=$ONNX_PATH --saveEngine=$TRT_SAVE_PATH --minShapes=input_ids:1x1,attention_mask:1x1,token_type_ids:1x1 --optShapes=input_ids:8x128,attention_mask:8x128,token_type_ids:8x128 --maxShapes=input_ids:16x512,attention_mask:16x512,token_type_ids:16x512 --verbose
             ```
-        
+
         2. Inference with TensorRT
             ```python
-            from UniRetrieval import AbsInferenceArguments, BaseEmbedderInferenceEngine
-            model_path = 'path to model'
-            trt_model_path ='path to trt model'
-            
-            sentences='The quick brown fox jumps over the lazy dog.'
+            from InfoNexus import AbsInferenceArguments, BaseEmbedderInferenceEngine
+
+
+            # trt path is path to TensorRT you have downloaded.
+            trt_path='/data2/home/angqing/tensorrt/TensorRT-10.7.0.23'
+
+            model_path='/data2/OpenLLMs/bge-base-zh-v1.5'
+            trt_model_path ='/data2/OpenLLMs/bge-base-zh-v1.5/trt/model.trt'
+            onnx_model_path='/data2/OpenLLMs/bge-base-zh-v1.5/onnx/model.onnx'
+
+            sentences = [
+                "The quick brown fox jumps over the lazy dog.",
+                "Artificial intelligence is transforming the world.",
+                "The Eiffel Tower is located in Paris, France.",
+                "Python is a popular programming language.",
+                "The Great Wall of China is one of the Seven Wonders of the World.",
+                "Space exploration has led to many scientific discoveries.",
+                "Climate change is a pressing global issue.",
+                "The Mona Lisa is a famous painting by Leonardo da Vinci.",
+                "Electric cars are becoming more common.",
+                "The human brain is an incredibly complex organ."
+            ]
 
             args=AbsInferenceArguments(
                 model_name_or_path=model_path,
                 onnx_model_path=onnx_model_path,
                 trt_model_path=trt_model_path,
                 infer_mode='tensorrt',
-                infer_device=0,
+                infer_device=7,
                 infer_batch_size=16
             )
+
+            # Convert onnx to tensorrt. Skip if you already have tensorrt model.  
+            BaseEmbedderInferenceEngine.convert_to_tensorrt(args.onnx_model_path, args.trt_model_path, args.infer_batch_size, trt_path=trt_path)
+
             inference_engine_tensorrt=BaseEmbedderInferenceEngine(args)
-            embeddings=inference_engine_tensorrt.inference(sentences, normalize=True)
+
+
+            emb_trt=inference_engine_tensorrt.inference(sentences, normalize=True, batch_size=5)
+            print(emb_trt.shape)
+            print(emb_trt[0]@ emb_trt[1].T)
             ```
 
 2. Reranker
@@ -261,17 +312,27 @@ Detailed scripts are in ./training
 
         ```python
         # 1. not use inference engine
-        # TODO pesudo import, should change
-        from UniRetrieval import FlagReranker, AbsInferenceArguments, BaseRerankerInferenceEngine
+        from InfoNexus import TextReranker, AbsInferenceArguments, BaseRerankerInferenceEngine
 
         # inputs should be Union[Tuple, List[Tuple]]
-        qa_pair = ("What is the capital of France?", "Paris is the capital and most populous city of France.")
+        qa_pairs = [
+            ("What is the capital of France?", "Paris is the capital and most populous city of France."),
+            ("Who wrote 'Pride and Prejudice'?","Edison wrote this." ),
+            ("What is the largest planet in our solar system?", "May be our mother land."),
+            ("Who is the current president of the United States?", "The current president of the United States is Joe Biden."),
+            ("What is the chemical symbol for water?", "The chemical symbol for water is H2O."),
+            ("What is the speed of light?", "The speed of light is approximately 299,792 kilometers per second."),
+            ("Who painted the Mona Lisa?", "The Mona Lisa was painted by Leonardo da Vinci."),
+            ("What is the tallest mountain in the world?", "Mount Everest is the tallest mountain in the world."),
+            ("What is the smallest country in the world?", "Vatican City is the smallest country in the world."),
+            ("Who discovered penicillin?", "Penicillin was discovered by Alexander Fleming.")
+        ]
 
-        model_name_or_path= ''
+        model_name_or_path= '/data2/OpenLLMs/bge-reranker-base'
 
-        model = FlagReranker(model_name_or_path=model_name_or_path, use_fp16=True, devices=['cuda:1','cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
-        score = model.compute_score(qa_pair)
-
+        model = TextReranker(model_name_or_path=model_name_or_path, normalize=True, use_fp16=True, devices=['cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
+        score = model.compute_score(qa_pairs)
+        print(score)
         # 2. using inference engine
         args=AbsInferenceArguments(
             model_name_or_path=model_name_or_path,
@@ -281,7 +342,8 @@ Detailed scripts are in ./training
         )
         args.infer_mode = 'normal'
         inference_engine = BaseRerankerInferenceEngine(args)
-        score = inference_engine.inference(qa_pair, batch_size=10, normalize=True)
+        score = inference_engine.inference(qa_pairs, batch_size=10, normalize=True)
+        print(score)
         ```
 
     2. ONNX
@@ -289,15 +351,26 @@ Detailed scripts are in ./training
         Convert pytorch model to onnx first.
 
         ```python
+        from InfoNexus import AbsInferenceArguments, BaseRerankerInferenceEngine
+        model_path='/data2/OpenLLMs/bge-reranker-base'
+        onnx_model_path='/data2/OpenLLMs/bge-reranker-base/onnx/model.onnx'
+
         # 1. convert pytorch model to ONNX
-        from UniRetrieval import AbsInferenceArguments, BaseRerankerInferenceEngine
-        model_path='path to pytorch model'
-        onnx_model_path='path to save onnx model'
-        BaseRerankerInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
+        BaseRerankerInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=onnx_model_path)
 
         # inputs should be Union[Tuple, List[Tuple]]
-        qa_pair = ("What is the capital of France?", "Paris is the capital and most populous city of France.")        
-
+        qa_pairs = [
+            ("What is the capital of France?", "Paris is the capital and most populous city of France."),
+            ("Who wrote 'Pride and Prejudice'?","Edison wrote this." ),
+            ("What is the largest planet in our solar system?", "May be our mother land."),
+            ("Who is the current president of the United States?", "The current president of the United States is Joe Biden."),
+            ("What is the chemical symbol for water?", "The chemical symbol for water is H2O."),
+            ("What is the speed of light?", "The speed of light is approximately 299,792 kilometers per second."),
+            ("Who painted the Mona Lisa?", "The Mona Lisa was painted by Leonardo da Vinci."),
+            ("What is the tallest mountain in the world?", "Mount Everest is the tallest mountain in the world."),
+            ("What is the smallest country in the world?", "Vatican City is the smallest country in the world."),
+            ("Who discovered penicillin?", "Penicillin was discovered by Alexander Fleming.")
+        ]
         # 2. Inference with onnx session
         args=AbsInferenceArguments(
             model_name_or_path=model_path,
@@ -308,12 +381,13 @@ Detailed scripts are in ./training
             infer_batch_size=16
         )
         inference_engine_onnx = BaseRerankerInferenceEngine(args)
-        score = inference_engine_onnx.inference(qa_pair, normalize=True)
+        score = inference_engine_onnx.inference(qa_pairs, normalize=True, batch_size=5)
+        print(score)
         ```
         
     3. TensorRT
 
-        Please use official tool `trtexec` to convert onnx model to TensorRT first. 
+        Please use official tool `trtexec` to convert onnx model to TensorRT first, or use `BaseRerankerInferenceEngine.convert_to_tensorrt` .
 
         1. Bash scripts of converting ONNX to TensorRT
             ```bash
@@ -335,35 +409,64 @@ Detailed scripts are in ./training
         
         2. Inference with TensorRT
             ```python
-            from UniRetrieval import AbsInferenceArguments, BaseRerankerInferenceEngine
-            model_path = 'path to model'
-            trt_model_path ='path to trt model'
-            
-            qa_pair = ("What is the capital of France?", "Paris is the capital and most populous city of France.")   
+            from InfoNexus import AbsInferenceArguments, BaseRerankerInferenceEngine
+
+            # trt path is path to TensorRT you have downloaded.
+            trt_path='/data2/home/angqing/tensorrt/TensorRT-10.7.0.23'
+
+            model_path='/data2/OpenLLMs/bge-reranker-base'
+            onnx_model_path='/data2/OpenLLMs/bge-reranker-base/onnx/model.onnx'
+            trt_model_path='/data2/OpenLLMs/bge-reranker-base/trt/model.trt'
+
+            qa_pairs = [
+                ("What is the capital of France?", "Paris is the capital and most populous city of France."),
+                ("Who wrote 'Pride and Prejudice'?","Edison wrote this." ),
+                ("What is the largest planet in our solar system?", "May be our mother land."),
+                ("Who is the current president of the United States?", "The current president of the United States is Joe Biden."),
+                ("What is the chemical symbol for water?", "The chemical symbol for water is H2O."),
+                ("What is the speed of light?", "The speed of light is approximately 299,792 kilometers per second."),
+                ("Who painted the Mona Lisa?", "The Mona Lisa was painted by Leonardo da Vinci."),
+                ("What is the tallest mountain in the world?", "Mount Everest is the tallest mountain in the world."),
+                ("What is the smallest country in the world?", "Vatican City is the smallest country in the world."),
+                ("Who discovered penicillin?", "Penicillin was discovered by Alexander Fleming.")
+            ]
 
             args=AbsInferenceArguments(
                 model_name_or_path=model_path,
                 onnx_model_path=onnx_model_path,
                 trt_model_path=trt_model_path,
                 infer_mode='tensorrt',
-                infer_device=0,
+                infer_device=7,
                 infer_batch_size=16
             )
+
+            # Convert onnx model to tensorrt. Skip if you already have tensorrt model.
+            BaseRerankerInferenceEngine.convert_to_tensorrt(args.onnx_model_path, args.trt_model_path, args.infer_batch_size, trt_path)
+
             inference_engine_tensorrt = BaseRerankerInferenceEngine(args)
-            score = inference_engine_tensorrt.inference(qa_pair, normalize=True)
+
+            score = inference_engine_tensorrt.inference(qa_pairs, normalize=True, batch_size=5)
+            print(score)
             ```
 
 ## Eval
 
 ```bash
-BASE_DIR=/data1/home/recstudio/angqing/UniRetrieval
+BASE_DIR=/data1/home/recstudio/angqing/InfoNexus
 EMBEDDER=/data1/home/recstudio/angqing/models/bge-base-zh-v1.5
 RERANKER=/data1/home/recstudio/angqing/models/bge-reranker-base
+embedder_infer_mode=onnx
+reranker_infer_mode=onnx
+embedder_onnx_path=$EMBEDDER/onnx/model.onnx
+reranker_onnx_path=$RERANKER/onnx/model.onnx
+embedder_trt_path=$EMBEDDER/trt/model.trt
+reranker_trt_path=$RERANKER/trt/model.trt
+
 
 cd $BASE_DIR
 
 
-python -m UniRetrieval.evaluation.text_retrieval.airbench \
+python -m InfoNexus.evaluation.text_retrieval.airbench \
     --benchmark_version AIR-Bench_24.05 \
     --task_types qa \
     --domains arxiv \
@@ -379,5 +482,11 @@ python -m UniRetrieval.evaluation.text_retrieval.airbench \
     --devices cuda:0 \
     --model_cache_dir $BASE_DIR/examples/text_retrieval/evaluation/cache/model \
     --reranker_query_max_length 128 \
-    --reranker_max_length 512
+    --reranker_max_length 512 \
+    --embedder_infer_mode $embedder_infer_mode \
+    --reranker_infer_mode $reranker_infer_mode \
+    --embedder_onnx_model_path $embedder_onnx_path \
+    --reranker_onnx_model_path $reranker_onnx_path \
+    --embedder_trt_model_path $embedder_trt_path \
+    --reranker_trt_model_path $reranker_trt_path
 ```

@@ -1,5 +1,5 @@
 stage: rank 
-model_ckpt_path: /data1/home/recstudio/haoran/InfoNexus/saves/recommender_results/mlp_ranker
+model_ckpt_path: ./saves/recommender_results/mlp_ranker
 feature_cache_config_path: ./examples/recommendation/inference/feature_insert/feature_cache_configs/recflow_feature_cache_config.yaml
 output_topk: 6
 infer_batch_size: 128

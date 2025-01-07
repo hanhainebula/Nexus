@@ -2,10 +2,10 @@ import torch
 from dataclasses import dataclass, field
 from collections import OrderedDict
 
-from UniRetrieval.training.embedder.recommendation.runner import RetrieverRunner
-from UniRetrieval.training.embedder.recommendation.modeling import BaseRetriever
-from UniRetrieval.training.embedder.recommendation.arguments import ModelArguments
-from UniRetrieval.modules import (
+from InfoNexus.training.embedder.recommendation.runner import RetrieverRunner
+from InfoNexus.training.embedder.recommendation.modeling import BaseRetriever
+from InfoNexus.training.embedder.recommendation.arguments import ModelArguments
+from InfoNexus.modules import (
     MultiFeatEmbedding,
     SASRecEncoder,
     MLPModule,

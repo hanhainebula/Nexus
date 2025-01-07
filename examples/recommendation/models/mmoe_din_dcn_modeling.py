@@ -1,11 +1,11 @@
 import torch
 from dataclasses import dataclass, field
 
-from UniRetrieval.training.reranker.recommendation.runner import RankerRunner
-from UniRetrieval.training.reranker.recommendation.arguments import ModelArguments
-from UniRetrieval.training.reranker.recommendation.modeling import BaseRanker
-from UniRetrieval.modules import LambdaModule, MLPModule, HStackModule, CrossNetwork
-from UniRetrieval.modules import (
+from InfoNexus.training.reranker.recommendation.runner import RankerRunner
+from InfoNexus.training.reranker.recommendation.arguments import ModelArguments
+from InfoNexus.training.reranker.recommendation.modeling import BaseRanker
+from InfoNexus.modules import LambdaModule, MLPModule, HStackModule, CrossNetwork
+from InfoNexus.modules import (
     MLPModule, LambdaModule, MultiFeatEmbedding,
     DeepInterestAggregator, CrossNetwork, HStackModule, MultiExperts
     )
