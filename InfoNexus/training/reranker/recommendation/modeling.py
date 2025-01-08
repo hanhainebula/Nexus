@@ -1,8 +1,9 @@
 import os
 import json
-from typing import Dict, Union, Tuple, List
+from typing import Dict, Union, Tuple, List, Optional
 import torch
 
+from InfoNexus.modules.loss import BCEWithLogitLoss
 from InfoNexus.abc.training.reranker import AbsRerankerModel, RerankerOutput
 from InfoNexus.training.reranker.recommendation.arguments import DataAttr4Model, ModelArguments
 from InfoNexus.modules import MLPModule, LambdaModule, MultiFeatEmbedding, AverageAggregator
@@ -69,7 +70,7 @@ class BaseRanker(AbsRerankerModel):
 
     def get_loss_function(self):
         # BCELoss is not good for autocast in distributed training, reminded by pytorch
-        return get_modules("loss", "BCEWithLogitLoss")(reduction='mean')
+        return BCEWithLogitLoss(reduction='mean')
 
 
     def compute_score(
@@ -103,9 +104,6 @@ class BaseRanker(AbsRerankerModel):
     
     def get_score_function(self):
         return self.compute_score
-    
-    def sampling(self, query, num_neg, *args, **kwargs):
-        return self.negative_sampler(query, num_neg)
         
     def forward(self, batch, cal_loss=False, *args, **kwargs) -> RerankerOutput:
         if cal_loss:
@@ -126,7 +124,8 @@ class BaseRanker(AbsRerankerModel):
             label = torch.stack(label, dim=1) # [batch_size, n_task]
         output_dict['label'] = label
         loss = self.loss_function(**output_dict)
-        
+        # print("output_dict.scores:",output_dict['scores'])
+        # print("label:",output_dict['label'])
         if isinstance(loss, dict):
             return loss
         else:
@@ -171,13 +170,13 @@ class BaseRanker(AbsRerankerModel):
             # B, * -> BxN, *
             if isinstance(v, dict):
                 for k_, v_ in v.items():
-                    # 替代 repeat_interleave
-                    v_expanded = v_.unsqueeze(1).expand(-1, num_candidates, *v_.shape[1:])  # 扩展
-                    v[k_] = v_expanded.reshape(-1, *v_.shape[1:])  # 展平
+                    # replace repeat_interleave
+                    v_expanded = v_.unsqueeze(1).expand(-1, num_candidates, *v_.shape[1:])  # expand
+                    v[k_] = v_expanded.reshape(-1, *v_.shape[1:])  # flatten
             else:
-                # 替代 repeat_interleave
-                v_expanded = v.unsqueeze(1).expand(-1, num_candidates, *v.shape[1:])  # 扩展
-                context_input[k] = v_expanded.reshape(-1, *v.shape[1:])  # 展平
+                # replace repeat_interleave
+                v_expanded = v.unsqueeze(1).expand(-1, num_candidates, *v.shape[1:])  # expand
+                context_input[k] = v_expanded.reshape(-1, *v.shape[1:])  # flatten
                 
         for k, v in candidates.items():
             # B, N, * -> BxN, *
@@ -199,7 +198,6 @@ class BaseRanker(AbsRerankerModel):
         #     scores = torch.stack(scores, dim=-1)  # [B, N]
         
         # get topk idx
-        # self.model_config.topk = output_topk
         topk = min(self.model_config.topk, num_candidates)
         topk_score, topk_idx = torch.topk(scores, topk)
         return topk_idx
@@ -220,15 +218,28 @@ class BaseRanker(AbsRerankerModel):
 
 
     @staticmethod
-    def from_pretrained(checkpoint_dir: str):
+    def from_pretrained(checkpoint_dir: str, 
+                        model_class_or_name:Optional[Union[type, str]]=None):
         config_path = os.path.join(checkpoint_dir, "model_config.json")
         with open(config_path, "r", encoding="utf-8") as config_path:
             config_dict = json.load(config_path)
+            
+        # data config 
         data_config = DataAttr4Model.from_dict(config_dict['data_config'])
-        model_cls = get_model_cls(config_dict['model_type'], config_dict['model_name'])
-        del config_dict['data_config'], config_dict['model_type'], config_dict['model_name']
+        del config_dict['data_config']
         
+        # model config 
         model_config = ModelArguments.from_dict(config_dict)
+        
+        # model class 
+        if model_class_or_name is None:
+            model_class_or_name = config_dict['model_name']
+        if isinstance(model_class_or_name, str):
+            model_cls = get_model_cls(config_dict['model_type'], model_class_or_name)
+        else:
+            model_cls = model_class_or_name
+        del config_dict['model_type'], config_dict['model_name']
+        
         ckpt_path = os.path.join(checkpoint_dir, "model.pt")
         state_dict = torch.load(ckpt_path, weights_only=True, map_location="cpu")
         model = model_cls(data_config, model_config)

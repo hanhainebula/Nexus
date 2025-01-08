@@ -168,3 +168,4 @@ def log_dict(logger, d: Dict):
     """Log a dictionary of values."""
     output_list = [f"{k}={v}" for k, v in d.items()]
     logger.info(", ".join(output_list))
+    

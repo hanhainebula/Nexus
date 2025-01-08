@@ -32,7 +32,6 @@ import numpy as np
 
 import tensorrt as trt
 import pycuda.driver as cuda
-import pycuda.autoinit
 
 # from inference.inference.inference_engine import InferenceEngine
 from InfoNexus.inference.utils import gen_item_index, gen_i2i_index
@@ -65,7 +64,7 @@ import onnxruntime as ort
 
 import tensorrt as trt
 import pycuda.driver as cuda
-import pycuda.autoinit
+
 
 from loguru import logger
 
@@ -73,7 +72,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
     def __init__(self, config: dict) -> None:
         # super().__init__(config)
-
+        import pycuda.autoinit
         # load config 
         self.config = config
         with open(os.path.join(config['model_ckpt_path'], 'model_config.json'), 'r', encoding='utf-8') as f:
@@ -132,6 +131,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         feed_dict = {}
         feed_dict.update(batch_user_context_dict)
         feed_dict.update(batch_candidates_dict)
+        
         for key in feed_dict:
             feed_dict[key] = np.array(feed_dict[key])
             
@@ -241,7 +241,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
         output_topk = self.config['output_topk']
         input_names.append('output_topk')
-        model.model_config.topk = output_topk
+        model.model_config.topk = output_topk # scalar input can't be handled by TensorRT
 
         model_onnx_path = os.path.join(self.config['model_ckpt_path'], 'model_onnx.pb')
         torch.onnx.export(
@@ -291,8 +291,8 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         for feat in self.feature_config['context_features']:
             if isinstance(feat, dict):
                 for feat_name, feat_fields in feat.items():
-                    cur_dict = defaultdict(list) 
                     if isinstance(user_context_dict[feat_name][0], Iterable):
+                        cur_dict = defaultdict(list) 
                         # the case is for sequence features 
                         for proto_seq in user_context_dict[feat_name]:
                             for field in feat_fields: 
@@ -303,6 +303,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                         for field in feat_fields:
                             user_context_dict[feat_name + '_' + field] = cur_dict[field]
                     else:
+                        cur_dict = {}
                         for proto in user_context_dict[feat_name]:
                             for field in feat_fields:
                                 cur_dict[field].append(getattr(proto, field))
@@ -441,6 +442,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                     if dim == -1:
                         print('input_name:', input_name, 'input_shape:', input_shape, 'opt_shape:', opt_shape, 'max_shape:', max_shape)
                 profile.set_shape(input_name, tuple(min_shape), tuple(opt_shape), tuple(max_shape))
+                    
             config.add_optimization_profile(profile)
             # Build and serialize the engine
             serialized_engine = builder.build_serialized_network(network, config)

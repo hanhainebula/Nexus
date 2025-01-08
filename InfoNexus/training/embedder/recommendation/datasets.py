@@ -26,22 +26,25 @@ class ItemDataset(Dataset):
         )
         self.item_id_col = self.item_feat_df.index.name
 
-    def __getitem__(self, index):
-        feat_dict = self.item_feat_df.loc[self.item_ids[index]].to_dict()
-        if self.item_id_col is not None:
-            feat_dict.update({self.item_id_col: self.item_ids[index]})
-        return feat_dict
+    def __getitem__(self, index: Union[int, torch.Tensor]):
+        if isinstance(index, int):
+            feat_dict = self.item_feat_df.loc[self.item_ids[index]].to_dict()
+            if self.item_id_col is not None:
+                feat_dict.update({self.item_id_col: self.item_ids[index]})
+            return feat_dict
+        elif isinstance(index, torch.Tensor):
+            item_ids_list = index.view(-1).tolist()
+            item_ids_list = self.item_ids[item_ids_list]
+            feats = self.item_feat_df.loc[item_ids_list].to_dict("list")
+            feats = {k: torch.tensor(v).reshape(*index.shape).to(index.device) for k,v in feats.items()}
+            return feats
+        else:
+            raise ValueError("Index must be an integer or a tensor.")
+        
     
     def __len__(self):
         return len(self.item_ids)
     
-
-    def get_item_feat(self, item_ids: torch.LongTensor):
-        item_ids_list = item_ids.view(-1).tolist()
-        item_ids_list = self.item_ids[item_ids_list]
-        feats = self.item_feat_df.loc[item_ids_list].to_dict("list")
-        feats = {k: torch.tensor(v).reshape(*item_ids.shape).to(item_ids.device) for k,v in feats.items()}
-        return feats
 
 class ConfigProcessor(object):
     """

@@ -1,4 +1,4 @@
-from InfoNexus.evaluation.recommendation import RecommenderEvalArgs, RecommenderEvalModelArgs, RecommenderEvalRunner
+from InfoNexus.evaluation.recommendation import RecommenderEvalArgs, RecommenderEvalModelArgs, TDERecommenderEvalRunner
 
 
 def main():
@@ -9,7 +9,7 @@ def main():
     eval_args = RecommenderEvalArgs.from_json(eval_config_path)
     model_args = RecommenderEvalModelArgs.from_json(model_config_path)
         
-    runner = RecommenderEvalRunner(
+    runner = TDERecommenderEvalRunner(
         eval_args=eval_args,
         model_args=model_args
     )

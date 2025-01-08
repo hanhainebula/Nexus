@@ -5,7 +5,6 @@ import torch
 from tqdm import tqdm
 
 def gen_item_index(file_path, item_index_path, item_ids_path):
-    # file_path = '/data1/home/recstudio/huangxu/saves/mlp_retriever_test/best_ckpt/item_vectors.pt'
     data = torch.load(file_path, map_location=torch.device('cpu'))
 
     item_vectors = data['item_vectors']  # NxD

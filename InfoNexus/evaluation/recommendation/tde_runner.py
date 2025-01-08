@@ -1,19 +1,18 @@
-import os
-import json
 from loguru import logger
 from typing import List, Union, Tuple
 
 from .arguments import RecommenderEvalArgs, RecommenderEvalModelArgs
-from .evaluator import RecommenderAbsEvaluator
+from .evaluator import RecommenderAbsEvaluator, TDERecommenderEvaluator
 from InfoNexus.abc.evaluation import AbsEvalRunner
 
 from InfoNexus.training.embedder.recommendation.modeling import BaseRetriever
 from InfoNexus.training.reranker.recommendation.modeling import BaseRanker
-import torch 
+from InfoNexus.training.embedder.recommendation.tde_modeling import TDEModel as RetrieverTDEModel
+from InfoNexus.training.reranker.recommendation.tde_modeling import TDEModel as RankerTDEModel
 from .datasets import RecommenderEvalDataLoader
 
 
-class RecommenderEvalRunner(AbsEvalRunner):
+class TDERecommenderEvalRunner(AbsEvalRunner):
     
     """
     Abstract class of evaluation runner.
@@ -41,34 +40,32 @@ class RecommenderEvalRunner(AbsEvalRunner):
     def load_retriever_and_ranker(self, model_args: RecommenderEvalModelArgs) -> Tuple[BaseRetriever, Union[BaseRanker, None]]:
         retriever = None
         if model_args.retriever_ckpt_path is not None:
-            retriever = BaseRetriever.from_pretrained(model_args.retriever_ckpt_path)
-            checkpoint = torch.load(os.path.join(model_args.retriever_ckpt_path, 'model.pt'), map_location=torch.device('cpu'), weights_only=True)
-            retriever.load_state_dict(checkpoint)
+            retriever = RetrieverTDEModel.from_pretrained(model_args.retriever_ckpt_path)
             retriever.eval()
     
         ranker = None
         if model_args.ranker_ckpt_path is not None:
-            ranker = BaseRanker.from_pretrained(model_args.ranker_ckpt_path)
-            checkpoint = torch.load(os.path.join(model_args.ranker_ckpt_path, 'model.pt'), map_location=torch.device('cpu'), weights_only=True)
-            ranker.load_state_dict(checkpoint)
+            ranker = RankerTDEModel.from_pretrained(model_args.ranker_ckpt_path)
             ranker.eval()
             
         if retriever is None and ranker is None:
             raise ValueError("Both retriever and ranker cannot be None. At least one must be provided.")
             
         return retriever, ranker
-
-    def load_data_loader(self) -> RecommenderEvalDataLoader:
+        
+    def load_data_loader(self):
         loader = RecommenderEvalDataLoader(self.eval_args, self.model_args)
         return loader
 
     def load_evaluator(self) -> RecommenderAbsEvaluator:
-        evaluator = RecommenderAbsEvaluator(
+        evaluator = TDERecommenderEvaluator(
             retriever_data_loader=self.data_loader.retriever_eval_loader,
             ranker_data_loader=self.data_loader.ranker_eval_loader,
             item_loader=self.data_loader.item_loader,
             config=self.eval_args,
-            model_config=self.model_args
+            model_config=self.model_args,
+            retriever=self.retriever,
+            ranker=self.ranker
         )
         return evaluator
 

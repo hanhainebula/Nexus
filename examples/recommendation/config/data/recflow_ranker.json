@@ -9,7 +9,7 @@
     "item_col": "video_id",
     "context_features": ["user_id", "device_id", "age", "gender", "province"],
     "item_features": ["video_id", "author_id", "category_level_two", "upload_type", "category_level_one"],
-    "labels": ["like", "follow", "forward", "comment"],
+    "labels": ["like"],
     "user_sequential_info": [
         {
             "name": "user_seq_effective_50",
@@ -21,6 +21,7 @@
         }
     ],
     "stats": {
+        "request_id": 9370581,
         "user_id": 42472,
         "device_id": 42561,
         "age": 8,

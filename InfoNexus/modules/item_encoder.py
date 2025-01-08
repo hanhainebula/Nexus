@@ -12,15 +12,15 @@ class MLPItemEncoder(torch.nn.Module):
     def __init__(self, data_config, model_config):
         super(MLPItemEncoder, self).__init__()
         
-        self.item_emb = MultiFeatEmbedding(
+        item_emb = MultiFeatEmbedding(
             features=data_config.item_features,
             stats=data_config.stats,
             embedding_dim=model_config.embedding_dim,
             concat_embeddings=True
         )
         
-        self.mlp = MLPModule(
-            mlp_layers=[self.item_emb.total_embedding_dim] + model_config.mlp_layers,
+        mlp = MLPModule(
+            mlp_layers=[item_emb.total_embedding_dim] + model_config.mlp_layers,
             activation_func=model_config.activation,
             dropout=model_config.dropout,
             bias=True,
@@ -30,8 +30,8 @@ class MLPItemEncoder(torch.nn.Module):
         )
         
         self.encoder_mlp_sequence = torch.nn.Sequential(OrderedDict([
-            ("item_embedding", self.item_emb),
-            ("mlp", self.mlp)
+            ("item_embedding", item_emb),
+            ("mlp", mlp)
         ]))
 
     def forward(self, x):

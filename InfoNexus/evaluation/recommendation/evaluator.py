@@ -1,7 +1,5 @@
-"""
-Adapted from https://github.com/AIR-Bench/AIR-Bench/blob/0.1.0/air_benchmark/evaluation_utils/evaluator.py
-"""
 from collections import defaultdict
+from accelerate import Accelerator
 
 import json
 from loguru import logger
@@ -19,8 +17,11 @@ from InfoNexus.abc.evaluation import AbsEvaluator
 from .datasets import RecommenderEvalDataLoader
 import torch
 from torch.utils.data import DataLoader, Dataset
-from .arguments import RecommenderEvalArgs
 from InfoNexus.modules.arguments import log_dict
+from .arguments import RecommenderEvalArgs, RecommenderEvalModelArgs
+
+from torchrec.distributed import DistributedModelParallel
+from dynamic_embedding.wrappers import wrap_dataloader, wrap_dataset
 
 
 class RecommenderAbsEvaluator(AbsEvaluator):
@@ -34,29 +35,35 @@ class RecommenderAbsEvaluator(AbsEvaluator):
     """
     def __init__(
         self,
-        data_loader: DataLoader,
+        retriever_data_loader: DataLoader,
+        ranker_data_loader: DataLoader,
         item_loader: DataLoader, 
         config: RecommenderEvalArgs,
+        model_config: RecommenderEvalModelArgs,
         *args,
         **kwargs,
     ):
-        self.eval_loader = data_loader
+        self.retriever_eval_loader = retriever_data_loader
+        self.ranker_eval_loader = ranker_data_loader
         self.item_loader = item_loader
         self.item_vectors = None
         self.item_ids = None
         self.config = config
+        self.model_config = model_config
+        self.accelerator = Accelerator()
     
     def __call__(
         self,
-        retriever: BaseRetriever,
+        retriever: Optional[BaseRetriever] = None,
         ranker: Optional[BaseRanker] = None,
         *args,
         **kwargs,
     ):
-        logger.info(f"Retriever evaluation begins.")
-        metrics = self.evaluate(retriever)
-        logger.info(f"Retriever evaluation done.")
-        log_dict(logger, metrics)
+        if retriever is not None:
+            logger.info(f"Retriever evaluation begins.")
+            metrics = self.evaluate(retriever)
+            logger.info(f"Retriever evaluation done.")
+            log_dict(logger, metrics)
         
         if ranker is not None:
             logger.info(f"Ranker evaluation begins.")
@@ -68,22 +75,31 @@ class RecommenderAbsEvaluator(AbsEvaluator):
     @torch.no_grad()
     def evaluate(self, model:Union[BaseRetriever, BaseRanker], *args, **kwargs) -> Dict:
         model.eval()
+        model = self.accelerator.prepare(model)
         if model.model_type == "retriever":
-            logger.info(f"Updating item vectors...")
-            self.item_vectors, self.item_ids = self.update_item_vectors(model)
-            logger.info(f"Updating item vectors done...")
+            item_vector_path = os.path.join(self.model_config.retriever_ckpt_path, 'item_vectors.pt')
+            if os.path.exists(item_vector_path):
+                logger.info(f"Loading item vectors from {item_vector_path} ...")
+                item_vectors_dict = torch.load(item_vector_path)
+                self.item_vectors = item_vectors_dict['item_vectors'].to(self.accelerator.device)
+                self.item_ids = item_vectors_dict['item_ids'].to('cpu')
+            else:
+                logger.info(f"Updating item vectors...")
+                self.item_vectors, self.item_ids = self.update_item_vectors(model)
+                logger.info(f"Updating item vectors done...")
         eval_outputs = []
         eval_total_bs = 0
-        for eval_step, eval_batch in enumerate(self.eval_loader):
-            logger.info(f"Retriever evaluation step {eval_step + 1} begins..")
+        eval_loader = self.retriever_eval_loader if model.model_type == "retriever" else self.ranker_eval_loader
+        for eval_step, eval_batch in enumerate(self.accelerator.prepare(eval_loader)):
+            logger.info(f"Evaluation step {eval_step + 1} begins..")
             eval_batch_size = eval_batch[list(eval_batch.keys())[0]].shape[0]
             metrics = self._eval_batch(model, eval_batch, *args, **kwargs)
             eval_outputs.append((metrics, eval_batch_size))
             eval_total_bs += eval_batch_size
-            logger.info(f"Retriever evaluation step {eval_step + 1} done.")
-            # log_dict(logger, metrics)
+            logger.info(f"Evaluation step {eval_step + 1} done.")
             if eval_step > 50:
                 break
+        model = self.accelerator.unwrap_model(model)
         metrics = self.eval_epoch_end(model, eval_outputs)
         self._total_eval_samples = eval_total_bs
         return metrics
@@ -104,6 +120,7 @@ class RecommenderAbsEvaluator(AbsEvaluator):
                 outputs = model.eval_step(batch, k=k, item_vectors=self.item_vectors, *args, **kwargs)
             else:
                 outputs = model.eval_step(batch, k=k, *args, **kwargs)
+            outputs = self.accelerator.gather_for_metrics(outputs)
             metrics: dict = self.compute_metrics(model, outputs)
             return metrics
     
@@ -206,4 +223,71 @@ class RecommenderAbsEvaluator(AbsEvaluator):
             return out
             
     
+class TDERecommenderEvaluator(RecommenderAbsEvaluator):
     
+    def __init__(
+        self,
+        retriever_data_loader: DataLoader,
+        ranker_data_loader: DataLoader,
+        item_loader: DataLoader, 
+        config: RecommenderEvalArgs,
+        model_config: RecommenderEvalModelArgs,
+        retriever: BaseRetriever,
+        ranker: BaseRanker,
+        *args,
+        **kwargs,
+    ):
+        self.retriever_eval_loader = retriever_data_loader
+        self.ranker_eval_loader = ranker_data_loader
+        self.item_loader = item_loader
+        self.item_vectors = None
+        self.item_ids = None
+        self.config = config
+        self.model_config = model_config
+        self.accelerator = Accelerator()
+        
+        # wrap and prepare the dataloader 
+        if self.retriever_eval_loader is not None:
+            self.retriever_eval_loader = self.accelerator.prepare(self.retriever_eval_loader)
+            self.retriever_eval_loader = wrap_dataloader(self.retriever_eval_loader, 
+                                                         retriever, retriever.module.tde_configs_dict)
+            
+            # item loader has a bug, we don't use it. 
+            # If we prepare it, we need to gather, there is no gather. 
+            # If we don't prepare it, we need to move it to the device manually, there is no move operation.
+        
+        if self.ranker_eval_loader is not None:
+            self.ranker_eval_loader = self.accelerator.prepare(self.ranker_eval_loader)
+            self.ranker_eval_loader = wrap_dataloader(self.ranker_eval_loader,
+                                                      ranker, ranker.module.tde_configs_dict)
+        
+
+    @torch.no_grad()
+    def evaluate(self, model:DistributedModelParallel, *args, **kwargs) -> Dict:
+        model.eval()
+        if model.module.model_type == "retriever":
+            item_vector_path = os.path.join(self.model_config.retriever_ckpt_path, 'item_vectors.pt')
+            if os.path.exists(item_vector_path):
+                logger.info(f"Loading item vectors from {item_vector_path} ...")
+                item_vectors_dict = torch.load(item_vector_path)
+                self.item_vectors = item_vectors_dict['item_vectors'].to(self.accelerator.device)
+                self.item_ids = item_vectors_dict['item_ids'].to('cpu')
+            else:
+                logger.info(f"Updating item vectors...")
+                self.item_vectors, self.item_ids = self.update_item_vectors(model)
+                logger.info(f"Updating item vectors done...")
+        eval_outputs = []
+        eval_total_bs = 0
+        eval_loader = self.retriever_eval_loader if model.module.model_type == "retriever" else self.ranker_eval_loader
+        for eval_step, eval_batch in enumerate(eval_loader):
+            logger.info(f"Evaluation step {eval_step + 1} begins..")
+            eval_batch_size = eval_batch[list(eval_batch.keys())[0]].shape[0]
+            metrics = self._eval_batch(model.module, eval_batch, *args, **kwargs)
+            eval_outputs.append((metrics, eval_batch_size))
+            eval_total_bs += eval_batch_size
+            logger.info(f"Evaluation step {eval_step + 1} done.")
+            if eval_step > 50:
+                break
+        metrics = self.eval_epoch_end(model.module, eval_outputs)
+        self._total_eval_samples = eval_total_bs
+        return metrics
