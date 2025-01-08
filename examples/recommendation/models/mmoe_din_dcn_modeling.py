@@ -1,11 +1,11 @@
 import torch
 from dataclasses import dataclass, field
 
-from InfoNexus.training.reranker.recommendation.runner import RankerRunner
-from InfoNexus.training.reranker.recommendation.arguments import ModelArguments
-from InfoNexus.training.reranker.recommendation.modeling import BaseRanker
-from InfoNexus.modules import LambdaModule, MLPModule, HStackModule, CrossNetwork
-from InfoNexus.modules import (
+from Nexus.training.reranker.recommendation.runner import RankerRunner
+from Nexus.training.reranker.recommendation.arguments import ModelArguments
+from Nexus.training.reranker.recommendation.modeling import BaseRanker
+from Nexus.modules import LambdaModule, MLPModule, HStackModule, CrossNetwork
+from Nexus.modules import (
     MLPModule, LambdaModule, MultiFeatEmbedding,
     DeepInterestAggregator, CrossNetwork, HStackModule, MultiExperts
     )

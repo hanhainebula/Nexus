@@ -10,6 +10,9 @@
     "context_features": ["user_id", "device_id", "age", "gender", "province"],
     "item_features": ["video_id", "author_id", "category_level_two", "upload_type", "category_level_one"],
     "labels": ["like"],
+    "filter_settings": {
+        "like": ["==1"]
+    },
     "item_info": {
         "url": "hdfs://node1:8020/recstudio/recflow/others/video_info.pkl",
         "key": "video_id",
@@ -47,4 +50,5 @@
         "start_date": "2024-02-08",
         "end_date": "2024-02-09"
     }
+    
 }

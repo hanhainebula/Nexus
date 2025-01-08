@@ -3,7 +3,7 @@ from typing import Dict, List, Union
 
 import torch
 import torch.distributed as dist
-from UniRetrieval.modules.embedding import TDEMultiFeatEmbedding, MultiFeatEmbedding
+from Nexus.modules.embedding import TDEMultiFeatEmbedding, MultiFeatEmbedding
 
 from torchrec import JaggedTensor
 
