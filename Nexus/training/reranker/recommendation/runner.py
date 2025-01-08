@@ -34,7 +34,6 @@ class RankerRunner(AbsRerankerRunner):
         self.model = model if model is not None else self.load_model()
         self.data_collator = self.load_data_collator()
         self.trainer = trainer if trainer is not None else self.load_trainer()
-        print("self.trainer.callback_handler.callback_list:", self.trainer.callback_handler.callback_list)
 
     def load_dataset(self) -> Tuple[ShardedDataset, DataAttr4Model]:
         config_processor = ConfigProcessor(self.data_args)

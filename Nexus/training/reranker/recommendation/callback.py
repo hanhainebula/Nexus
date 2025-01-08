@@ -7,7 +7,7 @@ from transformers import (
     TrainerControl
 )
 from .arguments import TrainingArguments
-
+import math
 
 class Callback:
     def __init__(self):
@@ -39,9 +39,11 @@ class LoggerCallback(TrainerCallback):
         **kwargs
     ):
         _ = logs.pop("total_flos", None)
-        _ = logs.pop("epoch", None)
+        if 'epoch' in logs:
+            logs['epoch'] = math.ceil(logs['epoch'])
         if state.is_local_process_zero:
-            print(f"Step {state.global_step}: {logs}")
+            formatted_logs = {k: round(v, 6) if isinstance(v, float) else v for k, v in logs.items()}
+            print(f"Step {state.global_step}: {formatted_logs}")
             
             
 class StopCallback(TrainerCallback):
