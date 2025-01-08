@@ -10,7 +10,7 @@ from Nexus.abc.evaluation import AbsEvalRunner
 from Nexus.training.embedder.recommendation.modeling import BaseRetriever
 from Nexus.training.reranker.recommendation.modeling import BaseRanker
 import torch 
-from .datasets import RecommenderEvalDataLoader
+from .dataset import RecommenderEvalDataLoader
 
 
 class RecommenderEvalRunner(AbsEvalRunner):

@@ -5,7 +5,7 @@ __pycache__/
 *old.ipynb
 recommender_results/
 */recommender_results/
-InfoNexus.egg-info/
+Nexus.egg-info/
 tmp_trainer/
 build/
 examples/recommendation/inference/inference_data/recflow/*

@@ -50,8 +50,7 @@ class MultiFeatEmbedding(torch.nn.Module):
         outputs = {}
         if strict:
             for feat, emb in self.feat2embedding.items():
-                device = next(iter(self.feat2embedding.values())).weight.device
-                outputs[feat] = emb(batch[feat].to(device))
+                outputs[feat] = emb(batch[feat])
         else:
             for feat, value in batch.items():
                 if feat in self.feat2embedding:

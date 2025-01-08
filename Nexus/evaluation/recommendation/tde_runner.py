@@ -9,7 +9,7 @@ from Nexus.training.embedder.recommendation.modeling import BaseRetriever
 from Nexus.training.reranker.recommendation.modeling import BaseRanker
 from Nexus.training.embedder.recommendation.tde_modeling import TDEModel as RetrieverTDEModel
 from Nexus.training.reranker.recommendation.tde_modeling import TDEModel as RankerTDEModel
-from .datasets import RecommenderEvalDataLoader
+from .dataset import RecommenderEvalDataLoader
 
 
 class TDERecommenderEvalRunner(AbsEvalRunner):

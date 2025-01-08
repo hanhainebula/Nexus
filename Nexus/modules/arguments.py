@@ -107,22 +107,22 @@ def read_json(json_path: str) -> Dict[str, Any]:
 def get_modules(module_type: str, module_name: str):
     assert module_type in ["loss", "sampler", "encoder", "interaction", "score", "module"], f"{module_type} is not a valid module type"
     try:
-        module = importlib.import_module(f"InfoNexus.modules.{module_type}")
+        module = importlib.import_module(f"Nexus.modules.{module_type}")
         cls = getattr(module, module_name)
         return cls
     except ImportError as e:
-        raise ImportError(f"Could not import {module_name} from InfoNexus.modules.{module_type}") from e
+        raise ImportError(f"Could not import {module_name} from Nexus.modules.{module_type}") from e
     
 
 def get_model_cls(model_type: str, model_name: str):
     assert model_type in ["retriever", "ranker"], f"{model_type} is not a valid model type"
     model_type = 'embedder' if (model_type == "retriever") else "reranker"
     try:
-        module = importlib.import_module(f"InfoNexus.training.{model_type}.recommendation.modeling")
+        module = importlib.import_module(f"Nexus.training.{model_type}.recommendation.modeling")
         cls = getattr(module, model_name)
         return cls
     except ImportError as e:
-        raise ImportError(f"Could not import {model_name} from InfoNexus.training.{model_type}.recommendation.modeling") from e
+        raise ImportError(f"Could not import {model_name} from Nexus.training.{model_type}.recommendation.modeling") from e
 
 def get_seq_data(d: dict, seq_name: Optional[str]):
     """ Get sequence data from a batch.

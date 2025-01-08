@@ -1,11 +1,6 @@
 from dataclasses import dataclass, field
-import os
-from Nexus.abc.evaluation import AbsEvalArguments, AbsEvalDataLoaderArguments
-from Nexus.training.embedder.recommendation import ModelArguments as RetrieverModelArguments
-from Nexus.training.reranker.recommendation import ModelArguments as RankerModelArguments
-from typing import List, Optional, Dict, Any
-import json
-from Nexus.abc.training.arguments import AbsDataArguments,  AbsModelArguments, AbsTrainingArguments
+from Nexus.abc.evaluation import AbsEvalArguments
+from Nexus.abc.training.arguments import AbsModelArguments
 from Nexus.training.embedder.recommendation.arguments import DataArguments
 
 

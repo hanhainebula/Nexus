@@ -168,8 +168,7 @@ class BaseRetriever(AbsEmbedderModel):
                 index_flat = faiss.IndexFlatIP(item_vectors.shape[-1])
             else:
                 raise NotImplementedError(f"Not supported scorer {self.score_function.__class__.__name__}.")
-            # gpu_index = next(self.query_encoder.parameters()).device.index
-            gpu_index = 0
+            gpu_index = next(self.query_encoder.parameters()).device.index
             index_flat = faiss.index_cpu_to_gpu(res, gpu_index, index=index_flat)
             index_flat.add(item_vectors)
 

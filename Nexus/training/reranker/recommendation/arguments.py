@@ -136,7 +136,7 @@ class DataArguments(AbsRerankerDataArguments):
         """ Get the dataset attributes for model
 
         Return:
-            `DataAttr4Model`: dataset attributes for model. See `InfoNexus.modules.arguments.DataAttr4Model`.
+            `DataAttr4Model`: dataset attributes for model. See `Nexus.modules.arguments.DataAttr4Model`.
         """
         seq_feats = self.get_seq_features()
         seq_feats_list = list(seq_feats.keys())

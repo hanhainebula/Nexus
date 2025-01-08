@@ -1,16 +1,10 @@
-from pathlib import Path
-import json
+
 from datetime import datetime
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from Nexus.abc.training.embedder import AbsEmbedderModelArguments, AbsEmbedderDataArguments, AbsEmbedderTrainingArguments
-from Nexus.abc.arguments import AbsArguments
-from typing import Dict, Tuple
-import torch
-from accelerate import Accelerator
-from loguru import logger as loguru_logger
+from typing import Dict
 from Nexus.modules.arguments import DataAttr4Model, Statistics
-import importlib
 
 @dataclass
 class TrainingArguments(AbsEmbedderTrainingArguments):
@@ -135,7 +129,7 @@ class DataArguments(AbsEmbedderDataArguments):
         """ Get the dataset attributes for model
 
         Return:
-            `DataAttr4Model`: dataset attributes for model. See `InfoNexus.modules.arguments.DataAttr4Model`.
+            `DataAttr4Model`: dataset attributes for model. See `Nexus.modules.arguments.DataAttr4Model`.
         """
         seq_feats = self.get_seq_features()
         seq_feats_list = list(seq_feats.keys())

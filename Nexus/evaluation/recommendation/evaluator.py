@@ -14,7 +14,7 @@ from Nexus.training.reranker.recommendation.modeling import BaseRanker
 
 from Nexus.modules.metrics import get_eval_metrics
 from Nexus.abc.evaluation import AbsEvaluator
-from .datasets import RecommenderEvalDataLoader
+from .dataset import RecommenderEvalDataLoader
 import torch
 from torch.utils.data import DataLoader, Dataset
 from Nexus.modules.arguments import log_dict
