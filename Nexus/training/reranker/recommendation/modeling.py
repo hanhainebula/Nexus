@@ -94,12 +94,12 @@ class BaseRanker(AbsRerankerModel):
                 )   # [B, N1, D]
                 all_embs.append(seq_rep)
         all_embs += [context_emb, item_emb]
-        all_embs = torch.concat(all_embs, dim=1) # [B, N1+N2+N3, D]
-        interacted_emb = self.feature_interaction_layer(all_embs)    # [B, **]
+        all_embs_cat = torch.concat(all_embs, dim=1) # [B, N1+N2+N3, D]
+        interacted_emb = self.feature_interaction_layer(all_embs_cat)    # [B, **]
         score = self.prediction_layer(interacted_emb)   # [B], sigmoid
         if len(score.shape) == 2 and score.size(-1) == 1:
             score = score.squeeze(-1)   # [B, 1] -> [B]
-        return RerankerOutput(score, [context_emb, item_emb, seq_emb])
+        return RerankerOutput(score, all_embs)
     
     
     def get_score_function(self):
