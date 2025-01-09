@@ -235,18 +235,7 @@ class ShardedDataset(IterableDataset):
         self.shuffle = shuffle
         item_data = self.sharded_data_iterator.load_item_file()
         self.item_feat_dataset = ItemDataset(item_data) if item_data is not None else None
-        # self.long_sequence_selectors: Dict[str, BaseSelector] = {}
-        
 
-    # def add_long_sequence_selectors(self, selectors: Union[BaseSelector, List[BaseSelector]]):
-    #     """Add long sequence selector function which will be applied after loading data"""
-    #     if isinstance(selectors, BaseSelector):
-    #         selectors = [selectors]
-    #     for selector in selectors:
-    #         assert selector.seq_name in self.config.user_sequential_info, f"sequential features `{selector.seq_name}` not provided in config"
-    #         assert selector.seq_name not in self.long_sequence_selectors, f"duplicate selector for sequential features `{selector.seq_name}`"
-    #         self.long_sequence_selectors[selector.seq_name] = selector
-    #         print(f"Long Sequence Selector `{selector.__class__.__name__}` added to feature `{selector.seq_name}`")
 
     def __len__(self):
         return 1000000000
@@ -269,25 +258,11 @@ class ShardedDataset(IterableDataset):
                         for i, seq_df in enumerate(seq_df_list):
                             seq_data_dict = seq_df.loc[data_dict[self.seq_index_cols[i]]].to_dict()
                             seq_data_dict = {k: np.copy(v) for k, v in seq_data_dict.items()}
-                            # if self.seq_data_names[i] in self.long_sequence_selectors:
-                            #     target_item_dict: Dict[str, Any] = {k: v for k, v in data_dict.items() if k in self.config.item_features}
-                            #     seq_data_dict = self.long_sequence_selectors[self.seq_data_names[i]](seq_data_dict, target_item_dict)
                             data_dict[self.seq_data_names[i]] = seq_data_dict
                     for index_key in self.seq_index_cols:
                         del data_dict[index_key]
                     yield (data_dict, )
 
-    def get_item_feat(self, item_ids: torch.Tensor):
-        """
-        Return item features by item_ids
-
-        Args:
-            item_ids (torch.Tensor): [B x N] or [N]
-
-        Returns:
-            torch.Tensor: [B x N x F] or [N x F]
-        """
-        return self.item_feat_dataset.get_item_feat(item_ids)
     
     def get_item_loader(self, batch_size, num_workers=0, shuffle=False):
         return DataLoader(self.item_feat_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle)

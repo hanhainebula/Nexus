@@ -1,4 +1,3 @@
-import logging
 from typing import Tuple
 from Nexus.abc.training.embedder import AbsEmbedderRunner
 from .arguments import TrainingArguments, ModelArguments, DataArguments, DataAttr4Model
@@ -6,7 +5,6 @@ from .modeling import BaseRetriever
 from .trainer import RetrieverTrainer
 from .dataset import AbsRecommenderEmbedderCollator, ConfigProcessor, ShardedDataset
 from Nexus.modules.optimizer import get_lr_scheduler, get_optimizer
-from Nexus.training.embedder.recommendation.callback import ItemVectorCallback
 from .callback import StopCallback, LoggerCallback
 from transformers import PrinterCallback
 
