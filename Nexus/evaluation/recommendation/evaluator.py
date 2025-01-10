@@ -75,8 +75,9 @@ class RecommenderAbsEvaluator(AbsEvaluator):
     @torch.no_grad()
     def evaluate(self, model:Union[BaseRetriever, BaseRanker], *args, **kwargs) -> Dict:
         model.eval()
+        model_type = model.model_type
         model = self.accelerator.prepare(model)
-        if model.model_type == "retriever":
+        if model_type == "retriever":
             item_vector_path = os.path.join(self.model_config.retriever_ckpt_path, 'item_vectors.pt')
             if os.path.exists(item_vector_path):
                 logger.info(f"Loading item vectors from {item_vector_path} ...")
@@ -89,7 +90,7 @@ class RecommenderAbsEvaluator(AbsEvaluator):
                 logger.info(f"Updating item vectors done...")
         eval_outputs = []
         eval_total_bs = 0
-        eval_loader = self.retriever_eval_loader if model.model_type == "retriever" else self.ranker_eval_loader
+        eval_loader = self.retriever_eval_loader if model_type == "retriever" else self.ranker_eval_loader
         for eval_step, eval_batch in enumerate(self.accelerator.prepare(eval_loader)):
             logger.info(f"Evaluation step {eval_step + 1} begins..")
             eval_batch_size = eval_batch[list(eval_batch.keys())[0]].shape[0]
@@ -116,6 +117,7 @@ class RecommenderAbsEvaluator(AbsEvaluator):
         with torch.no_grad():
             model.eval()
             k = max(self.config.cutoffs) if self.config.cutoffs is not None else None
+            model = self.accelerator.unwrap_model(model)
             if model.model_type == 'retriever':
                 outputs = model.eval_step(batch, k=k, item_vectors=self.item_vectors, *args, **kwargs)
             else:
@@ -126,12 +128,16 @@ class RecommenderAbsEvaluator(AbsEvaluator):
     
     @torch.no_grad()
     def update_item_vectors(self, model:Union[BaseRetriever, BaseRanker]):
+        logger.info(f'Update item vectors...')
         model.eval()
         all_item_vectors, all_item_ids = [], []
-        for item_batch in self.item_loader:
-            item_vector = model.item_encoder(item_batch)
+        model_unwrapped = self.accelerator.unwrap_model(model)
+        for item_batch in self.accelerator.prepare(model_unwrapped.item_loader):
+            item_vector = model_unwrapped.item_encoder(item_batch)
             all_item_vectors.append(item_vector)
-            all_item_ids.append(item_batch[model.fiid])
+            all_item_ids.append(item_batch[model_unwrapped.fiid])
+        all_item_vectors = self.accelerator.gather_for_metrics(all_item_vectors)
+        all_item_ids = self.accelerator.gather_for_metrics(all_item_ids)
         all_item_vectors = torch.cat(all_item_vectors, dim=0)
         all_item_ids = torch.cat(all_item_ids, dim=0).cpu()
         return all_item_vectors, all_item_ids

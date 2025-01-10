@@ -86,6 +86,7 @@ class BaseRetriever(AbsEmbedderModel):
             *args, 
             **kwargs
         ) -> RetrieverModelOutput:
+
         item_loader = self.item_loader
         pos_item_id = batch[self.fiid]
         query_vec = self.query_encoder(batch)

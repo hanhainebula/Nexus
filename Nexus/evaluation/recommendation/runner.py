@@ -55,7 +55,6 @@ class RecommenderEvalRunner(AbsEvalRunner):
             
         if retriever is None and ranker is None:
             raise ValueError("Both retriever and ranker cannot be None. At least one must be provided.")
-            
         return retriever, ranker
 
     def load_data_loader(self) -> RecommenderEvalDataLoader:

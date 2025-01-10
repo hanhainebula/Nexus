@@ -14,8 +14,6 @@ if __name__ == '__main__':
 
     
     retriever_inference_engine = BaseEmbedderInferenceEngine(config)
-    # if retriever_inference_engine.config['infer_mode'] == 'trt':
-    #     cuda.Context.pop()
         
     infer_df = pd.read_feather('/data1/home/recstudio/haoran/Nexus/examples/recommendation/inference/inference_data/recflow/recflow_infer_data.feather')
     for batch_idx in range(10):
