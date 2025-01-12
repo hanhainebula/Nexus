@@ -1,0 +1,5 @@
+infer_retrieval_config_path=
+infer_ranker_config_path=
+
+
+python inference_service.py --infer_retrieval_config_path $infer_retrieval_config_path --infer_ranker_config_path $infer_ranker_config_path
