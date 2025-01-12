@@ -52,7 +52,7 @@ import onnxruntime as ort
 
 import tensorrt as trt
 import pycuda.driver as cuda
-from base import BaseRerankerInferenceEngine
+from .base import BaseRerankerInferenceEngine
 
 from dynamic_embedding.wrappers import BatchWrapper
 from torchrec.distributed import DistributedModelParallel
