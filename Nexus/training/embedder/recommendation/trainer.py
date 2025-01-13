@@ -55,15 +55,6 @@ class RetrieverTrainer(AbsEmbedderTrainer):
             all_item_vectors = torch.cat(all_item_vectors, dim=0)
             all_item_ids = torch.cat(all_item_ids, dim=0).cpu()
             return all_item_vectors, all_item_ids
-            # self.trainer.item_vectors = all_item_vectors
-            # self.trainer.item_ids = all_item_ids
-            
-            # logger.info(f'Item vectors updated.')
-            # if self.accelerator.is_main_process:
-            #     if model.model_type == "retriever":
-            #         item_vectors_path = os.path.join(output_dir, 'item_vectors.pt')
-            #         torch.save({'item_vectors': all_item_vectors, 'item_ids': all_item_ids}, item_vectors_path)
-            #         logger.info(f'Item vectors saved.')
     
 
 class TDERetrieverTrainer(AbsEmbedderTrainer):

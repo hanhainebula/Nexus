@@ -12,11 +12,10 @@ from Nexus.training.embedder.recommendation.arguments import DataAttr4Model, Mod
 from Nexus.training.embedder.recommendation.dataset import ItemDataset
 from Nexus.modules.query_encoder import MLPQueryEncoder
 from Nexus.modules.item_encoder import MLPItemEncoder
-from Nexus.modules.sampler import UniformSampler
+from Nexus.modules.sampler import UniformSampler, Sampler
 from Nexus.modules.score import InnerProductScorer
 from Nexus.modules.loss import BPRLoss
 from Nexus.modules.arguments import get_model_cls
-
 
 @dataclass
 class RetrieverModelOutput(EmbedderOutput):
@@ -46,17 +45,18 @@ class BaseRetriever(AbsEmbedderModel):
         self.data_config: DataAttr4Model = data_config
         self.model_config: ModelArguments = self.load_config(model_config)
        
+        self.item_loader: DataLoader = item_loader # need to be prepared 
         super(BaseRetriever, self).__init__(*args, **kwargs)
         self.model_type = 'retriever'
+
         self.init_modules()
         
-        self.item_loader: DataLoader = item_loader # need to be prepared 
-
         self.num_items: int = self.data_config.num_items
         self.fiid: str = self.data_config.fiid  # item id field
         self.flabel: str = self.data_config.flabels[0]  # label field, only support one label for retriever
         self.item_vectors = None
         self.item_ids = None
+        self.seq_features = data_config.seq_features
 
     def init_modules(self):
         super().init_modules()
@@ -73,7 +73,7 @@ class BaseRetriever(AbsEmbedderModel):
     def get_score_function(self):
         raise NotImplementedError
 
-    def get_negative_sampler(self):
+    def get_negative_sampler(self) -> Sampler:
         return None
 
     def get_loss_function(self):
@@ -100,12 +100,19 @@ class BaseRetriever(AbsEmbedderModel):
                 if not self.model_config.num_neg:
                     raise ValueError("`negative_count` is required when `sampler` is not none.")
                 else:
-                    neg_item_idx, log_neg_prob = self.sampling(query_vec, self.model_config.num_neg)
+                    # print(batch)
+                    seq_for_neg_sampling = list(self.data_config.seq_features.keys())[0] if self.data_config.seq_features is not None else None
+                    user_hist = batch[seq_for_neg_sampling][self.fiid] if seq_for_neg_sampling is not None else None
+                    log_pos_prob, neg_item_idx, log_neg_prob = self.sampling(
+                        query=query_vec, 
+                        num_neg=self.model_config.num_neg,
+                        pos_items=pos_item_id,
+                        user_hist=user_hist,
+                    )
                     neg_item_feat = self.get_item_feat(item_loader.dataset, neg_item_idx)
                     neg_item_id = neg_item_feat.get(self.fiid)
                     neg_item_vec = self.item_encoder(neg_item_feat)
-                    # log_pos_prob = self.negative_sampler.compute_item_p(query_vec, pos_item_id)
-                    log_pos_prob = None
+                    log_pos_prob = self.negative_sampler.compute_item_p(query_vec, pos_item_id) if log_pos_prob is None else log_pos_prob
             else:
                 raise NotImplementedError("Full softmax is not supported for industrial dataset yet.")
             neg_score = self.score_function(query_vec, neg_item_vec)
@@ -129,7 +136,7 @@ class BaseRetriever(AbsEmbedderModel):
         return output
     
     def sampling(self, query, num_neg, *args, **kwargs):
-        return self.negative_sampler(query, num_neg)
+        return self.negative_sampler(query, num_neg, *args, **kwargs)
         
     def forward(self, batch, cal_loss=False, *args, **kwargs) -> RetrieverModelOutput:
         if cal_loss:
@@ -242,12 +249,12 @@ class BaseRetriever(AbsEmbedderModel):
 
 
     @staticmethod
-    def from_pretrained(checkpoint_dir: str):
+    def from_pretrained(checkpoint_dir: str, model_cls=None):
         config_path = os.path.join(checkpoint_dir, "model_config.json")
         with open(config_path, "r", encoding="utf-8") as config_path:
             config_dict = json.load(config_path)
         data_config = DataAttr4Model.from_dict(config_dict['data_config'])
-        model_cls = get_model_cls(config_dict['model_type'], config_dict['model_name'])
+        model_cls = get_model_cls(config_dict['model_type'], config_dict['model_name']) if model_cls is None else model_cls
         del config_dict['data_config'], config_dict['model_type'], config_dict['model_name']
         model_config = ModelArguments.from_dict(config_dict)
         ckpt_path = os.path.join(checkpoint_dir, "model.pt")

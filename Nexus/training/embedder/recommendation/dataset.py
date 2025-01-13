@@ -306,8 +306,6 @@ class AbsRecommenderEmbedderCollator(AbsEmbedderCollator):
                     all_dicts[k][_k] = torch.stack(all_dicts[k][_k], dim=0)
             else:
                 all_dicts[k] = torch.stack(all_dicts[k], dim=0)
-            
-        
         return all_dicts
         # return features
         

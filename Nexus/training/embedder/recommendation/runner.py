@@ -29,6 +29,7 @@ class RetrieverRunner(AbsEmbedderRunner):
         self.model_args = ModelArguments.from_json(model_config_or_path) if isinstance(model_config_or_path, str) else model_config_or_path
         self.training_args = TrainingArguments.from_json(train_config_or_path) if isinstance(train_config_or_path, str) else train_config_or_path
         
+        print('self.data_args:',self.data_args)
         self.train_dataset, self.cp_attr = self.load_dataset()
         self.model = model if model is not None else self.load_model()
         self.data_collator = self.load_data_collator()

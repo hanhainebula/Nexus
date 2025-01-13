@@ -98,8 +98,6 @@ class RecommenderAbsEvaluator(AbsEvaluator):
             eval_outputs.append((metrics, eval_batch_size))
             eval_total_bs += eval_batch_size
             logger.info(f"Evaluation step {eval_step + 1} done.")
-            if eval_step > 50:
-                break
         model = self.accelerator.unwrap_model(model)
         metrics = self.eval_epoch_end(model, eval_outputs)
         self._total_eval_samples = eval_total_bs
@@ -292,8 +290,7 @@ class TDERecommenderEvaluator(RecommenderAbsEvaluator):
             eval_outputs.append((metrics, eval_batch_size))
             eval_total_bs += eval_batch_size
             logger.info(f"Evaluation step {eval_step + 1} done.")
-            if eval_step > 50:
-                break
+
         metrics = self.eval_epoch_end(model.module, eval_outputs)
         self._total_eval_samples = eval_total_bs
         return metrics
