@@ -2,7 +2,7 @@
 
 Nexus is the first [Pytorch](https://pytorch.org/)-based information retrieval development toolkit aimed at industrial internet applications such as recommendation system and document retrieval. It inherits the modular design concept of [RecStudio](https://github.com/USTCLLM/RecStudio), aiming to help algorithm engineers quickly experiment with various modules by modularizing various machine learning models. Additionally, it adds industry-friendly features beyond RecStudio, supporting the rapid construction and deployment of industrial internet information retrieval systems. 
 
-![This is the framework of Nexus](./imgs/framework.jpg)
+![This is the framework of Nexus](./imgs/framework.png)
 
 
 ## Key Industry Features
