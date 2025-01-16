@@ -406,9 +406,9 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         if self.config['infer_device'] == 'cpu':
             providers = ["CPUExecutionProvider"]
         elif isinstance(self.config['infer_device'], int):
-            providers = [("CUDAExecutionProvider", {"device_id": self.config['infer_device']})]
+            providers = ["CPUExecutionProvider", ("CUDAExecutionProvider", {"device_id": self.config['infer_device']})]
         else:
-            providers = ['CUDAExecutionProvider']
+            providers = ['CUDAExecutionProvider', "CPUExecutionProvider"]
         onnx_model_path = self.config["onnx_model_path"]
         return ort.InferenceSession(onnx_model_path, providers=providers)
 
