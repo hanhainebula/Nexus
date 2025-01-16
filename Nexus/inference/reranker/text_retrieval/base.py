@@ -452,7 +452,16 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             output_names=['output'],  
             dynamic_axes={'input_ids': {0: 'batch_size', 1:'token_length'}, 'output': {0: 'batch_size'}, 'attention_mask': {0: 'batch_size', 1: 'token_length'}}
         )
+        
+        if use_fp16:
+            from onnxconverter_common.float16 import convert_float_to_float16
+            import copy
+            model_fp32 = onnx.load(onnx_model_path)
+            model_fp16 = convert_float_to_float16(copy.deepcopy(model_fp32))
+            onnx.save(model_fp16, onnx_model_path)
+        
         print(f"Model has been converted to ONNX and saved at {onnx_model_path}")
+        
 
     
     @classmethod

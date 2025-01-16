@@ -492,9 +492,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         tokenizer=base_model.tokenizer
         dummy_input = tokenizer("This is a dummy input", return_tensors="pt", padding=True)
         dummy_input = (torch.LongTensor(dummy_input['input_ids']).view(1, -1), torch.LongTensor(dummy_input['attention_mask']).view(1, -1), torch.LongTensor(dummy_input['token_type_ids']).view(1, -1))
-        if use_fp16:
-            model = model.half()  # 将模型权重转换为 FP16
-            dummy_input = {key: value.half() for key, value in dummy_input.items()}  # 将输入数据转换为 FP16
+
 
         torch.onnx.export(
             model,  
@@ -506,7 +504,14 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             dynamic_axes={'input_ids': {0: 'batch_size', 1: 'token_length'},'token_type_ids': {0: 'batch_size', 1: 'token_length'},'attention_mask': {0: 'batch_size', 1: 'token_length'}, 'output':{0: 'batch_size', 1: 'token_length'}}  
         )
         print(f"Model has been converted to ONNX and saved at {onnx_model_path}")
-
+        if use_fp16:
+            from onnxconverter_common.float16 import convert_float_to_float16
+            import copy
+            model_fp32 = onnx.load(onnx_model_path)
+            model_fp16 = convert_float_to_float16(copy.deepcopy(model_fp32))
+            onnx.save(model_fp16, onnx_model_path)
+            
+            
     @classmethod
     def convert_to_tensorrt(cls, onnx_model_path: str = None, trt_model_path: str = None, batch_size=16, trt_path: str = None):
         if not os.path.isfile(onnx_model_path):
