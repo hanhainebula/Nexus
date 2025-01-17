@@ -1,12 +1,17 @@
 export WANDB_MODE=disabled
 
-train_data='/data2/home/angqing/code/InfoNexus/examples/text_retrieval/example_data/fiqa.jsonl'
+base_dir='/data1/home/recstudio/haoran/Nexus'
+train_data='/data1/home/recstudio/haoran/angqing_temp/data/fiqa.jsonl'
+model_name_or_path='/data1/home/recstudio/angqing/models/bge-reranker-base'
+ckpt_save_dir='/data1/home/recstudio/haoran/angqing_temp/ckpt/test_reranker'
+
+deepspeed='/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/training/ds_stage0.json'
 
 # set large epochs and small batch size for testing
 num_train_epochs=2
-per_device_train_batch_size=30
+per_device_train_batch_size=8
 gradient_accumulation_steps=1
-train_group_size=16
+train_group_size=8
 
 # set num_gpus to 2 for testing
 num_gpus=2
@@ -16,7 +21,7 @@ if [ -z "$HF_HUB_CACHE" ]; then
 fi
 
 model_args="\
-    --model_name_or_path /data2/OpenLLMs/bge-reranker-base \
+    --model_name_or_path $model_name_or_path \
     --cache_dir $HF_HUB_CACHE \
 "
 
@@ -31,7 +36,7 @@ data_args="\
 "
 
 training_args="\
-    --output_dir /data2/home/angqing/code/InfoNexus/checkpoints/test_reranker \
+    --output_dir $ckpt_save_dir \
     --overwrite_output_dir \
     --learning_rate 6e-5 \
     --fp16 \
@@ -42,13 +47,13 @@ training_args="\
     --warmup_ratio 0.1 \
     --gradient_checkpointing \
     --weight_decay 0.01 \
-    --deepspeed /data2/home/angqing/code/InfoNexus/examples/text_retrieval/training/ds_stage0.json \
+    --deepspeed $deepspeed \
     --logging_steps 1 \
     --save_steps 100 \
 "
-cd /data2/home/angqing/code/InfoNexus
+cd $base_dir
 cmd="torchrun --nproc_per_node $num_gpus \
-    -m InfoNexus.training.reranker.text_retrieval \
+    -m Nexus.training.reranker.text_retrieval \
     $model_args \
     $data_args \
     $training_args \

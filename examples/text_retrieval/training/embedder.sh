@@ -1,17 +1,17 @@
 export WANDB_MODE=disabled
 
-base_dir='/data2/home/angqing/code/InfoNexus'
-train_data='/data2/home/angqing/code/InfoNexus/examples/text_retrieval/example_data/fiqa.jsonl'
-model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5'
-ckpt_save_dir='/data2/home/angqing/code/InfoNexus/checkpoints/test_embedder'
+base_dir='/data1/home/recstudio/haoran/Nexus'
+train_data='/data1/home/recstudio/haoran/angqing_temp/data/fiqa.jsonl'
+model_name_or_path='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5'
+ckpt_save_dir='/data1/home/recstudio/haoran/angqing_temp/ckpt/test_embedder'
 
-deepspeed='/data2/home/angqing/code/InfoNexus/examples/text_retrieval/training/ds_stage0.json'
+deepspeed='/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/training/ds_stage0.json'
 # set large epochs and small batch size for testing
-num_train_epochs=2
-per_device_train_batch_size=30
+num_train_epochs=1
+per_device_train_batch_size=8
 
 # set num_gpus to 2 for testing
-num_gpus=2
+num_gpus=1
 
 if [ -z "$HF_HUB_CACHE" ]; then
     export HF_HUB_CACHE="$HOME/.cache/huggingface/hub"
@@ -58,7 +58,7 @@ training_args="\
 cd $base_dir
 
 cmd="torchrun --nproc_per_node $num_gpus \
-    -m InfoNexus.training.embedder.text_retrieval \
+    -m Nexus.training.embedder.text_retrieval \
     $model_args \
     $data_args \
     $training_args \

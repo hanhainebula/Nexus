@@ -482,7 +482,8 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             f"--minShapes=input_ids:1x1,attention_mask:1x1 "
             f"--optShapes=input_ids:{batch_size}x512,attention_mask:{batch_size}x512 "
             f"--maxShapes=input_ids:{batch_size}x512,attention_mask:{batch_size}x512 "
-            "--verbose"
+            "--verbose "
+            "--fp16"
         )
 
         # Run trtexec command
