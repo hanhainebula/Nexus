@@ -24,4 +24,4 @@ if __name__ == '__main__':
         retriever_outputs = retriever_inference_engine.batch_inference(batch_infer_df)
         print(type(retriever_outputs), retriever_outputs.shape, retriever_outputs)
     if retriever_inference_engine.config['infer_mode'] == 'trt':
-        cuda.Context.pop()
+        retriever_inference_engine.context.pop()

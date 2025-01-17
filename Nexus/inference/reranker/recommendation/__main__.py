@@ -30,4 +30,4 @@ if __name__ == '__main__':
         print(type(ranker_outputs), ranker_outputs.shape, ranker_outputs[-5:])
         
     if rank_inference_engine.config['infer_mode'] == 'trt':
-        cuda.Context.pop()
+        rank_inference_engine.context.pop()

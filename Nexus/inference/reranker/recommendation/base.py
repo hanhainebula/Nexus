@@ -388,7 +388,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         trt_engine_path = os.path.join(self.config['model_ckpt_path'], 'model_trt.engine')
         # Set the GPU device
         
-        cuda.Device(self.config['infer_device']).make_context()
+        self.context = cuda.Device(self.config['infer_device']).make_context()
         # Build or load the engine
         if not os.path.exists(trt_engine_path):
             serialized_engine = self.build_engine(model_onnx_path, trt_engine_path)
@@ -476,7 +476,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                     output_memory = cuda.mem_alloc(output_buffer.nbytes)
                     bindings[i] = int(output_memory)
                     context.set_tensor_address(tensor_name, output_memory)
-                    # cuda.memcpy_htod_async(output_memory, output_buffer, stream)
+                    cuda.memcpy_htod_async(output_memory, output_buffer, stream)
                     output_buffers[tensor_name] = (output_buffer, output_memory)
 
             context.execute_async_v3(stream_handle=stream.handle)

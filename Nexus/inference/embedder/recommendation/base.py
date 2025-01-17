@@ -404,7 +404,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         trt_engine_path = os.path.join(self.config['model_ckpt_path'], 'model_trt.engine')
 
         # Set the GPU device
-        cuda.Device(self.config['infer_device']).make_context()
+        self.context = cuda.Device(self.config['infer_device']).make_context()
 
         # Build or load the engine
         if not os.path.exists(trt_engine_path):

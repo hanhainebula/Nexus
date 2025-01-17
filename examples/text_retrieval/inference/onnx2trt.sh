@@ -1,10 +1,10 @@
 # scripts to convert onnx to tensorrt
 
-ONNX_PATH='/data2/OpenLLMs/bge-base-zh-v1.5/onnx/model.onnx' # onnx model path
-TRT_SAVE_PATH='/data2/OpenLLMs/bge-base-zh-v1.5/trt/model.trt' # tensorrt model path, dirpath should be created early
+ONNX_PATH='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5/onnx/model.onnx' # onnx model path
+TRT_SAVE_PATH='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5/trt/model.trt' # tensorrt model path, dirpath should be created early
 
 # your tensorrt path here
-TRT_PATH='/data2/home/angqing/tensorrt/TensorRT-10.7.0.23'
+TRT_PATH='/data1/home/recstudio/angqing/tensorrt/TensorRT-10.7.0.23'
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$TRT_PATH/lib
 export PATH=$PATH:$TRT_PATH/bin

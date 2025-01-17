@@ -97,8 +97,9 @@ class BaseRanker(AbsRerankerModel):
         all_embs_cat = torch.concat(all_embs, dim=1) # [B, N1+N2+N3, D]
         interacted_emb = self.feature_interaction_layer(all_embs_cat)    # [B, **]
         score = self.prediction_layer(interacted_emb)   # [B], sigmoid
-        if len(score.shape) == 2 and score.size(-1) == 1:
-            score = score.squeeze(-1)   # [B, 1] -> [B]
+        if (len(score.shape) == 2) and (score.size(-1) == 1):
+            # score = score.squeeze(-1)   # [B, 1] -> [B]
+            score = score.reshape(-1)   # [B, 1] -> [B]
         return RerankerOutput(score, all_embs)
     
     
@@ -148,25 +149,20 @@ class BaseRanker(AbsRerankerModel):
         return pred, target
 
     @torch.no_grad()
-    def predict(self, context_input: Dict, candidates: Dict, output_topk=None, gpu_mem_save=False, *args, **kwargs):
+    def predict(self, context_input: Dict, candidates: Dict, output_topk=None, *args, **kwargs):
         """ predict topk candidates for each context
         
         Args:
             context_input (Dict): input context feature
             candidates (Dict): candidate items
             topk (int): topk candidates
-            gpu_mem_save (bool): whether to save gpu memroy by using loop to process each candidate
 
         Returns:
             torch.Tensor: topk indices (offset instead of real item id)
         """
         num_candidates = candidates[self.fiid].size(1)
-        # if not gpu_mem_save:
-        print('not gpu_mem_save')
-        # expand batch to match the number of candidates, consuming more memory
         batch_size = candidates[self.fiid].size(0)
         for k, v in context_input.items():
-            # logger.info(k)
             # B, * -> BxN, *
             if isinstance(v, dict):
                 for k_, v_ in v.items():
@@ -184,18 +180,6 @@ class BaseRanker(AbsRerankerModel):
         context_input.update(candidates)    # {key: BxN, *}
         output = self.compute_score(context_input, *args, **kwargs)
         scores = output.scores.view(batch_size, num_candidates)  # [B, N]
-        # else:
-        #     print('gpu_mem_save')
-        #     # use loop to process each candidate
-        #     scores = []
-        #     batch_size = candidates[self.fiid].size(0)
-        #     for i in range(num_candidates):
-        #         candidate = {k: v[:, i] for k, v in candidates.items()}
-        #         new_batch = dict(**context_input)
-        #         new_batch.update(candidate)
-        #         output = self.compute_score(new_batch, *args, **kwargs)
-        #         scores.append(output.score)
-        #     scores = torch.stack(scores, dim=-1)  # [B, N]
         
         # get topk idx
         topk = min(self.model_config.topk, num_candidates)

@@ -74,7 +74,7 @@ def main():
         model_config_or_path=model_config_path,
         data_config_or_path=data_config_path,
         train_config_or_path=train_config_path,
-        model_class=MYMLPRetriever,
+        model_class=MLPRetriever,
     )
     runner.run()
     
