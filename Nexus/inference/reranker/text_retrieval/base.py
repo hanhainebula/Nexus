@@ -437,11 +437,6 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         dummy_input= tokenizer(queries, passages, padding=True , return_tensors='pt', truncation='only_second', max_length=512)
 
         dummy_input = (torch.LongTensor(dummy_input['input_ids']).view(1, -1), torch.LongTensor(dummy_input['attention_mask']).view(1, -1))
-        print(dummy_input[0].shape)
-        
-        if use_fp16:
-            model = model.half()  # 将模型权重转换为 FP16
-            dummy_input = {key: value.half() for key, value in dummy_input.items()}  
             
         torch.onnx.export(
             model,  
