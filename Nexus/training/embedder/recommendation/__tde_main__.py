@@ -14,7 +14,8 @@ def main():
         model_class=MLPRetriever,
     )
     runner.run()
-
+    if hasattr(runner.model, "_id_transformer_group"):
+        runner.model._id_transformer_group.__del__()
 
 if __name__ == "__main__":
     main()

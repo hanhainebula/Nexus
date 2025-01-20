@@ -27,3 +27,6 @@ if __name__ == '__main__':
         batch_candidates_df = pd.DataFrame({rank_inference_engine.feature_config['fiid']: batch_candidates.tolist()})
         ranker_outputs = rank_inference_engine.batch_inference(batch_infer_df, batch_candidates_df)
         print(type(ranker_outputs), ranker_outputs.shape, ranker_outputs[-5:])
+        
+    if hasattr(rank_inference_engine, '_id_transformer_group'):
+        rank_inference_engine._id_transformer_group.__del__()

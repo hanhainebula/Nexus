@@ -22,3 +22,6 @@ if __name__ == '__main__':
         batch_infer_df = infer_df.iloc[batch_st:batch_ed]
         retriever_outputs = retriever_inference_engine.batch_inference(batch_infer_df)
         print(type(retriever_outputs), retriever_outputs.shape, retriever_outputs)
+        
+    if hasattr(retriever_inference_engine, '_id_transformer_group'):
+        retriever_inference_engine._id_transformer_group.__del__()

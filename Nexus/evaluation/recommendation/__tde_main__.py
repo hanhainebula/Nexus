@@ -15,6 +15,11 @@ def main():
     )
 
     runner.run()
+    if runner.retriever is not None and hasattr(runner.retriever, "_id_transformer_group"):
+        del runner.retriever._id_transformer_group
+    if runner.ranker is not None and hasattr(runner.ranker, "_id_transformer_group"):
+        del runner.ranker._id_transformer_group
+    
 
 
 if __name__ == "__main__":
