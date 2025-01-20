@@ -29,6 +29,8 @@ from torchrec.optim.optimizers import in_backward_optimizer_filter
 from torchrec.distributed import DistributedModelParallel
 
 from dynamic_embedding.wrappers import attach_id_transformer_group, wrap_dataset
+from .callback import StopCallback, LoggerCallback
+from transformers import PrinterCallback
 
 
 class TDERetrieverRunner(RetrieverRunner):
@@ -204,4 +206,8 @@ class TDERetrieverRunner(RetrieverRunner):
             data_collator=self.data_collator,
             optimizers=[self.optimizer, self.lr_scheduler]
         )
+        trainer.add_callback(StopCallback)
+        trainer.add_callback(LoggerCallback)
+        trainer.pop_callback(PrinterCallback)
+        
         return trainer

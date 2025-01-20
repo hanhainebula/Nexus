@@ -27,6 +27,9 @@ from torchrec.optim.keyed import CombinedOptimizer, KeyedOptimizerWrapper
 from torchrec.optim.optimizers import in_backward_optimizer_filter
 
 from dynamic_embedding.wrappers import attach_id_transformer_group
+from .callback import StopCallback, LoggerCallback
+from transformers import PrinterCallback
+
 
 class TDERankerRunner(RankerRunner):
     """
@@ -199,5 +202,8 @@ class TDERankerRunner(RankerRunner):
             optimizers=[self.optimizer, self.lr_scheduler],
             
         )
+        trainer.add_callback(StopCallback)
+        trainer.add_callback(LoggerCallback)
+        trainer.pop_callback(PrinterCallback)
         
         return trainer

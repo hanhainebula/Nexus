@@ -1,8 +1,11 @@
 {
     "num_train_epochs": 1,
-    "max_steps": 10,
     "per_device_train_batch_size": 1024,
     "output_dir": "./saves/recommender_results/mlp_retriever",
     "checkpoint_steps": 150,
-    "optimizer": "adam"
+    "learning_rate": 0.001,
+    "weight_decay": 0.0,
+    "warmup_steps": 1000,
+    "logging_steps": 50,
+    "disable_tqdm": true
 }

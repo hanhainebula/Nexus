@@ -1,9 +1,13 @@
 {
     "num_train_epochs": 1,
-    "max_steps": 50,
     "per_device_train_batch_size": 1024,
     "output_dir": "./saves/recommender_results/mlp_ranker",
     "checkpoint_steps": 3000,
     "metrics": ["auc", "logloss"], 
-    "optimizer": "adam"
+    "learning_rate": 0.001,
+    "weight_decay": 0.0,
+    "warmup_steps": 1000,
+    "save_steps": 5000,
+    "logging_steps": 5,
+    "disable_tqdm": true
 }
