@@ -1,3 +1,4 @@
+import os 
 import numpy as np
 import faiss
 import redis
@@ -40,7 +41,7 @@ def gen_i2i_index(topk, file_path, redis_host, redis_port, redis_db, item_index_
     D, I = item_index.search(item_embeddings, topk)
     print('Search Done.')
 
-    r = redis.Redis(host=redis_host, port=redis_port, db=redis_db)
+    r = redis.Redis(host=redis_host, port=redis_port, db=redis_db, password=os.getenv('REDIS_PW'))
 
     for item_idx in tqdm(range(len(item_ids))):
         top10_indices = I[item_idx]

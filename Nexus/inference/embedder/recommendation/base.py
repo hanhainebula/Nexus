@@ -82,7 +82,8 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         # connect to redis for feature cache
         self.redis_client = redis.Redis(host=self.feature_cache_config['host'], 
                                         port=self.feature_cache_config['port'], 
-                                        db=self.feature_cache_config['db'])
+                                        db=self.feature_cache_config['db'],
+                                        password=os.getenv('REDIS_PW'))
         
         # put seq into context_features
         # self.feature_config is deepcopy of self.model_ckpt_config['data_config']
@@ -118,7 +119,8 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                                   item_index_path=self.retrieve_index_config['item_index_path'])
                 self.i2i_redis_client = redis.Redis(host=self.retrieve_index_config['i2i_redis_host'], 
                                     port=self.retrieve_index_config['i2i_redis_port'], 
-                                    db=self.retrieve_index_config['i2i_redis_db'])
+                                    db=self.retrieve_index_config['i2i_redis_db'],
+                                    password=os.getenv('REDIS_PW'))
                 
     def batch_inference(self, batch_infer_df:DataFrame):
         """

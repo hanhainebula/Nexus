@@ -93,7 +93,8 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         # connect to redis for feature cache
         self.redis_client = redis.Redis(host=self.feature_cache_config['host'], 
                                         port=self.feature_cache_config['port'], 
-                                        db=self.feature_cache_config['db'])
+                                        db=self.feature_cache_config['db'],
+                                        password=os.getenv('REDIS_PW'))
             
         # put seq into context_features
         # self.feature_config is deepcopy of self.model_ckpt_config['data_config']
