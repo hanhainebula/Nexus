@@ -10,7 +10,7 @@
             "user_id": {
                 "name": "t_user",
                 "embedding_dim": 4,
-                "num_embeddings": 100000,
+                "num_embeddings": 500000,
                 "feature_names": [
                 "user_id"
                 ],
@@ -20,7 +20,7 @@
             "video_id": {
                 "name": "t_item",
                 "embedding_dim": 4,
-                "num_embeddings": 100000,
+                "num_embeddings": 500000,
                 "feature_names": [
                 "video_id"
                 ],
@@ -30,7 +30,7 @@
             "author_id": {
                 "name": "t_author",
                 "embedding_dim": 4,
-                "num_embeddings": 100000,
+                "num_embeddings": 500000,
                 "feature_names": [
                 "author_id"
                 ],
@@ -39,6 +39,6 @@
             }
         },
         "sharding_type": "ROW_WISE",
-        "ps_url": "redis://127.0.0.1:6379/?prefix=test_xiaolong"
+        "ps_url": "redis://default:xxx@127.0.0.1:6379/?db=2&&prefix=recflow_tde_ranker"
     }
 }

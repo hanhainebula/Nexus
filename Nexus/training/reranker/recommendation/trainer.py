@@ -66,6 +66,8 @@ class TDERankerTrainer(AbsRerankerTrainer):
             os.makedirs(checkpoint_dir, exist_ok=True)
             self.model.module.save(checkpoint_dir)
             logger.info(f"Model saved in {checkpoint_dir}.")
-            tde_save(self.model)
+        tde_save(self.model)
+        logger.info(f"IDTransformer saved.")
+            
         
 

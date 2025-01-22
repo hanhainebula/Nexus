@@ -1,3 +1,4 @@
+import os 
 import sys 
 sys.path.append('.')
 
@@ -10,7 +11,7 @@ from tqdm import tqdm
 import yaml 
 
 # connect to Redis
-r = redis.Redis(host='localhost', port=6379, db=0)
+r = redis.Redis(host='localhost', port=6379, db=0, password=os.getenv('REDIS_PW'))
 
 # Item
 test_video_info = pd.read_feather('./examples/recommendation/inference/feature_data/recflow/realshow_test_video_info.feather')

@@ -65,6 +65,7 @@ class TDERankerRunner(RankerRunner):
         def _init_process():
             rank = int(os.environ["LOCAL_RANK"])
             world_size = int(os.environ["WORLD_SIZE"])
+            local_world_size = int(os.environ["LOCAL_WORLD_SIZE"])
             if torch.cuda.is_available():
                 device: torch.device = torch.device(f"cuda:{rank}")
                 backend = "nccl"
@@ -76,7 +77,7 @@ class TDERankerRunner(RankerRunner):
                 dist.init_process_group(rank=rank, world_size=world_size, backend=backend)
             pg = dist.group.WORLD
 
-            return rank, world_size, device, backend, pg
+            return rank, world_size, local_world_size, device, backend, pg
         
         def _get_tde_configs_dict(model) -> Dict:
             """Get the embedding configurations from the model.
@@ -121,10 +122,10 @@ class TDERankerRunner(RankerRunner):
         tde_feature_names = _get_tde_feature_names(model)
         tde_settings = model.model_config.tde_settings
         
-        rank, world_size, device, backend, pg = _init_process()
+        rank, world_size, local_world_size, device, backend, pg = _init_process()
         topology = Topology(
             world_size=world_size,
-            local_world_size=world_size,
+            local_world_size=local_world_size,
             compute_device=device.type,
         )
 
