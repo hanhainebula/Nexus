@@ -393,7 +393,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         # Build or load the engine
         if not os.path.exists(trt_engine_path):
             serialized_engine = self.build_engine(model_onnx_path, trt_engine_path)
-            TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+            TRT_LOGGER = trt.Logger(trt.Logger.INTERNAL_ERROR)
             runtime = trt.Runtime(TRT_LOGGER)
             engine = runtime.deserialize_cuda_engine(serialized_engine)
         else:
@@ -404,14 +404,14 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         return engine
     
     def load_engine(self, engine_file_path):
-        TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)
+        TRT_LOGGER = trt.Logger(trt.Logger.INTERNAL_ERROR)
         with open(engine_file_path, 'rb') as f, trt.Runtime(TRT_LOGGER) as runtime:
             return runtime.deserialize_cuda_engine(f.read())
         
     
     
     def build_engine(self, onnx_file_path, engine_file_path):
-        TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
+        TRT_LOGGER = trt.Logger(trt.Logger.INTERNAL_ERROR)
         with trt.Builder(TRT_LOGGER) as builder, builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)) as network, trt.OnnxParser(network, TRT_LOGGER) as parser:
             # Parse ONNX model
             with open(onnx_file_path, 'rb') as model:
