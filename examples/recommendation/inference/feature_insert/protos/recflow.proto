@@ -20,5 +20,5 @@ message UserTimestamp {
   int32 age = 5;                  
   int64 gender = 6;              
   int64 province = 7;
-  repeated Item seq_effective_50 = 8;
+  repeated Item user_seq_effective_50 = 8;
 }
