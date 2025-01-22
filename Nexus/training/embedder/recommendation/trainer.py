@@ -112,6 +112,8 @@ class TDERetrieverTrainer(AbsEmbedderTrainer):
             item_vectors_path = os.path.join(checkpoint_dir, 'item_vectors.pt')
             torch.save({'item_vectors': item_vectors, 'item_ids': item_ids}, item_vectors_path)
             logger.info(f'Item vectors saved to {checkpoint_dir}.')
+        tde_save(self.model)
+        logger.info(f"IDTransformer saved.")
     
     def _batch_to_device(self, batch_data:dict, device):
         '''
