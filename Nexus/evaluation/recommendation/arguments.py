@@ -42,8 +42,9 @@ class RecommenderEvalArgs(AbsEvalArguments):
     #     default=256, metadata={"help": "Item batch size."}
     # )
     def __post_init__(self):
-        retriever_eval_data_arguments = DataArguments.from_json(self.retriever_data_path)
-        self.retriever_item_batch_size = retriever_eval_data_arguments.item_batch_size
+        if self.retriever_data_path is not None:
+            retriever_eval_data_arguments = DataArguments.from_json(self.retriever_data_path)
+            self.retriever_item_batch_size = retriever_eval_data_arguments.item_batch_size
 
 @dataclass
 class RecommenderEvalModelArgs(AbsModelArguments):
