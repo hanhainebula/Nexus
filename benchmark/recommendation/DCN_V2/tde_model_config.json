@@ -1,0 +1,45 @@
+{
+    "embedding_dim": 32,
+    "cross_net_layers": 5, 
+    "deep_cross_combination": "parallel",
+    "mlp_layers": [1024,1024],
+    "activation": "relu",
+    "dropout": 0.1,
+    "batch_norm": false,
+    "tde_settings": {
+        "table_configs": {
+            "user_id": {
+                "name": "t_user",
+                "embedding_dim": 32,
+                "num_embeddings": 100000,
+                "feature_names": [
+                "user_id"
+                ],
+                "weight_init_min": -0.02,
+                "weight_init_max": 0.02
+            },
+            "video_id": {
+                "name": "t_item",
+                "embedding_dim": 32,
+                "num_embeddings": 100000,
+                "feature_names": [
+                "video_id"
+                ],
+                "weight_init_min": -0.02,
+                "weight_init_max": 0.02
+            },
+            "author_id": {
+                "name": "t_author",
+                "embedding_dim": 32,
+                "num_embeddings": 100000,
+                "feature_names": [
+                "author_id"
+                ],
+                "weight_init_min": -0.02,
+                "weight_init_max": 0.02
+            }
+        },
+        "sharding_type": "ROW_WISE",
+        "ps_url": "redis://127.0.0.1:6379/?prefix=test_xiaolong"
+    }
+}

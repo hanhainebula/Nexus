@@ -1,0 +1,8 @@
+stage: rank 
+model_ckpt_path: ./saves/ckpt
+feature_cache_config_path: ./infer_data_recflow_feature_cache_config.yaml
+output_topk: 6
+infer_batch_size: 128
+num_candidates: 50
+infer_device: 0
+infer_mode: trt
