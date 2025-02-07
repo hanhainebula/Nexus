@@ -2,8 +2,8 @@ export HF_ENDPOINT="https://hf-mirror.com"
 BASE_DIR=/data1/home/recstudio/angqing/InfoNexus
 EMBEDDER=/data1/home/recstudio/angqing/models/bge-base-zh-v1.5
 RERANKER=/data1/home/recstudio/angqing/models/bge-reranker-base
-embedder_infer_mode=tensorrt
-reranker_infer_mode=tensorrt
+embedder_infer_mode=normal
+reranker_infer_mode=normal
 embedder_onnx_path=$EMBEDDER/onnx/model_fp16.onnx
 reranker_onnx_path=$RERANKER/onnx/model_fp16.onnx
 embedder_trt_path=$EMBEDDER/trt/model_fp16.trt
@@ -13,7 +13,7 @@ reranker_trt_path=$RERANKER/trt/model_fp16.trt
 cd $BASE_DIR
 
 
-python -m InfoNexus.evaluation.text_retrieval.airbench \
+python -m Nexus.evaluation.text_retrieval.airbench \
     --benchmark_version AIR-Bench_24.05 \
     --task_types qa \
     --domains arxiv \
