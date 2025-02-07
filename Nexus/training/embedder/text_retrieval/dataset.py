@@ -62,7 +62,11 @@ class AbsTextEmbedderTrainDataset(AbsEmbedderTrainDataset):
         Returns:
             datasets.Dataset: Loaded HF dataset.
         """
-        if dist.get_rank() == 0:
+        
+        if dist.is_available() and dist.is_initialized():
+            if dist.get_rank() == 0:
+                logger.info(f'loading data from {file_path} ...')
+        else:
             logger.info(f'loading data from {file_path} ...')
 
         temp_dataset = datasets.load_dataset('json', data_files=file_path, split='train', cache_dir=self.args.cache_path)
