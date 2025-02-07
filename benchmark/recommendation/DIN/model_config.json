@@ -1,0 +1,10 @@
+{
+    "embedding_dim": 2,
+    "din_hidden_size": 36,
+    "din_feature_inter_strategy": "mlp",
+    "mlp_layers": [128, 128],
+    "prediction_layers": [32],
+    "activation": "relu",
+    "dropout": 0.1,
+    "batch_norm": false
+}
