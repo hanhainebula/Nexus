@@ -16,9 +16,9 @@ def main():
 
     runner.run()
     if runner.retriever is not None and hasattr(runner.retriever, "_id_transformer_group"):
-        del runner.retriever._id_transformer_group
+        runner.retriever._id_transformer_group.__del__()
     if runner.ranker is not None and hasattr(runner.ranker, "_id_transformer_group"):
-        del runner.ranker._id_transformer_group
+        runner.ranker._id_transformer_group.__del__()
     
 
 
