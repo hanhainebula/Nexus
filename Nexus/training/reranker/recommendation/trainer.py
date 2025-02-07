@@ -61,13 +61,15 @@ class TDERankerTrainer(AbsRerankerTrainer):
     def save_model(self, output_dir = None, **kwargs):
         
         """ Save the best model. """
+        # call save method on each rank 
+        checkpoint_dir = output_dir if output_dir is not None else self.args.output_dir
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        self.model.module.save(checkpoint_dir)
         if self.accelerator.is_main_process:
-            checkpoint_dir = output_dir if output_dir is not None else self.args.output_dir
-            os.makedirs(checkpoint_dir, exist_ok=True)
-            self.model.module.save(checkpoint_dir)
             logger.info(f"Model saved in {checkpoint_dir}.")
         tde_save(self.model)
-        logger.info(f"IDTransformer saved.")
+        if self.accelerator.is_main_process:
+            logger.info(f"IDTransformer saved.")
             
         
 

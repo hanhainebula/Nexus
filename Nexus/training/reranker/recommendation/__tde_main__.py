@@ -33,7 +33,7 @@ def main():
         runner.model._id_transformer_group.__del__()
 
 if __name__ == "__main__":
-    local_interfaces = get_local_interfaces()
+    local_interfaces = get_local_interfaces() # for
     # set the interface for Gloo, refer to issue https://github.com/pytorch/pytorch/issues/68726#issuecomment-1813807190
     os.environ["TP_SOCKET_IFNAME"] = local_interfaces[0]
     os.environ["GLOO_SOCKET_IFNAME"] = local_interfaces[0]

@@ -3,6 +3,8 @@ import os
 import json
 from typing import Dict, Union, Tuple, Optional, List
 import itertools
+from collections import OrderedDict
+from torch.distributed._shard.sharded_tensor import Shard, ShardedTensor
 
 import torch
 import torch.distributed as dist
@@ -146,15 +148,31 @@ class TDEModel(torch.nn.Module):
         
         return model
     
-    # save -> shard -> load  
+    
+    # multi_save + shard + load
+    def save_checkpoint(self, checkpoint_dir):
+        path = os.path.join(checkpoint_dir, "model.pt")
+        checkpoint_pg = dist.new_group(backend="gloo")
+        # Copy sharded state_dict to CPU.
+        cpu_state_dict = state_dict_to_device(
+            self.state_dict(), pg=checkpoint_pg, device=torch.device("cpu"))
+        
+        new_cpu_state_dict = OrderedDict()
+        for key, value in cpu_state_dict.items():
+            if isinstance(value, ShardedTensor):
+                new_cpu_state_dict[key] = torch.zeros(value.metadata().size, 
+                                        dtype=value.dtype,
+                                        device=value.device if dist.get_rank() == 0 else 'meta')        
+            else:
+                new_cpu_state_dict[key] = torch.zeros_like(value)
+        state_dict_gather(cpu_state_dict, new_cpu_state_dict)
+        if dist.get_rank() == 0:
+            torch.save(new_cpu_state_dict, path)
+        
     def save(self, checkpoint_dir: str, **kwargs):
         self.save_checkpoint(checkpoint_dir)
         self.base_model.save_configurations(checkpoint_dir)
     
-    def save_checkpoint(self, checkpoint_dir: str):
-        path = os.path.join(checkpoint_dir, "model.pt")
-        torch.save(self.state_dict(), path)
-        
     @staticmethod
     def from_pretrained(checkpoint_dir:str, 
                         model_class_or_name:Optional[Union[type, str]]=None):
@@ -182,20 +200,20 @@ class TDEModel(torch.nn.Module):
         
         # create model         
         model = model_cls(data_config, model_config)
-
+        
         # wrap TDEModel 
         model = TDEModel(model)
-        model = TDEModel._prepare_model(model)
         
         # load state_dict
         ckpt_path = os.path.join(checkpoint_dir, "model.pt")
         state_dict = torch.load(ckpt_path, weights_only=False, map_location='cpu')
-
+        # shard and then load
+        # if we load first and then shard, parameters in state_dict will be covered 
+        model = model._prepare_model(model)
         model.load_state_dict(state_dict)
         
-        item_vectors_path = os.path.join(checkpoint_dir, "item_vectors.pt")
-        if os.path.exists(item_vectors_path):
-            item_vectors = torch.load(item_vectors_path, map_location='cpu')
-            model.module.base_model.item_vectors = item_vectors
+        if "item_vectors" in state_dict:
+            model.item_vectors = state_dict["item_vectors"]
+            del state_dict['item_vectors']
         
         return model

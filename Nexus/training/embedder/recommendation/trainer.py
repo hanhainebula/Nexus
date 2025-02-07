@@ -101,19 +101,23 @@ class TDERetrieverTrainer(AbsEmbedderTrainer):
     
     def save_model(self, output_dir = None, **kwargs):
         """ Save the best model. """
+        # call save method on every rank
         item_vectors, item_ids = self.update_item_vectors(output_dir)
+        
+        checkpoint_dir = output_dir if output_dir is not None else self.args.output_dir
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        self.model.module.save(checkpoint_dir)
         if self.accelerator.is_main_process:
-            checkpoint_dir = output_dir if output_dir is not None else self.args.output_dir
-            os.makedirs(checkpoint_dir, exist_ok=True)
-            self.model.module.save(checkpoint_dir)
             logger.info(f"Model saved in {checkpoint_dir}.")
-            tde_save(self.model)
-            logger.info(f"ID transformer group is saved.")
+        
+        if self.accelerator.is_main_process:
             item_vectors_path = os.path.join(checkpoint_dir, 'item_vectors.pt')
             torch.save({'item_vectors': item_vectors, 'item_ids': item_ids}, item_vectors_path)
             logger.info(f'Item vectors saved to {checkpoint_dir}.')
+        
         tde_save(self.model)
-        logger.info(f"IDTransformer saved.")
+        if self.accelerator.is_main_process:
+            logger.info(f"IDTransformer saved.")
     
     def _batch_to_device(self, batch_data:dict, device):
         '''
