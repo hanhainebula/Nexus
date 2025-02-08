@@ -1,2 +1,2 @@
-cd /data2/home/angqing/code/InfoNexus/
-python -m InfoNexus.inference.embedder.text_retrieval.base
+cd /data1/home/recstudio/haoran/Nexus
+python -m Nexus.inference.embedder.text_retrieval.base

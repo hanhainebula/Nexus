@@ -1,4 +1,4 @@
-ACCELERATE_CONFIG=/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/training/single_node_multi_device.json
+ACCELERATE_CONFIG=/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/training/single_node_single_device.json
 
 cd /data1/home/recstudio/haoran/Nexus
 

@@ -1,0 +1,16 @@
+{
+    "embedder_name_or_path": "/data1/home/recstudio/angqing/models/bge-base-zh-v1.5",
+    "reranker_name_or_path": "/data1/home/recstudio/angqing/models/bge-reranker-base",
+    "embedder_batch_size": 32,
+    "reranker_batch_size": 8,
+    "devices": ["cuda:0"],
+    "model_cache_dir": "./cache/model",
+    "reranker_query_max_length": 128,
+    "reranker_max_length": 512,
+    "embedder_infer_mode": "normal",
+    "reranker_infer_mode": "normal",
+    "embedder_onnx_model_path": "/data1/home/recstudio/angqing/models/bge-base-zh-v1.5/onnx/model_fp16.onnx",
+    "reranker_onnx_model_path": "/data1/home/recstudio/angqing/models/bge-reranker-base/onnx/model_fp16.onnx",
+    "embedder_trt_model_path": "/data1/home/recstudio/angqing/models/bge-base-zh-v1.5/trt/model_fp16.trt",
+    "reranker_trt_model_path": "/data1/home/recstudio/angqing/models/bge-reranker-base/trt/model_fp16.trt"
+}

@@ -1,0 +1,12 @@
+{
+    "benchmark_version": "AIR-Bench_24.05",
+    "output_dir": "./search_results",
+    "task_types": ["qa"],
+    "domains": ["arxiv"],
+    "languages": ["en"],
+    "splits": ["dev", "test"],
+    "search_top_k": 1000,
+    "rerank_top_k": 20,
+    "cache_dir": "./cache/data",
+    "overwrite": false
+}
