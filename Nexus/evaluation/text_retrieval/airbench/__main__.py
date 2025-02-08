@@ -5,14 +5,16 @@ from Nexus.evaluation.text_retrieval.airbench import (
     AIRBenchEvalRunner
 )
 
+from Nexus.evaluation.text_retrieval.arguments import load_config
 
 def main():
-    parser = HfArgumentParser((
-        AIRBenchEvalArgs,
-        AIRBenchEvalModelArgs
-    ))
 
-    eval_args, model_args = parser.parse_args_into_dataclasses()
+    eval_config_path='/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/evaluation/eval_config.json'
+    model_config_path='/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/evaluation/model_config.json'
+    
+    eval_args = load_config(eval_config_path, AIRBenchEvalArgs)
+    model_args = load_config(model_config_path, AIRBenchEvalModelArgs)
+    
     eval_args: AIRBenchEvalArgs
     model_args: AIRBenchEvalModelArgs
 

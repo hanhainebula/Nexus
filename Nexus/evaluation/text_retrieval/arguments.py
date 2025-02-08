@@ -1,11 +1,14 @@
 from dataclasses import dataclass, field
 from typing import Optional
 import os
-
+import json
 from Nexus.abc.arguments import AbsArguments
 from Nexus.abc.evaluation import AbsEvalArguments
 
-
+def load_config(file_path, config_class):
+    with open(file_path, "r") as f:
+        data = json.load(f)
+    return config_class(**data)
 @dataclass
 class TextRetrievalEvalArgs(AbsEvalArguments):
     """

@@ -1,15 +1,16 @@
 from transformers import HfArgumentParser
 
 from Nexus.evaluation.text_retrieval import TextRetrievalEvalArgs, TextRetrievalEvalModelArgs, TextRetrievalEvalRunner
-
+from Nexus.evaluation.text_retrieval.arguments import load_config
 
 def main():
-    parser = HfArgumentParser((
-        TextRetrievalEvalArgs,
-        TextRetrievalEvalModelArgs
-    ))
 
-    eval_args, model_args = parser.parse_args_into_dataclasses()
+    eval_config_path=''
+    model_config_path=''
+    
+    eval_args = load_config(eval_config_path, TextRetrievalEvalArgs)
+    model_args = load_config(model_config_path, TextRetrievalEvalModelArgs)
+    
     eval_args: TextRetrievalEvalArgs
     model_args: TextRetrievalEvalModelArgs
 
