@@ -1,0 +1,11 @@
+{
+    "train_data": "/data1/home/recstudio/haoran/angqing_temp/data/fiqa.jsonl",
+    "cache_path": "~/.cache",
+    "train_group_size": 8,
+    "query_max_len": 512,
+    "passage_max_len": 512,
+    "pad_to_multiple_of": 8,
+    "query_instruction_for_retrieval": "Represent this sentence for searching relevant passages: ",
+    "query_instruction_format": "{}{}",
+    "knowledge_distillation": false
+}
