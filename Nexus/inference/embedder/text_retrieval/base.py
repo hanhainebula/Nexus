@@ -698,40 +698,13 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         return self.inference(inputs, *args, **kwargs)
 
 if __name__=='__main__':
-    import pdb
-    # sentences_1 = ["样例数据-1", "样例数据-2"]
-    # sentences_2 = ["样例数据-3", "样例数据-4"]
-    # model = BaseEmbedder(model_name_or_path='/data2/OpenLLMs/bge-base-zh-v1.5', use_fp16=True, devices=['cuda:1','cuda:0']) # Setting use_fp16 to True speeds up computation with a slight performance degradation
-    # pdb.set_trace()
-    # embeddings_1 = model.encode(sentences_1)
-    # embeddings_2 = model.encode(sentences_2)
-    # similarity = embeddings_1 @ embeddings_2.T
-    # print(similarity)
+    from Nexus import AbsInferenceArguments, BaseEmbedderInferenceEngine
+    model_path='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5'
+    onnx_model_path='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5/onnx/model_fp16.onnx'
 
-    # # for s2p(short query to long passage) retrieval task, suggest to use encode_queries() which will automatically add the instruction to each query
-    # # corpus in retrieval task can still use encode_corpus(), since they don't need instruction
-    # queries = ['query_1', 'query_2']
-    # passages = ["样例文档-1", "样例文档-2"]
-    # q_embeddings = model.encode_query(queries)
-    # p_embeddings = model.encode_info(passages)
-    # scores = q_embeddings @ p_embeddings.T
-    # print(scores)
-    
-    # del model
-    
-    """
-    below test BaseEmbedderInferenceEngine
-    """
-    model_path='/data2/OpenLLMs/bge-base-zh-v1.5'
-    args=AbsInferenceArguments(
-        model_name_or_path=model_path,
-        onnx_model_path='/data2/OpenLLMs/bge-base-zh-v1.5/onnx/model.onnx',
-        trt_model_path='/data2/OpenLLMs/bge-base-zh-v1.5/trt/model.trt',
-        infer_mode='tensorrt',
-        infer_device=0,
-        infer_batch_size=16
-    )
-    
+    # BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=onnx_model_path, use_fp16=True)
+
+    # 2. Inference with onnx session
     sentences = [
         "The quick brown fox jumps over the lazy dog.",
         "Artificial intelligence is transforming the world.",
@@ -744,30 +717,17 @@ if __name__=='__main__':
         "Electric cars are becoming more common.",
         "The human brain is an incredibly complex organ."
     ]
-    # 1. convert model to onnx
-    # BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=args.onnx_model_path)
-    
-    BaseEmbedderInferenceEngine.convert_to_tensorrt(args.onnx_model_path, args.trt_model_path, batch_size=16, trt_path='/data2/home/angqing/tensorrt/TensorRT-10.7.0.23')
-    pdb.set_trace()
-    
-    # 2. test normal session
-    args.infer_mode='normal'
-    inference_engine=BaseEmbedderInferenceEngine(args)
-    s_e_norm=inference_engine.encode_query(sentences, batch_size=10, normalize=True)
-    print(s_e_norm.shape)
-    
-    # 3. test onnx session
-    args.infer_mode = 'onnx'
+
+    args=AbsInferenceArguments(
+        model_name_or_path=model_path,
+        onnx_model_path=onnx_model_path,
+        trt_model_path=None,
+        infer_mode='onnx',
+        infer_device=0,
+        infer_batch_size=16
+    )
     inference_engine_onnx = BaseEmbedderInferenceEngine(args)
-    s_e_onnx = inference_engine_onnx.encode_query(sentences, normalize=True)
-    print(s_e_onnx.shape)
-    
-    # 4. test tensorrt session
-    # args.infer_mode='tensorrt'
-    # inference_engine_tensorrt=BaseEmbedderInferenceEngine(args)
-    # s_e_trt=inference_engine_tensorrt.inference(sentences, normalize=True)
-    # print(s_e_trt.shape)
-    # cuda.Context.pop()
-    # s2_e=inference_engine_tensorrt.inference(s2)
-    # print(f'test tensorrt: {s_e @ s2_e.T}')
-    
+    emb_onnx = inference_engine_onnx.inference(sentences, normalize=True, batch_size=5)
+    print(emb_onnx.shape)
+    print(emb_onnx[0]@ emb_onnx[1].T)
+        

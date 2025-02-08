@@ -33,6 +33,9 @@ class AbsEmbedderDataArguments(AbsDataArguments):
 
 
     def __post_init__(self):
+        if not isinstance(self.train_data, list):
+            self.train_data = self.train_data.split()
+            
         for train_dir in self.train_data:
             if not os.path.exists(train_dir):
                 raise FileNotFoundError(f"cannot find file: {train_dir}, please set a true path")
