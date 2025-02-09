@@ -459,8 +459,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         providers = ['CUDAExecutionProvider', "CPUExecutionProvider"]
         if self.config['infer_device'] == 'cpu':
             providers = ["CPUExecutionProvider"]
-        elif isinstance(self.config['infer_device'], int):
-            providers = ["CPUExecutionProvider", ("CUDAExecutionProvider", {"device_id": self.config['infer_device']})]
+
             
         onnx_model_path = self.config["onnx_model_path"]
         return ort.InferenceSession(onnx_model_path, providers=providers)
@@ -594,7 +593,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         for idx in trange(0, len(inputs), batch_size, desc='Batch Inference'):
             batch_inputs=inputs[idx: idx+batch_size]
             
-            encoded_inputs= tokenizer(batch_inputs, return_tensors="np", padding=True, truncation=True, max_length=512)
+            encoded_inputs= tokenizer(batch_inputs, return_tensors="np", padding='max_length', truncation=True, max_length=512)
             inputs_feed={
                 'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
                 'attention_mask':encoded_inputs['attention_mask'],
@@ -673,6 +672,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         
         return cls_emb
 
+
     def _inference_normal(self, inputs,batch_size = None, encode_query = False, *args, **kwargs):
         if not batch_size:
             batch_size = self.batch_size
@@ -699,15 +699,12 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
 
 if __name__=='__main__':
     from Nexus import AbsInferenceArguments, BaseEmbedderInferenceEngine
-
-
-    # trt path is path to TensorRT you have downloaded.
-    trt_path='/root/TensorRT-10.7.0.23'
-
     model_path='/root/models/bge-base-zh-v1.5'
-    trt_model_path ='/root/models/bge-base-zh-v1.5/trt/model_fp16.trt'
-    onnx_model_path='/root/models/bge-base-zh-v1.5/onnx/model.onnx'
+    onnx_model_path='/root/models/bge-base-zh-v1.5/onnx/model_fp16.onnx'
 
+    BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=onnx_model_path, use_fp16=True, opset_version=17)
+
+    # 2. Inference with onnx session
     sentences = [
         "The quick brown fox jumps over the lazy dog.",
         "Artificial intelligence is transforming the world.",
@@ -724,18 +721,12 @@ if __name__=='__main__':
     args=AbsInferenceArguments(
         model_name_or_path=model_path,
         onnx_model_path=onnx_model_path,
-        trt_model_path=trt_model_path,
-        infer_mode='tensorrt',
-        infer_device=7,
-        infer_batch_size=48
+        trt_model_path=None,
+        infer_mode='onnx',
+        infer_device=0,
+        infer_batch_size=16
     )
-
-    BaseEmbedderInferenceEngine.convert_to_tensorrt(args.onnx_model_path, args.trt_model_path, args.infer_batch_size, trt_path=trt_path)
-
-    inference_engine_tensorrt=BaseEmbedderInferenceEngine(args)
-
-
-    emb_trt=inference_engine_tensorrt.inference(sentences, normalize=True, batch_size=5)
-    print(emb_trt.shape)
-    print(emb_trt[0]@ emb_trt[1].T)
-        
+    inference_engine_onnx = BaseEmbedderInferenceEngine(args)
+    emb_onnx = inference_engine_onnx.inference(sentences, normalize=True, batch_size=5)
+    print(emb_onnx.shape)
+    print(emb_onnx[0]@ emb_onnx[1].T)

@@ -1,8 +1,8 @@
 export HF_ENDPOINT="https://hf-mirror.com"
 BASE_DIR=/data1/home/recstudio/angqing/InfoNexus
 DATASET_DIR=/root/datasets/test_datasets/fiqa
-EMBEDDER=/data1/home/recstudio/angqing/models/bge-base-zh-v1.5
-RERANKER=/data1/home/recstudio/angqing/models/bge-reranker-base
+EMBEDDER=/root/models/bge-base-zh-v1.5
+RERANKER=/root/models/bge-reranker-base
 embedder_infer_mode=normal
 reranker_infer_mode=normal
 embedder_onnx_path=$EMBEDDER/onnx/model_fp16.onnx

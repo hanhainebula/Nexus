@@ -9,8 +9,8 @@ from Nexus.evaluation.text_retrieval.arguments import load_config
 
 def main():
 
-    eval_config_path='/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/evaluation/eval_config.json'
-    model_config_path='/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/evaluation/model_config.json'
+    eval_config_path='/root/Nexus/examples/text_retrieval/evaluation/eval_config.json'
+    model_config_path='/root/Nexus/examples/text_retrieval/evaluation/model_config.json'
     
     eval_args = load_config(eval_config_path, AIRBenchEvalArgs)
     model_args = load_config(model_config_path, AIRBenchEvalModelArgs)
