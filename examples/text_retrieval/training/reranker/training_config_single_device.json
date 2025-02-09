@@ -1,5 +1,5 @@
 {
-    "output_dir": "/data1/home/recstudio/haoran/angqing_temp/ckpt/test_reranker_accelerate",
+    "output_dir": "/root/models/reranker_ckpt",
     "overwrite_output_dir": true,
     "learning_rate": 6e-5,
     "fp16": true,

@@ -699,12 +699,15 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
 
 if __name__=='__main__':
     from Nexus import AbsInferenceArguments, BaseEmbedderInferenceEngine
-    model_path='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5'
-    onnx_model_path='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5/onnx/model_fp16.onnx'
 
-    # BaseEmbedderInferenceEngine.convert_to_onnx(model_name_or_path=model_path, onnx_model_path=onnx_model_path, use_fp16=True)
 
-    # 2. Inference with onnx session
+    # trt path is path to TensorRT you have downloaded.
+    trt_path='/root/TensorRT-10.7.0.23'
+
+    model_path='/root/models/bge-base-zh-v1.5'
+    trt_model_path ='/root/models/bge-base-zh-v1.5/trt/model_fp16.trt'
+    onnx_model_path='/root/models/bge-base-zh-v1.5/onnx/model.onnx'
+
     sentences = [
         "The quick brown fox jumps over the lazy dog.",
         "Artificial intelligence is transforming the world.",
@@ -721,13 +724,18 @@ if __name__=='__main__':
     args=AbsInferenceArguments(
         model_name_or_path=model_path,
         onnx_model_path=onnx_model_path,
-        trt_model_path=None,
-        infer_mode='onnx',
-        infer_device=0,
-        infer_batch_size=16
+        trt_model_path=trt_model_path,
+        infer_mode='tensorrt',
+        infer_device=7,
+        infer_batch_size=48
     )
-    inference_engine_onnx = BaseEmbedderInferenceEngine(args)
-    emb_onnx = inference_engine_onnx.inference(sentences, normalize=True, batch_size=5)
-    print(emb_onnx.shape)
-    print(emb_onnx[0]@ emb_onnx[1].T)
+
+    BaseEmbedderInferenceEngine.convert_to_tensorrt(args.onnx_model_path, args.trt_model_path, args.infer_batch_size, trt_path=trt_path)
+
+    inference_engine_tensorrt=BaseEmbedderInferenceEngine(args)
+
+
+    emb_trt=inference_engine_tensorrt.inference(sentences, normalize=True, batch_size=5)
+    print(emb_trt.shape)
+    print(emb_trt[0]@ emb_trt[1].T)
         

@@ -4,10 +4,10 @@ ONNX_PATH='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5/onnx/model.onnx
 TRT_SAVE_PATH='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5/trt/model.trt' # tensorrt model path, dirpath should be created early
 
 # your tensorrt path here
-TRT_PATH='/data1/home/recstudio/angqing/tensorrt/TensorRT-10.7.0.23'
+TRT_PATH='/root/TensorRT-10.7.0.23'
 
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$TRT_PATH/lib
-export PATH=$PATH:$TRT_PATH/bin
+export LD_LIBRARY_PATH=$TRT_PATH/lib:$LD_LIBRARY_PATH
+export PATH=$TRT_PATH/bin:$PATH
 
 
 # Convert ONNX to TensorRT with dynamic shapes

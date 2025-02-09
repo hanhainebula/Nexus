@@ -1,5 +1,5 @@
 {
-    "output_dir": "/root/models/embedder_ckpt_multi_node",
+    "output_dir": "/root/models/embedder_ckpt_single_device",
     "overwrite_output_dir": true,
     "learning_rate": 1e-5,
     "fp16": true,
@@ -8,9 +8,8 @@
     "dataloader_drop_last": true,
     "warmup_ratio": 0.1,
     "gradient_checkpointing": true,
-    "deepspeed": "/root/Nexus/examples/text_retrieval/training/ds_stage0.json",
     "logging_steps": 10,
-    "save_steps": 1000,
+    "save_steps": 500,
     "negatives_cross_device": false,
     "temperature": 0.02,
     "sentence_pooling_method": "cls",

@@ -634,33 +634,19 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
 
 if __name__=='__main__':
-    # from . import FlagReranker
-    # model_name_or_path='/data2/OpenLLMs/bge-reranker-base'
-    # model=FlagReranker(
-    #     model_name_or_path,use_fp16=True,devices=['cuda:1','cuda:0'], normalize=True)
-    
-    # qa=['what is love?','love is ...']
-    # print(model.compute_score(qa),)
-    
-    model_path='/data2/OpenLLMs/bge-reranker-base'
-    args=AbsInferenceArguments(
-        model_name_or_path=model_path,
-        onnx_model_path='/data2/OpenLLMs/bge-reranker-base/onnx/model.onnx',
-        trt_model_path='/data2/OpenLLMs/bge-reranker-base/trt/model.trt',
-        infer_mode='normal',
-        infer_device='cuda:0',
-        infer_batch_size=16
-    )
-    
-    
-    # 1. test conver_to_onnx
-    # BaseRerankerInferenceEngine.convert_to_onnx(args.model_name_or_path, args.onnx_model_path)
-    
-    
+    from Nexus import AbsInferenceArguments, BaseRerankerInferenceEngine
+
+    # trt path is path to TensorRT you have downloaded.
+    trt_path='/root/TensorRT-10.7.0.23'
+
+    model_path='/root/models/bge-reranker-base'
+    trt_model_path ='/root/models/bge-reranker-base/trt/model_fp16.trt'
+    onnx_model_path='/root/models/bge-reranker-base/onnx/model.onnx'
+
     qa_pairs = [
         ("What is the capital of France?", "Paris is the capital and most populous city of France."),
-        ("Who wrote 'Pride and Prejudice'?", "'Pride and Prejudice' was written by Jane Austen."),
-        ("What is the largest planet in our solar system?", "Jupiter is the largest planet in our solar system."),
+        ("Who wrote 'Pride and Prejudice'?","Edison wrote this." ),
+        ("What is the largest planet in our solar system?", "May be our mother land."),
         ("Who is the current president of the United States?", "The current president of the United States is Joe Biden."),
         ("What is the chemical symbol for water?", "The chemical symbol for water is H2O."),
         ("What is the speed of light?", "The speed of light is approximately 299,792 kilometers per second."),
@@ -669,26 +655,19 @@ if __name__=='__main__':
         ("What is the smallest country in the world?", "Vatican City is the smallest country in the world."),
         ("Who discovered penicillin?", "Penicillin was discovered by Alexander Fleming.")
     ]
-    qa_pairs=("What is the capital of France?", "Paris is the capital and most populous city of France.")
-    # 2. test normal session
-    # args.infer_mode='normal'
-    # inference_engine=BaseRerankerInferenceEngine(args)
-    # score_normal=inference_engine.inference(qa_pairs, batch_size=5)
-    # print(score_normal)
-    
-    # # 3. test onnx session
-    
-    # args.infer_mode='onnx'
-    # inference_engine_onnx=BaseRerankerInferenceEngine(args)
-    # score_onnx=inference_engine_onnx.inference(qa_pairs, normalize=True, batch_size=5)
-    # print(score_onnx)
-    
-    # 4. test tensorrt session
-    args.infer_mode='tensorrt'
-    inference_engine_tensorrt=BaseRerankerInferenceEngine(args)
-    score_trt=inference_engine_tensorrt.inference(qa_pairs, normalize=True, batch_size=5)
-    print(score_trt)
-    
-    pdb.set_trace()
-    cuda.Context.pop()
-    
+
+    args=AbsInferenceArguments(
+        model_name_or_path=model_path,
+        onnx_model_path=onnx_model_path,
+        trt_model_path=trt_model_path,
+        infer_mode='tensorrt',
+        infer_device=0,
+        infer_batch_size=48
+    )
+
+    # BaseRerankerInferenceEngine.convert_to_tensorrt(args.onnx_model_path, args.trt_model_path, args.infer_batch_size, trt_path)
+
+    inference_engine_tensorrt = BaseRerankerInferenceEngine(args)
+
+    score = inference_engine_tensorrt.inference(qa_pairs, normalize=True, batch_size=5)
+    print(score)
