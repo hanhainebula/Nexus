@@ -5,7 +5,7 @@ output_topk: 50
 infer_device: 0
 retrieve_index_config:
 
-  gen_item_index: False
+  gen_item_index: True
   item_index_path: /data1/home/recstudio/haoran/Nexus/saves/recommender_results/mlp_retriever/faiss_item_ivf2.index
   item_ids_path: /data1/home/recstudio/haoran/Nexus/saves/recommender_results/mlp_retriever/item_ids.npy
   retrieve_mode: 'u2i'
@@ -16,7 +16,8 @@ retrieve_index_config:
   i2i_redis_port: 6379
   i2i_redis_db: 4
 
+infer_mode: normal
 # infer_mode: ort
-infer_mode: trt
+# infer_mode: trt
 retrieval_mode: u2i
 infer_batch_size: 128

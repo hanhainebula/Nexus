@@ -5,5 +5,6 @@ output_topk: 6
 infer_batch_size: 128
 num_candidates: 50
 infer_device: 0
+infer_mode: normal
 # infer_mode: ort
-infer_mode: trt
+# infer_mode: trt

@@ -149,7 +149,6 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         for key in feed_dict:
             feed_dict[key] = np.array(feed_dict[key])
         
-        print("feed_dict:", feed_dict)
         if self.config['retrieval_mode'] == 'u2i':
             if self.config['infer_mode'] == 'normal':
                 self.model.to(self.config['infer_device'])
@@ -158,10 +157,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                         batch_user_context_dict[key] = {sub_key: torch.tensor(sub_value).to(self.config['infer_device']) for sub_key, sub_value in value.items()}
                     else:
                         batch_user_context_dict[key] = torch.tensor(value).to(self.config['infer_device'])
-
-                batch_candidates_dict = {key.replace('candidates_', ''): torch.tensor(value).to(self.config['infer_device']) for key, value in batch_candidates_dict.items()}
-                self.model.model_config.topk = self.config['output_topk']
-                batch_outputs_idx = self.model.predict(batch_user_context_dict, batch_candidates_dict).to('cpu')
+                batch_user_embedding = self.model.encode_query(batch_user_context_dict)
                 
             elif self.config['infer_mode'] == 'ort':
                 batch_user_embedding = self.ort_session.run(
@@ -171,7 +167,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             elif self.config['infer_mode'] == 'trt':
                 batch_user_embedding = self.infer_with_trt(feed_dict)
 
-            user_embedding_np = batch_user_embedding[:batch_infer_df.shape[0]]
+            user_embedding_np = batch_user_embedding[:batch_infer_df.shape[0]].to('cpu')
             # user_embedding_noise = np.random.normal(loc=0.0, scale=0.01, size=user_embedding_np.shape)
             # user_embedding_np = user_embedding_np + user_embedding_noise
             D, I = self.item_index.search(user_embedding_np, self.config['output_topk'])
@@ -183,7 +179,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         # print(batch_outputs.shape)
         batch_ed_time = time.time()
         # print(f'batch time: {batch_ed_time - batch_st_time}s')
-      
+
         if self.config['retrieval_mode'] == 'u2i':
             return self.item_ids_table[batch_outputs]
         else:
@@ -337,16 +333,26 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                                 cur_dict[field].append(cur_list)
                         
                         del user_context_dict[feat_name]
-                        for field in feat_fields:
-                            user_context_dict[feat_name + '_' + field] = cur_dict[field]
+                        if self.config['infer_mode'] == 'normal':
+                            user_context_dict[feat_name] = {}
+                            for field in feat_fields:
+                                user_context_dict[feat_name][field] = cur_dict[field]
+                        else:
+                            for field in feat_fields:
+                                user_context_dict[feat_name + '_' + field] = cur_dict[field]
                     else:
                         for proto in user_context_dict[feat_name]:
                             for field in feat_fields:
                                 cur_dict[field].append(getattr(proto, field))
                         
                         del user_context_dict[feat_name]
-                        for field in feat_fields:
-                            user_context_dict[feat_name + '_' + field] = cur_dict[field]
+                        if self.config['infer_mode'] == 'normal':
+                            user_context_dict[feat_name] = {}
+                            for field in feat_fields:
+                                user_context_dict[feat_name][field] = cur_dict[field]
+                        else:
+                            for field in feat_fields:
+                                user_context_dict[feat_name + '_' + field] = cur_dict[field]
         
         return user_context_dict
     

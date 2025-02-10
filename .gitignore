@@ -3,6 +3,8 @@ __pycache__/
 *old.py
 *old.json
 *old.ipynb
+*old.ipynb
+
 recommender_results/
 */recommender_results/
 Nexus.egg-info/
@@ -17,3 +19,6 @@ saves/
 checkpoints/
 eval_scripts/
 note
+
+nexus_test/
+nexus_test*

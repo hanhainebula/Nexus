@@ -6,13 +6,12 @@ BASE_DIR='/data1/home/recstudio/haoran/Nexus'
 MODEL_NAME_OR_PATH='/data1/home/recstudio/angqing/models/bge-base-zh-v1.5'
 TRAIN_DATA='/data1/home/recstudio/haoran/angqing_temp/data/fiqa.jsonl'
 CKPT_SAVE_DIR='/data1/home/recstudio/haoran/angqing_temp/ckpt/test_embedder_accelerate'
-DEEPSPEED_DIR='/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/training/ds_stage0.json'
-ACCELERATE_CONFIG='/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/training/single_node_multi_device.json'
+ACCELERATE_CONFIG='/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/training/single_node_single_device.json'
 # set large epochs and small batch size for testing
 num_train_epochs=1
 per_device_train_batch_size=8
 # set num_gpus to 2 for testing
-num_gpus=2
+num_gpus=1
 
 if [ -z "$HF_HUB_CACHE" ]; then
     export HF_HUB_CACHE="$HOME/.cache/huggingface/hub"
@@ -45,10 +44,8 @@ training_args="\
     --dataloader_drop_last True \
     --warmup_ratio 0.1 \
     --gradient_checkpointing \
-    --deepspeed $DEEPSPEED_DIR \
     --logging_steps 10 \
     --save_steps 500 \
-    --negatives_cross_device \
     --temperature 0.02 \
     --sentence_pooling_method cls \
     --normalize_embeddings True \
