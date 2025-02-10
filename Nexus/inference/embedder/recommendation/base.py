@@ -157,7 +157,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                         batch_user_context_dict[key] = {sub_key: torch.tensor(sub_value).to(self.config['infer_device']) for sub_key, sub_value in value.items()}
                     else:
                         batch_user_context_dict[key] = torch.tensor(value).to(self.config['infer_device'])
-                batch_user_embedding = self.model.encode_query(batch_user_context_dict)
+                batch_user_embedding = self.model.encode_query(batch_user_context_dict).to('cpu')
                 
             elif self.config['infer_mode'] == 'ort':
                 batch_user_embedding = self.ort_session.run(
@@ -167,7 +167,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             elif self.config['infer_mode'] == 'trt':
                 batch_user_embedding = self.infer_with_trt(feed_dict)
 
-            user_embedding_np = batch_user_embedding[:batch_infer_df.shape[0]].to('cpu')
+            user_embedding_np = batch_user_embedding[:batch_infer_df.shape[0]]
             # user_embedding_noise = np.random.normal(loc=0.0, scale=0.01, size=user_embedding_np.shape)
             # user_embedding_np = user_embedding_np + user_embedding_noise
             D, I = self.item_index.search(user_embedding_np, self.config['output_topk'])
