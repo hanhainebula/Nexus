@@ -102,11 +102,14 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             self.feature_config['context_features'].append(self.model_ckpt_config['data_config']['seq_features'])
                 
         # load model session
-        self.convert_to_onnx()
+        if config['infer_mode'] == 'normal':
+            self.model = self.load_model(config['model_ckpt_path'])
         if config['infer_mode'] == 'ort':
+            self.convert_to_onnx()
             self.ort_session = self.get_ort_session()
             print(f'Session is using : {self.ort_session.get_providers()}')
         if config['infer_mode'] == 'trt':
+            self.convert_to_onnx()
             # pdb.set_trace()
             self.engine = self.get_trt_session()    
             
@@ -124,7 +127,6 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
         # get user_context features 
         batch_user_context_dict = self.get_user_context_features(batch_infer_df)
-        
         # get candidates features
         batch_candidates_dict = self.get_candidates_features(batch_candidates_df)
         # TODO: Cross Features
@@ -136,7 +138,18 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         for key in feed_dict:
             feed_dict[key] = np.array(feed_dict[key])
             
-        if self.config['infer_mode'] == 'ort':
+        if self.config['infer_mode'] == 'normal':
+            self.model.to(self.config['infer_device'])
+            for key, value in batch_user_context_dict.items():
+                if isinstance(value, dict):
+                    batch_user_context_dict[key] = {sub_key: torch.tensor(sub_value).to(self.config['infer_device']) for sub_key, sub_value in value.items()}
+                else:
+                    batch_user_context_dict[key] = torch.tensor(value).to(self.config['infer_device'])
+
+            batch_candidates_dict = {key.replace('candidates_', ''): torch.tensor(value).to(self.config['infer_device']) for key, value in batch_candidates_dict.items()}
+            self.model.model_config.topk = self.config['output_topk']
+            batch_outputs_idx = self.model.predict(batch_user_context_dict, batch_candidates_dict).to('cpu')
+        elif self.config['infer_mode'] == 'ort':
             batch_outputs_idx = self.ort_session.run(
                 output_names=["output"],
                 input_feed=feed_dict
@@ -156,6 +169,8 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         batch_ed_time = time.time()
         # print(f'batch time: {batch_ed_time - batch_st_time}s')
         return batch_outputs
+
+    
     
     def get_candidates_features(self, batch_candidates_df:pd.DataFrame):
         '''
@@ -288,10 +303,12 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             context_features, 
             [self.feature_cache_config['features'][feat] for feat in context_features])
         
+        
         # expand features with nested keys
         for feat in self.feature_config['context_features']:
             if isinstance(feat, dict):
                 for feat_name, feat_fields in feat.items():
+                    # print("feat_fields:",feat_fields)
                     if isinstance(user_context_dict[feat_name][0], Iterable):
                         cur_dict = defaultdict(list) 
                         # the case is for sequence features 
@@ -301,8 +318,13 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                                 cur_dict[field].append(cur_list)
                         
                         del user_context_dict[feat_name]
-                        for field in feat_fields:
-                            user_context_dict[feat_name + '_' + field] = cur_dict[field]
+                        if self.config['infer_mode'] == 'normal':
+                            user_context_dict[feat_name] = {}
+                            for field in feat_fields:
+                                user_context_dict[feat_name][field] = cur_dict[field]
+                        else:
+                            for field in feat_fields:
+                                user_context_dict[feat_name + '_' + field] = cur_dict[field]
                     else:
                         cur_dict = {}
                         for proto in user_context_dict[feat_name]:
@@ -310,8 +332,13 @@ class BaseRerankerInferenceEngine(InferenceEngine):
                                 cur_dict[field].append(getattr(proto, field))
                         
                         del user_context_dict[feat_name]
-                        for field in feat_fields:
-                            user_context_dict[feat_name + '_' + field] = cur_dict[field]
+                        if self.config['infer_mode'] == 'normal':
+                            user_context_dict[feat_name] = {}
+                            for field in feat_fields:
+                                user_context_dict[feat_name][field] = cur_dict[field]
+                        else:
+                            for field in feat_fields:
+                                user_context_dict[feat_name + '_' + field] = cur_dict[field]
         
         return user_context_dict
     
@@ -489,3 +516,10 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         
         return output_buffers['output'][0]
     
+    def load_model(self, model_path) -> BaseRanker:
+        retriever = None
+        retriever = BaseRanker.from_pretrained(model_path)
+        checkpoint = torch.load(os.path.join(model_path, 'model.pt'), map_location=torch.device('cpu'), weights_only=True)
+        retriever.load_state_dict(checkpoint)
+        retriever.eval()
+        return retriever
