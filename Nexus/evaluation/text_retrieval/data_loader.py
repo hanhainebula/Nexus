@@ -41,7 +41,7 @@ class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
         """
         Returns: List[str]: Available dataset names.
         """
-        return []
+        return ['fiqa']
 
     def available_splits(self, dataset_name: Optional[str] = None) -> List[str]:
         """

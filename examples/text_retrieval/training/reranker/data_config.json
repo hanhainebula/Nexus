@@ -1,5 +1,5 @@
 {
-    "train_data": "/data1/home/recstudio/haoran/angqing_temp/data/fiqa_1000.jsonl",
+    "train_data": "/root/datasets/msmarco_hn_train.jsonl",
     "cache_path": "~/.cache",
     "train_group_size": 8,
     "query_max_len": 256,

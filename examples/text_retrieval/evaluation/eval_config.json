@@ -8,5 +8,5 @@
     "search_top_k": 1000,
     "rerank_top_k": 20,
     "cache_dir": "./cache/data",
-    "overwrite": false
+    "overwrite": true
 }

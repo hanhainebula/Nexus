@@ -1,3 +1,10 @@
+import torch.distributed as dist
+
+dist.init_process_group("nccl")  # 确保分布式环境已初始化
+world_size = dist.get_world_size()
+print(f"World size: {world_size}")
+
+
 from Nexus.training.reranker.recommendation.runner import RankerRunner
 from Nexus.training.reranker.recommendation.modeling import MLPRanker
 

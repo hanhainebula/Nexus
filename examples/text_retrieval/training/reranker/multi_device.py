@@ -1,7 +1,7 @@
 from transformers import HfArgumentParser
 
 from Nexus.training.reranker.text_retrieval import *
-
+import time
 
 def main():
     data_config_path='/root/Nexus/examples/text_retrieval/training/reranker/data_config.json'
@@ -17,7 +17,11 @@ def main():
         data_args=data_args,
         training_args=training_args
     )
+    start = time.time()
     runner.run()
+    end = time.time()
+    elapsed_time = end-start
+    print(f"程序运行耗时: {elapsed_time:.4f} 秒")
 
 if __name__ == "__main__":
     main()
