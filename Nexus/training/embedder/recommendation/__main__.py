@@ -3,9 +3,8 @@ from Nexus.training.embedder.recommendation.modeling import MLPRetriever, BaseRe
 from Nexus.modules.query_encoder import MLPQueryEncoder
 from Nexus.modules.item_encoder import MLPItemEncoder
 from Nexus.modules.sampler import UniformSampler, RetrieverSampler, MaskedUniformSampler, PopularSampler, MIDXUniformSampler, MIDXPopSampler, ClusterUniformSampler, ClusterPopSampler, LSHSampler
-from Nexus.modules.score import InnerProductScorer, CosineScorer
+from Nexus.modules.score import InnerProductScorer
 from Nexus.modules.loss import BPRLoss
-from Nexus.evaluation.recommendation import RecommenderEvalModelArgs
 import os
 import numpy as np
 import torch

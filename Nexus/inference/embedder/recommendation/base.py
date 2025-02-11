@@ -91,20 +91,24 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             self.feature_config['context_features'].append(self.model_ckpt_config['data_config']['seq_features'])
         
         # load model session
-        self.convert_to_onnx()
+        if config['infer_mode'] == 'normal':
+            self.model = self.load_model(config['model_ckpt_path'])
         if config['infer_mode'] == 'ort':
+            self.convert_to_onnx()
             self.ort_session = self.get_ort_session()
             print(f'Session is using : {self.ort_session.get_providers()}')
         if config['infer_mode'] == 'trt':
+            self.convert_to_onnx()
             self.engine = self.get_trt_session()    
+        
             
         self.retrieve_index_config = config['retrieve_index_config']
 
         if config['stage'] == 'retrieve':
             if self.retrieve_index_config.get('gen_item_index', True):
                 gen_item_index(os.path.join(config['model_ckpt_path'], 'item_vectors.pt'), 
-                               self.retrieve_index_config['item_index_path'],
-                               self.retrieve_index_config['item_ids_path'])
+                            self.retrieve_index_config['item_index_path'],
+                            self.retrieve_index_config['item_ids_path'])
             if config['retrieval_mode'] == 'u2i':
                 self.item_index = faiss.read_index(self.retrieve_index_config['item_index_path'])
                 self.item_index.nprobe = self.retrieve_index_config['nprobe']
@@ -112,11 +116,11 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             elif config['retrieval_mode'] == 'i2i':
                 if self.retrieve_index_config.get('gen_i2i_index', True):
                     gen_i2i_index(config['output_topk'],
-                                  config['model_ckpt_path'], 
-                                  self.retrieve_index_config['i2i_redis_host'],
-                                  self.retrieve_index_config['i2i_redis_port'],
-                                  self.retrieve_index_config['i2i_redis_db'],
-                                  item_index_path=self.retrieve_index_config['item_index_path'])
+                                config['model_ckpt_path'], 
+                                self.retrieve_index_config['i2i_redis_host'],
+                                self.retrieve_index_config['i2i_redis_port'],
+                                self.retrieve_index_config['i2i_redis_db'],
+                                item_index_path=self.retrieve_index_config['item_index_path'])
                 self.i2i_redis_client = redis.Redis(host=self.retrieve_index_config['i2i_redis_host'], 
                                     port=self.retrieve_index_config['i2i_redis_port'], 
                                     db=self.retrieve_index_config['i2i_redis_db'],
@@ -144,9 +148,18 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         feed_dict.update(batch_user_context_dict)
         for key in feed_dict:
             feed_dict[key] = np.array(feed_dict[key])
-
+        
         if self.config['retrieval_mode'] == 'u2i':
-            if self.config['infer_mode'] == 'ort':
+            if self.config['infer_mode'] == 'normal':
+                self.model.to(self.config['infer_device'])
+                for key, value in batch_user_context_dict.items():
+                    if isinstance(value, dict):
+                        batch_user_context_dict[key] = {sub_key: torch.tensor(sub_value).to(self.config['infer_device']) for sub_key, sub_value in value.items()}
+                    else:
+                        batch_user_context_dict[key] = torch.tensor(value).to(self.config['infer_device'])
+                batch_user_embedding = self.model.encode_query(batch_user_context_dict).to('cpu')
+                
+            elif self.config['infer_mode'] == 'ort':
                 batch_user_embedding = self.ort_session.run(
                     output_names=["output"],
                     input_feed=feed_dict
@@ -166,7 +179,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         # print(batch_outputs.shape)
         batch_ed_time = time.time()
         # print(f'batch time: {batch_ed_time - batch_st_time}s')
-      
+
         if self.config['retrieval_mode'] == 'u2i':
             return self.item_ids_table[batch_outputs]
         else:
@@ -257,7 +270,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                     for sub_feat in sub_feat_list:
                         if feat_name in self.feature_config['seq_features']:
                             sub_context_input[sub_feat] = torch.randint(self.feature_config['stats'][sub_feat], 
-                                                                         (5, self.feature_config['seq_lengths'][feat_name]))
+                                                                        (5, self.feature_config['seq_lengths'][feat_name]))
                         else:
                             sub_context_input[sub_feat] = torch.randint(self.feature_config['stats'][sub_feat], (5,))
                         input_names.append(feat_name + '_' + sub_feat)
@@ -320,16 +333,26 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
                                 cur_dict[field].append(cur_list)
                         
                         del user_context_dict[feat_name]
-                        for field in feat_fields:
-                            user_context_dict[feat_name + '_' + field] = cur_dict[field]
+                        if self.config['infer_mode'] == 'normal':
+                            user_context_dict[feat_name] = {}
+                            for field in feat_fields:
+                                user_context_dict[feat_name][field] = cur_dict[field]
+                        else:
+                            for field in feat_fields:
+                                user_context_dict[feat_name + '_' + field] = cur_dict[field]
                     else:
                         for proto in user_context_dict[feat_name]:
                             for field in feat_fields:
                                 cur_dict[field].append(getattr(proto, field))
                         
                         del user_context_dict[feat_name]
-                        for field in feat_fields:
-                            user_context_dict[feat_name + '_' + field] = cur_dict[field]
+                        if self.config['infer_mode'] == 'normal':
+                            user_context_dict[feat_name] = {}
+                            for field in feat_fields:
+                                user_context_dict[feat_name][field] = cur_dict[field]
+                        else:
+                            for field in feat_fields:
+                                user_context_dict[feat_name + '_' + field] = cur_dict[field]
         
         return user_context_dict
     
@@ -462,3 +485,10 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             return serialized_engine
         
     
+    def load_model(self, model_path) -> BaseRetriever:
+        retriever = None
+        retriever = BaseRetriever.from_pretrained(model_path)
+        checkpoint = torch.load(os.path.join(model_path, 'model.pt'), map_location=torch.device('cpu'), weights_only=True)
+        retriever.load_state_dict(checkpoint)
+        retriever.eval()
+        return retriever
