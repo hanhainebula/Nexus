@@ -42,7 +42,7 @@ class BaseClient(object):
     
     def list_dir(self) -> list[str]:
         """List all files and directories in the given directory."""
-        return os.listdir(self.url)
+        return sorted(os.listdir(self.url))
     
     def get_train_eval_filenames(
             self, 
@@ -87,7 +87,7 @@ class HDFSClient(BaseClient):
     def list_dir(self) -> list[str]:
         """List all files and directories in the given directory."""
         fs = fsspec.filesystem('hdfs')
-        return [os.path.basename(file) for file in fs.ls(self.url)]
+        return sorted([os.path.basename(file) for file in fs.ls(self.url)])
     
 CLIENT_MAP = {
     'file': BaseClient,
