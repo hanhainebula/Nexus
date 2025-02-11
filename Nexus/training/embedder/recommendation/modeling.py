@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import os
 import json
+from collections import OrderedDict
 from typing import Dict, Union, Tuple
 import torch
 from torch.utils.data import DataLoader
@@ -16,6 +17,13 @@ from Nexus.modules.sampler import UniformSampler, Sampler
 from Nexus.modules.score import InnerProductScorer
 from Nexus.modules.loss import BPRLoss
 from Nexus.modules.arguments import get_model_cls
+
+from Nexus.modules import (
+    MLPModule,
+    SASRecEncoder,
+    MultiFeatEmbedding,
+    BinaryCrossEntropyLoss
+)
 
 @dataclass
 class RetrieverModelOutput(EmbedderOutput):
@@ -312,3 +320,84 @@ class MLPRetriever(BaseRetriever):
     
     def encode_info(self, *args, **kwargs):
         return super().encode_info(*args, **kwargs)
+
+class DSSMRetriever(BaseRetriever):
+    def __init__(self, data_config, model_config, item_loader=None, *args, **kwargs):
+        super().__init__(data_config, model_config, item_loader=item_loader, *args, **kwargs)
+    
+    def get_item_encoder(self):
+        return MLPItemEncoder(self.data_config, self.model_config)
+    
+    def get_query_encoder(self):
+        return MLPQueryEncoder(self.data_config, self.model_config, self.item_encoder)
+    
+    def get_loss_function(self):
+        return BPRLoss()
+    
+    def get_negative_sampler(self):
+        return UniformSampler(num_items=self.data_config.num_items)
+    
+    def get_score_function(self):
+        return InnerProductScorer()
+
+    def encode_info(self, *args, **kwargs):
+        return super().encode_info(*args, **kwargs)
+    
+class SASRecRetriever(BaseRetriever):
+    def __init__(self, data_config, model_config, item_loader=None, *args, **kwargs):
+        super().__init__(data_config=data_config, model_config=model_config, item_loader=item_loader, *args, **kwargs)
+
+    def get_item_encoder(self):
+        item_embedding = MultiFeatEmbedding(
+            features=self.data_config.item_features,
+            stats=self.data_config.stats,
+            embedding_dim=self.model_config.embedding_dim,
+            concat_embeddings=True
+        )
+        return item_embedding
+    
+
+    def get_query_encoder(self):
+        context_emb = MultiFeatEmbedding(
+            features=self.data_config.context_features,
+            stats=self.data_config.stats,
+            embedding_dim=self.model_config.embedding_dim
+        )
+        encoder = SASRecEncoder(
+            context_embedding=context_emb,
+            item_encoder=self.item_encoder,
+            max_seq_lengths = self.data_config.seq_lengths,
+            embedding_dim=self.item_encoder.total_embedding_dim,
+            n_layers=self.model_config.n_layers,
+            n_heads=self.model_config.n_heads,
+            hidden_size=self.model_config.hidden_size,
+            dropout=self.model_config.dropout,
+            activation=self.model_config.activation
+        )
+        num_seqs = len(self.data_config.seq_lengths)
+        output_dim = self.item_encoder.total_embedding_dim * num_seqs + context_emb.total_embedding_dim
+        mlp = MLPModule(
+            mlp_layers= [output_dim] + self.model_config.mlp_layers + [self.item_encoder.total_embedding_dim],
+            activation_func=self.model_config.activation,
+            dropout=self.model_config.dropout,
+            bias=True,
+            batch_norm=self.model_config.batch_norm,
+            last_activation=False,
+            last_bn=False
+        )
+        return torch.nn.Sequential(OrderedDict([
+            ("encoder", encoder),
+            ("mlp", mlp)
+        ]))
+    
+
+    def get_score_function(self):
+        return InnerProductScorer()
+    
+    
+    def get_loss_function(self):
+        return BinaryCrossEntropyLoss()
+
+    
+    def get_negative_sampler(self):
+        return UniformSampler(num_items=self.data_config.num_items)

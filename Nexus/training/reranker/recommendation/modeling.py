@@ -10,6 +10,8 @@ from Nexus.modules import MLPModule, LambdaModule, MultiFeatEmbedding, AverageAg
 from Nexus.modules.arguments import get_model_cls, get_modules, split_batch
 from loguru import logger
 
+from Nexus.modules import AverageAggregator, LambdaModule, MLPModule, HStackModule, CrossNetwork, MultiExperts
+
 class BaseRanker(AbsRerankerModel):
     def __init__(
             self, 
@@ -368,3 +370,131 @@ class MyMLPRanker(MLPRanker):
         topk_score, topk_idx = torch.topk(scores, self.topk)
         return topk_idx
     
+
+class DCNv2Ranker(BaseRanker):
+    def get_sequence_encoder(self):
+        encoder_dict = torch.nn.ModuleDict({
+            name: AverageAggregator(dim=1)
+            for name in self.data_config.seq_features
+        })
+        return encoder_dict
+        
+    
+    def get_feature_interaction_layer(self):
+        flatten_layer = LambdaModule(lambda x: x.flatten(start_dim=1))  # [B, N, D] -> [B, N*D]
+        cross_net = CrossNetwork(
+            input_dim=self.num_feat * self.model_config.embedding_dim,
+            n_layers=self.model_config.cross_net_layers,
+        )
+        deep_net = MLPModule(
+            mlp_layers= [self.num_feat * self.model_config.embedding_dim] + self.model_config.mlp_layers,
+            activation_func=self.model_config.activation,
+            dropout=self.model_config.dropout,
+            bias=True,
+            batch_norm=self.model_config.batch_norm,
+            last_activation=True,
+            last_bn=False
+        )
+        if self.model_config.deep_cross_combination == "stacked":
+            layer = torch.nn.Sequential(cross_net, deep_net)
+        else:
+            layer = HStackModule(
+                modules=[cross_net, deep_net], 
+                aggregate_function=lambda x: torch.cat(x, dim=-1)
+            )
+        return torch.nn.Sequential(flatten_layer, layer)
+    
+
+    def get_prediction_layer(self):
+        if self.model_config.deep_cross_combination == "stacked":
+            input_dim = self.model_config.mlp_layers[-1]
+        else:
+            input_dim = self.num_feat * self.model_config.embedding_dim + self.model_config.mlp_layers[-1]
+        pred_linear = torch.nn.Linear(
+            in_features=input_dim,
+            out_features=1,
+            bias=False
+        )
+        return pred_linear
+    
+class MMoERanker(BaseRanker):
+
+    def set_labels(self):   # set all labels as tasks
+        return self.data_config.flabels
+
+    def get_sequence_encoder(self):
+        encoder_dict = torch.nn.ModuleDict({
+            name: AverageAggregator(dim=1)
+            for name in self.data_config.seq_features
+        })
+        return encoder_dict
+        
+    
+    def get_feature_interaction_layer(self):
+        flatten_layer = LambdaModule(lambda x: x.flatten(start_dim=1))  # [B, N, D] -> [B, N*D]
+        expert_mlp = MLPModule(
+            mlp_layers=[self.num_feat * self.model_config.embedding_dim] + self.model_config.mlp_layers,
+            activation_func=self.model_config.activation,
+            dropout=self.model_config.dropout,
+            bias=True,
+            batch_norm=self.model_config.batch_norm,
+            last_activation=True,
+            last_bn=False
+        )
+        shared_multi_experts = MultiExperts(
+            n_experts=self.model_config.n_experts,
+            export_module=expert_mlp,
+        )   # [B, D] -> [B, N, D]
+
+        gate_mlp_layer = [self.num_feat * self.model_config.embedding_dim] + \
+            self.model_config.gate_layers + [self.model_config.n_experts]
+        multi_task_gates = HStackModule(
+            modules=[
+                torch.nn.Sequential(
+                    MLPModule(
+                        mlp_layers=gate_mlp_layer,
+                        activation_func=self.model_config.activation,
+                        dropout=self.model_config.dropout,
+                        bias=True,
+                        batch_norm=self.model_config.batch_norm,
+                        last_activation=False,
+                        last_bn=False
+                    ),
+                torch.nn.Softmax(dim=-1),
+                )
+                for _ in range(len(self.flabel))
+            ],
+            aggregate_function=lambda x: torch.stack(x, dim=1)
+        )  # [B, D] -> [B, T, N]
+        
+        mmoe_expert_gates = HStackModule(
+            modules=[multi_task_gates, shared_multi_experts],
+            aggregate_function=lambda x: torch.bmm(x[0], x[1]),
+        )   # [B, D] -> [B, T, D]
+
+        return torch.nn.Sequential(flatten_layer, mmoe_expert_gates)
+    
+
+    def get_prediction_layer(self):
+        pred_mlp_layers = [self.model_config.mlp_layers[-1]] + self.model_config.tower_layers + [1]
+        task_towers = [
+            torch.nn.Sequential(
+                LambdaModule(lambda x: x[:, i]),
+                MLPModule(
+                    mlp_layers=pred_mlp_layers,
+                    activation_func=self.model_config.activation,
+                    dropout=self.model_config.dropout,
+                    bias=True,
+                    batch_norm=self.model_config.batch_norm,
+                    last_activation=False,
+                    last_bn=False
+                )
+            )
+            for i in range(len(self.flabel))
+        ]
+        print(f"self.flabel:{self.flabel}")
+        stacked_tower_layers = HStackModule(
+            modules=task_towers,
+            aggregate_function=lambda x: torch.cat(x, dim=-1)
+        )   # [B, T, D] -> [B, T]
+        return stacked_tower_layers
