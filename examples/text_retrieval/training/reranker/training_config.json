@@ -12,5 +12,5 @@
     "weight_decay": 0.01,
     "deepspeed": "/root/Nexus/examples/text_retrieval/training/ds_stage0.json",
     "logging_steps": 1,
-    "save_steps": 100
+    "save_steps": 1000
 }
