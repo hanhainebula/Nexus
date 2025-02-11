@@ -10,6 +10,10 @@ class AbsInferenceArguments(AbsArguments):
         default=None,
         metadata={"help": "Stage of the inference process."}
     )
+    use_fp16: bool = field(
+        default=True,
+        metadata={"help": "use fp16"}
+    )
     model_name_or_path: str = field(
         default=None,
         metadata={"help": "Name or path to the model."}
