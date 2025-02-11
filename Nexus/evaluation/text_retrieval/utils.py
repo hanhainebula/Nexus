@@ -36,6 +36,8 @@ def evaluate_mrr(
         )[0:k_max]
 
     for query_id in top_hits:
+        if query_id not in qrels.keys():
+            continue
         query_relevant_docs = {
             doc_id for doc_id in qrels[query_id] if qrels[query_id][doc_id] > 0
         }

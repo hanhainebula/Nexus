@@ -591,9 +591,8 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         else:
             raise ValueError(f"Unsupported session type: {session_type}")
 
-    def _inference_tensorrt(self, inputs, normalize=True, batch_size=None, *args, **kwargs):
-        # prepaer inputs first
-        
+    def _inference_tensorrt_old(self, inputs, normalize=True, batch_size=None, *args, **kwargs):
+        # This func is deprecated        
         if not batch_size:
             batch_size = self.batch_size
         
@@ -658,7 +657,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             
         return all_outputs
 
-    def _inference_tensorrt_new(self, inputs, normalize=True, batch_size=None, *args, **kwargs):
+    def _inference_tensorrt(self, inputs, normalize=True, batch_size=None, *args, **kwargs):
         if not batch_size:
             batch_size = self.batch_size
         
@@ -766,7 +765,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         return cls_emb
 
 
-    def _inference_normal(self, inputs,batch_size = None, encode_query = False, *args, **kwargs):
+    def _inference_normal(self, inputs, normalize=True ,batch_size = None, encode_query = False, *args, **kwargs):
         if not batch_size:
             batch_size = self.batch_size
             
@@ -796,6 +795,10 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
 
             all_outputs.extend(cls_emb.cpu().numpy())  
 
+        if normalize == True:
+            all_outputs = all_outputs / np.linalg.norm(all_outputs, axis=-1, keepdims=True)
+            return all_outputs
+        
         return np.array(all_outputs)  # 返回嵌入结果的NumPy数组        
         
 

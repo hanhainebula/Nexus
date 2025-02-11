@@ -9,6 +9,7 @@ def load_config(file_path, config_class):
     with open(file_path, "r") as f:
         data = json.load(f)
     return config_class(**data)
+
 @dataclass
 class TextRetrievalEvalArgs(AbsEvalArguments):
     """

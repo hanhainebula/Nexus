@@ -18,6 +18,9 @@ def main():
         training_args=training_args
     )
     runner.run()
+    
+    """
+    3:23:57<00:00"""
 
 if __name__ == "__main__":
     main()
