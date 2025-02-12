@@ -768,14 +768,9 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
     def _inference_normal(self, inputs, normalize=True ,batch_size = None, encode_query = False, *args, **kwargs):
         if not batch_size:
             batch_size = self.batch_size
-            
-        # input_feed = {self.session.get_inputs()[0].name: inputs}
-
-        # outputs = self.session.run([self.session.get_outputs()[0].name], input_feed, encode_query = encode_query ,batch_size = batch_size)
+        if not isinstance(inputs, list):
+            inputs = [inputs]
         
-        # embeddings = outputs[0]
-        
-        # return embeddings
         model=self.model.model.to('cuda')
         tokenizer = self.model.tokenizer
         
@@ -798,7 +793,6 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         if normalize == True:
             all_outputs = all_outputs / np.linalg.norm(all_outputs, axis=-1, keepdims=True)
             return all_outputs
-        
         return np.array(all_outputs)  # 返回嵌入结果的NumPy数组        
         
 

@@ -734,7 +734,7 @@ class BaseRerankerInferenceEngine(InferenceEngine):
             all_outputs.extend(scores)  
             
         if normalize:
-            all_outputs = [sigmoid(score[0]) for score in all_outputs]
+            all_outputs = [sigmoid(score) for score in all_outputs]
 
         all_outputs = [float(score) for score in all_outputs]            
 
