@@ -245,7 +245,7 @@ class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
 
             corpus = {}
             for e in corpus_data:
-                corpus[e['id']] = {'title': e.get('title', ""), 'text': e['text']}
+                corpus[e['_id']] = {'title': e.get('title', ""), 'text': e['text']}
 
             return datasets.DatasetDict(corpus)
 
@@ -277,10 +277,10 @@ class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
 
             qrels = {}
             for data in qrels_data:
-                qid = data['qid']
+                qid = data['query-id']
                 if qid not in qrels:
                     qrels[qid] = {}
-                qrels[qid][data['docid']] = data['relevance']
+                qrels[qid][data['corpus-id']] = int(data['score'])
 
             return datasets.DatasetDict(qrels)
 
@@ -310,7 +310,7 @@ class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
         else:
             queries_data = datasets.load_dataset('json', data_files=queries_path, cache_dir=self.cache_dir)['train']
 
-            queries = {e['id']: e['text'] for e in queries_data}
+            queries = {e['_id']: e['text'] for e in queries_data}
             return datasets.DatasetDict(queries)
 
     def _download_file(self, download_url: str, save_dir: str):
