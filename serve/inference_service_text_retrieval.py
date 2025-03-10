@@ -26,32 +26,16 @@ def load(path):
             res.append(obj['title']+ '\n' +obj['content'])
     return res
 
-corpus_path = '/root/datasets/retrieval/test.jsonl'
-faiss_path = '/root/datasets/retrieval/index'
-embedder_config = '/root/test/Nexus/serve/config/embedder.json'
-reranker_config = '/root/test/Nexus/serve/config/reranker.json'
+corpus_path = '/data2/home/angqing/code/Nexus/datas/81cn.jsonl'
+faiss_path = '/data2/home/angqing/code/Nexus/datas/81cn.idx'
+embedder_config = '/data2/home/angqing/code/Nexus/serve/config/embedder.json'
+reranker_config = '/data2/home/angqing/code/Nexus/serve/config/reranker.json'
 
 
 index = faiss.read_index(faiss_path)
 corpus = load(corpus_path)
 
-# embedder_args = AbsInferenceArguments(
-#     model_name_or_path='/root/models/bge-base-zh-v1.5',
-#     onnx_model_path='/root/models/bge-base-zh-v1.5/onnx/model_fp16.onnx',
-#     trt_model_path='/root/models/bge-base-zh-v1.5/trt/model_fp16.trt',
-#     infer_mode='normal',
-#     infer_device=0,
-#     infer_batch_size=32
-# )
 
-# reranker_args = AbsInferenceArguments(
-#     model_name_or_path='/root/models/bge-reranker-base',
-#     onnx_model_path='/root/models/bge-reranker-base/onnx/model_fp16.onnx',
-#     trt_model_path='/root/models/bge-reranker-base/trt/model_fp16.trt',
-#     infer_mode='normal',
-#     infer_device=0,
-#     infer_batch_size=32
-# )
 embedder_args = AbsInferenceArguments.from_json(embedder_config)
 reranker_args = AbsInferenceArguments.from_json(reranker_config)
 retrieval_inference_engine = BaseEmbedderInferenceEngine(embedder_args)
@@ -78,7 +62,7 @@ def retrieve(user_query):
 
     # Sort the results based on the score (in descending order, so higher scores are ranked first)
     ranked_results.sort(key=lambda x: x["score"], reverse=True)
-
+    ranked_results=ranked_results[:rerank_topk]
     # Collect the results in the desired format
     results = []
     final_result = []
@@ -87,6 +71,7 @@ def retrieve(user_query):
         final_result.append({
             "id": result["id"],
             "corpus": result['corpus'],
+            "score":result['score']
         })
     
     return results, final_result
@@ -145,7 +130,7 @@ def change_user_fns(user_query):
 if __name__ == "__main__":
 
     search_topk = 20
-    rerank_topk = 5
+    rerank_topk = 20
     
     init_result = [{"id": -1, "corpus": None} for i in range(rerank_topk)]
     
