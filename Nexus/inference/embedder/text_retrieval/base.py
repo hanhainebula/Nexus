@@ -461,10 +461,20 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         session_options = ort.SessionOptions()
 
         # 启用 Profiler
-
-        providers = ['CUDAExecutionProvider', "CPUExecutionProvider"]
-        if self.config['infer_device'] == 'cpu':
+        if isinstance(self.config['infer_device'], int):
+            providers = [
+                ('CUDAExecutionProvider', {
+                    'device_id': self.config['infer_device'],
+                }),
+                'CPUExecutionProvider',
+            ]
+        
+        elif self.config['infer_device'] == 'cpu':
             providers = ["CPUExecutionProvider"]
+        
+        else:    
+            providers = ['CUDAExecutionProvider', "CPUExecutionProvider"]
+        
 
             
         onnx_model_path = self.config["onnx_model_path"]

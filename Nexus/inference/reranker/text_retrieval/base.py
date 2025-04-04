@@ -403,10 +403,21 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         return NormalSession(self.model)
 
     def get_ort_session(self) -> ort.InferenceSession:
-        if self.config['infer_device'] == 'cpu':
+        
+        if isinstance(self.config['infer_device'], int):
+            providers = [
+                ('CUDAExecutionProvider', {
+                    'device_id': self.config['infer_device'],
+                }),
+                'CPUExecutionProvider',
+            ]
+        
+        elif self.config['infer_device'] == 'cpu':
             providers = ["CPUExecutionProvider"]
-        else:
+        
+        else:    
             providers = ['CUDAExecutionProvider', "CPUExecutionProvider"]
+            
         onnx_model_path = self.config["onnx_model_path"]
         return ort.InferenceSession(onnx_model_path, providers=providers)
 
@@ -730,7 +741,6 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
             with torch.no_grad():  
                 scores = model(**encoded_inputs, return_dict=True).logits.view(-1, ).float().cpu().numpy()
-
             all_outputs.extend(scores)  
             
         if normalize:
