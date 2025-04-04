@@ -144,8 +144,8 @@ def change_user_fns(user_query):
 # Gradio界面
 if __name__ == "__main__":
 
-    search_topk = 20
-    rerank_topk = 5
+    search_topk = 40
+    rerank_topk = 20
     
     init_result = [{"id": -1, "corpus": None} for i in range(rerank_topk)]
     
@@ -174,4 +174,4 @@ if __name__ == "__main__":
         send_btn.click(fn=chat_interface, inputs=[user_query, chatbot], outputs=[chatbot, *result_textboxes])
 
     # Launch the Gradio interface
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(server_name="0.0.0.0", server_port=7777)
