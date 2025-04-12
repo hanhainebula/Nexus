@@ -607,4 +607,4 @@
 {'loss': 1.0711, 'grad_norm': 10.090245246887207, 'learning_rate': 2.7452415812591512e-08, 'epoch': 1.0}
 {'loss': 1.0885, 'grad_norm': 10.917430877685547, 'learning_rate': 9.150805270863836e-09, 'epoch': 1.0}
 {'train_runtime': 11054.412, 'train_samples_per_second': 43.948, 'train_steps_per_second': 0.549, 'train_loss': 1.1281118123584741, 'epoch': 1.0}
-程序运行耗时: 11056.6353 秒
+

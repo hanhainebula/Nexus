@@ -1,0 +1,34 @@
+[2025-03-03 15:36:09,630] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2025-03-03 15:36:09,992] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2025-03-03 15:36:09,999] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2025-03-03 15:36:10,092] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2025-03-03 15:36:10,155] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2025-03-03 15:36:10,165] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2025-03-03 15:36:10,173] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2025-03-03 15:36:10,217] [INFO] [real_accelerator.py:222:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2025-03-03 15:36:11,345] [INFO] [comm.py:658:init_distributed] cdb=None
+[2025-03-03 15:36:11,787] [INFO] [comm.py:658:init_distributed] cdb=None
+[2025-03-03 15:36:11,787] [INFO] [comm.py:689:init_distributed] Initializing TorchBackend in DeepSpeed with backend nccl
+[2025-03-03 15:36:11,793] [INFO] [comm.py:658:init_distributed] cdb=None
+[2025-03-03 15:36:11,865] [INFO] [comm.py:658:init_distributed] cdb=None
+[2025-03-03 15:36:12,123] [INFO] [comm.py:658:init_distributed] cdb=None
+[2025-03-03 15:36:12,166] [INFO] [comm.py:658:init_distributed] cdb=None
+[2025-03-03 15:36:12,275] [INFO] [comm.py:658:init_distributed] cdb=None
+[2025-03-03 15:36:12,285] [INFO] [comm.py:658:init_distributed] cdb=None
+ninja: no work to do.
+Time to load fused_adam op: 0.03847360610961914 seconds
+Time to load fused_adam op: 0.10150671005249023 seconds
+Time to load fused_adam op: 0.10224008560180664 seconds
+Time to load fused_adam op: 0.10122323036193848 seconds
+Time to load fused_adam op: 0.10156702995300293 seconds
+Time to load fused_adam op: 0.10170269012451172 seconds
+Time to load fused_adam op: 0.10175180435180664 seconds
+Time to load fused_adam op: 0.10313773155212402 seconds
+[2025-03-03 15:36:23,894] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started
+[2025-03-03 15:36:24,048] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started
+[2025-03-03 15:36:24,050] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started
+[2025-03-03 15:36:24,051] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started
+[2025-03-03 15:36:24,051] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started
+[2025-03-03 15:36:24,051] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started
+[2025-03-03 15:36:24,052] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started
+[2025-03-03 15:36:24,052] [WARNING] [lr_schedules.py:683:get_lr] Attempting to get learning rate from scheduler before it has started

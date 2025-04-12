@@ -21,7 +21,29 @@ def sigmoid(x):
     x = x.item() if not isinstance(x, float) else x
     return float(1 / (1 + np.exp(-x)))
 
+# The following code is modified from FlagEmbedding, licensed under the MIT License.
+# Source: https://github.com/FlagOpen/FlagEmbedding/blob/master/FlagEmbedding/inference/reranker/encoder_only/base.py
+# Original copyright notice: 
+# MIT License
+# Copyright (c) 2022 staoxiao
 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 class BaseReranker(AbsReranker):
     """Base reranker class for encoder only models.
 
@@ -403,10 +425,21 @@ class BaseRerankerInferenceEngine(InferenceEngine):
         return NormalSession(self.model)
 
     def get_ort_session(self) -> ort.InferenceSession:
-        if self.config['infer_device'] == 'cpu':
+        
+        if isinstance(self.config['infer_device'], int):
+            providers = [
+                ('CUDAExecutionProvider', {
+                    'device_id': self.config['infer_device'],
+                }),
+                'CPUExecutionProvider',
+            ]
+        
+        elif self.config['infer_device'] == 'cpu':
             providers = ["CPUExecutionProvider"]
-        else:
+        
+        else:    
             providers = ['CUDAExecutionProvider', "CPUExecutionProvider"]
+            
         onnx_model_path = self.config["onnx_model_path"]
         return ort.InferenceSession(onnx_model_path, providers=providers)
 
@@ -730,7 +763,6 @@ class BaseRerankerInferenceEngine(InferenceEngine):
 
             with torch.no_grad():  
                 scores = model(**encoded_inputs, return_dict=True).logits.view(-1, ).float().cpu().numpy()
-
             all_outputs.extend(scores)  
             
         if normalize:

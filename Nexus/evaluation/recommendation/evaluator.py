@@ -1,5 +1,6 @@
 from collections import defaultdict
 from accelerate import Accelerator
+import time
 
 import json
 from loguru import logger
@@ -74,6 +75,7 @@ class RecommenderAbsEvaluator(AbsEvaluator):
     
     @torch.no_grad()
     def evaluate(self, model:Union[BaseRetriever, BaseRanker], *args, **kwargs) -> Dict:
+        
         model.eval()
         model_type = model.model_type
         model = self.accelerator.prepare(model)
@@ -92,11 +94,17 @@ class RecommenderAbsEvaluator(AbsEvaluator):
         eval_total_bs = 0
         eval_loader = self.retriever_eval_loader if model_type == "retriever" else self.ranker_eval_loader
         for eval_step, eval_batch in enumerate(self.accelerator.prepare(eval_loader)):
+            start_time = time.time()
+
             logger.info(f"Evaluation step {eval_step + 1} begins..")
             eval_batch_size = eval_batch[list(eval_batch.keys())[0]].shape[0]
             metrics = self._eval_batch(model, eval_batch, *args, **kwargs)
             eval_outputs.append((metrics, eval_batch_size))
             eval_total_bs += eval_batch_size
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+
+            logger.info(f"batch cost time: {elapsed_time} sec")
             logger.info(f"Evaluation step {eval_step + 1} done.")
         model = self.accelerator.unwrap_model(model)
         metrics = self.eval_epoch_end(model, eval_outputs)

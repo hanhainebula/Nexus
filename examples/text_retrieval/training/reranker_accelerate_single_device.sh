@@ -1,11 +1,11 @@
 export WANDB_MODE=disabled
 
-BASE_DIR='/data1/home/recstudio/haoran/Nexus'
+BASE_DIR='/root/Nexus'
 
 MODEL_NAME_OR_PATH='/data1/home/recstudio/angqing/models/bge-reranker-base'
 TRAIN_DATA='/data1/home/recstudio/haoran/angqing_temp/data/fiqa.jsonl'
 CKPT_SAVE_DIR='/data1/home/recstudio/haoran/angqing_temp/ckpt/test_reranker_accelerate'
-ACCELERATE_CONFIG='/data1/home/recstudio/haoran/Nexus/examples/text_retrieval/training/single_node_single_device.json'
+ACCELERATE_CONFIG='/root/Nexus/examples/text_retrieval/training/single_node_single_device.json'
 
 
 # set large epochs and small batch size for testing

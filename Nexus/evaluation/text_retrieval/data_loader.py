@@ -7,7 +7,29 @@ from typing import List, Optional, Union
 from Nexus.abc.evaluation import AbsEvalDataLoader
 logger = logging.getLogger(__name__)
 
+# The following code is modified from FlagEmbedding, licensed under the MIT License.
+# Source: https://github.com/FlagOpen/FlagEmbedding/blob/master/FlagEmbedding/abc/evaluation/data_loader.py
+# Original copyright notice: 
+# MIT License
+# Copyright (c) 2022 staoxiao
 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
     
     """
@@ -245,7 +267,7 @@ class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
 
             corpus = {}
             for e in corpus_data:
-                corpus[e['id']] = {'title': e.get('title', ""), 'text': e['text']}
+                corpus[e['_id']] = {'title': e.get('title', ""), 'text': e['text']}
 
             return datasets.DatasetDict(corpus)
 
@@ -277,10 +299,10 @@ class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
 
             qrels = {}
             for data in qrels_data:
-                qid = data['qid']
+                qid = data['query-id']
                 if qid not in qrels:
                     qrels[qid] = {}
-                qrels[qid][data['docid']] = data['relevance']
+                qrels[qid][data['corpus-id']] = int(data['score'])
 
             return datasets.DatasetDict(qrels)
 
@@ -310,7 +332,7 @@ class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
         else:
             queries_data = datasets.load_dataset('json', data_files=queries_path, cache_dir=self.cache_dir)['train']
 
-            queries = {e['id']: e['text'] for e in queries_data}
+            queries = {e['_id']: e['text'] for e in queries_data}
             return datasets.DatasetDict(queries)
 
     def _download_file(self, download_url: str, save_dir: str):

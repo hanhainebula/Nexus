@@ -151,7 +151,3 @@ Time to load fused_adam op: 0.10144734382629395 seconds
 {'loss': 1.0871, 'grad_norm': 5.131898842234588, 'learning_rate': 1.729818780889621e-07, 'epoch': 0.99}
 {'loss': 1.0911, 'grad_norm': 5.3793883041867945, 'learning_rate': 9.060955518945634e-08, 'epoch': 0.99}
 {'train_runtime': 3077.8774, 'train_samples_per_second': 157.844, 'train_steps_per_second': 0.438, 'train_loss': 1.153792305643069, 'epoch': 1.0}
-程序运行耗时: 3081.2907 秒
-程序运行耗时: 3082.2891 秒
-程序运行耗时: 3082.3478 秒
-程序运行耗时: 3082.7868 秒

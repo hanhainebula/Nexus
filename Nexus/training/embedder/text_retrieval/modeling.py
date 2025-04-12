@@ -24,6 +24,29 @@ class TextEmbedderOutput(EmbedderOutput):
     loss: Optional[Tensor] = None
     scores: Optional[Tensor] = None
 
+# The following code is modified from FlagEmbedding, licensed under the MIT License.
+# Source: https://github.com/FlagOpen/FlagEmbedding/blob/master/FlagEmbedding/finetune/embedder/encoder_only/base/modeling.py
+# Original copyright notice: 
+# MIT License
+# Copyright (c) 2022 staoxiao
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 class BiTextEmbedderModel(AbsEmbedderModel):
     """Embedder class for encoder only model.
 
@@ -75,7 +98,48 @@ class BiTextEmbedderModel(AbsEmbedderModel):
     def init_modules(self):
         # init loss_function and score_function here
         super().init_modules()
-        self.distill_loss=self.get_distill_loss(self.kd_loss_type)
+        # self.distill_loss=self.get_distill_loss(self.kd_loss_type)
+
+    @staticmethod
+    def distill_loss(kd_loss_type, teacher_targets, student_scores, group_size=None):
+        """Compute the distillation loss.
+
+        Args:
+            kd_loss_type (str): Type of knowledge distillation loss, supports "kl_div" and "m3_kd_loss".
+            teacher_targets (torch.Tensor): Targets from the teacher model.
+            student_scores (torch.Tensor): Score of student model.
+            group_size (int, optional): Number of groups for . Defaults to ``None``.
+
+        Raises:
+            ValueError: Invalid kd_loss_type
+
+        Returns:
+            torch.Tensor: A scalar of computed distillation loss.
+        """
+        if kd_loss_type == 'kl_div':
+            # teacher_targets: (batch_size, group_size) / (world_size * batch_size, group_size)
+            # student_scores: (batch_size, group_size) / (world_size * batch_size, group_size)
+            return - torch.mean(
+                torch.sum(torch.log_softmax(student_scores, dim=-1) * teacher_targets, dim=-1)
+            )
+        elif kd_loss_type == 'm3_kd_loss':
+            # teacher_targets: (batch_size, group_size) / (world_size * batch_size, group_size)
+            # student_scores: (batch_size, batch_size * group_size) / (world_size * batch_size, world_size * batch_size * group_size)
+            labels = torch.arange(student_scores.size(0), device=student_scores.device, dtype=torch.long)
+            labels = labels * group_size
+
+            loss = 0
+            mask = torch.zeros_like(student_scores)
+            for i in range(group_size):
+                temp_target = labels + i
+                temp_scores = student_scores + mask
+                temp_loss = F.cross_entropy(temp_scores, temp_target, reduction="none")  # B
+                loss += torch.mean(teacher_targets[:, i] * temp_loss)
+                mask = torch.scatter(mask, dim=-1, index=temp_target.unsqueeze(-1),
+                                    value=torch.finfo(student_scores.dtype).min)
+            return loss
+        else:
+            raise ValueError(f"Invalid kd_loss_type: {kd_loss_type}")
 
     def get_distill_loss(self, kd_loss_type):
         if kd_loss_type == 'kl_div':
@@ -91,7 +155,7 @@ class BiTextEmbedderModel(AbsEmbedderModel):
         
 
     def get_loss_function(self):
-        return CrossEntropyLoss()
+        return torch.nn.CrossEntropyLoss(reduction='mean')
     
     def get_score_function(self):
         return IP_text_retrieval()
@@ -324,8 +388,7 @@ class BiTextEmbedderModel(AbsEmbedderModel):
             if self.kd_loss_type == "kl_div":
                 student_scores = self.get_local_score(q_reps, p_reps, scores) # (batch_size, group_size)
 
-                loss = self.distill_loss(teacher_targets, student_scores, group_size)
-
+                loss = self.distill_loss(self.kd_loss_type, teacher_targets, student_scores, group_size)
                 idxs = torch.arange(q_reps.size(0), device=q_reps.device, dtype=torch.long)
                 targets = idxs * (p_reps.size(0) // q_reps.size(0)) # (batch_size)
                 loss += self.loss_function(scores, targets)
@@ -363,7 +426,6 @@ class BiTextEmbedderModel(AbsEmbedderModel):
                 ]   # (batch_size, group_size)
 
                 loss = self.distill_loss(teacher_targets, student_scores, group_size)
-
                 cross_idxs = torch.arange(cross_q_reps.size(0), device=cross_q_reps.device, dtype=torch.long)
                 cross_targets = cross_idxs * group_size # (world_size * batch_size)
                 loss += self.loss_function(cross_scores, cross_targets)
