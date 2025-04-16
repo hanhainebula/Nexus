@@ -103,7 +103,7 @@ class DecoderOnlyEmbedderRunner(AbsEmbedderRunner):
             Tuple[PreTrainedTokenizer, AbsEmbedderModel]: Tokenizer and model instances.
         """
         tokenizer = AutoTokenizer.from_pretrained(
-            self.model_args.tokenizer_name if self.model_args.tokenizer_name else self.model_args.model_name_or_path,
+            self.model_args.model_name_or_path,
             token=self.model_args.token,
             cache_dir=self.model_args.cache_dir,
             use_fast=False,

@@ -1,3 +1,4 @@
+import os
 from typing import Optional, List
 from dataclasses import dataclass, field
 
@@ -66,6 +67,22 @@ class DecoderOnlyEmbedderModelArguments(AbsEmbedderModelArguments):
     only_merge_lora_model: bool = field(
         default=False,
         metadata={"help": "If passed, will only merge the lora modules and save the entire model."}
+    )
+    tokenizer_name: str = field(
+        default=None,
+        metadata={"help": "Pretrained tokenizer name or path if not the same as model_name."}
+    )
+    config_name: str = field(
+        default=None,
+        metadata={"help": "Pretrained config name or path if not the same as model_name."}
+    )
+    trust_remote_code: bool = field(
+        default=False,
+        metadata={"help": "Trust remote code"}
+    )
+    token: str = field(
+        default_factory=lambda: os.getenv('HF_TOKEN', None),
+        metadata={"help": "The token to use when accessing the model."}
     )
     
 @dataclass

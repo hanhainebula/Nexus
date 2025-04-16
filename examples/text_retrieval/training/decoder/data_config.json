@@ -1,0 +1,12 @@
+{
+    "train_data": "/share/project/aqjiang/datasets/msmarco_hn_train.jsonl",
+    "cache_path": "~/.cache",
+    "train_group_size": 8,
+    "query_max_len": 512,
+    "passage_max_len": 512,
+    "pad_to_multiple_of": 8,
+    "query_instruction_for_retrieval": "Given a web search query, retrieve relevant passages that answer the query",
+    "query_instruction_format": "Instruct: {}\nQuery: {}",
+    "knowledge_distillation": false,
+    "max_example_num_per_dataset":5000
+}

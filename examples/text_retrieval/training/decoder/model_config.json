@@ -1,0 +1,5 @@
+{
+    "model_name_or_path": "/share/project/aqjiang/models/gte-Qwen2-1_5B-Instruct",
+    "cache_dir": "~/.cache/huggingface/hub",
+    "trust_remote_code": true
+}

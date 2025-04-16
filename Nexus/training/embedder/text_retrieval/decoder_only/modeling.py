@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from typing import Optional
 import torch
 from torch import Tensor
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer
+from transformers import AutoModel, PreTrainedModel, PreTrainedTokenizer
 import torch.distributed as dist
 import torch.nn.functional as F
 # from FlagEmbedding.abc.finetune.embedder import AbsEmbedderModel
@@ -37,23 +38,19 @@ class BiDecoderOnlyEmbedderModel(AbsEmbedderModel):
 
     def __init__(
         self,
-        base_model: AutoModel,
-        tokenizer: AutoTokenizer = None,
+        base_model: PreTrainedModel,
+        tokenizer: PreTrainedTokenizer = None,
         negatives_cross_device: bool = False,
         temperature: float = 1.0,
         sub_batch_size: int = -1,
         kd_loss_type: str = 'kl_div',
         sentence_pooling_method: str = 'last_token',
         normalize_embeddings: bool = False,
+        *args, **kwargs
     ):
         self.kd_loss_type = kd_loss_type
         super().__init__(
-            base_model,
-            tokenizer=tokenizer,
-            negatives_cross_device=negatives_cross_device,
-            temperature=temperature,
-            sub_batch_size=sub_batch_size,
-            kd_loss_type=kd_loss_type,
+            *args, **kwargs
         )
 
         self.model = base_model

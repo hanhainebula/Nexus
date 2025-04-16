@@ -14,6 +14,10 @@ class AbsEmbedderModelArguments(AbsModelArguments):
     model_name_or_path: str = field(
         metadata={"help": "The model checkpoint for initialization."}
     )
+    cache_dir: str = field(
+        default=None,
+        metadata={"help": "Where do you want to store the pre-trained models downloaded from s3."}
+    )
 
 
 @dataclass
