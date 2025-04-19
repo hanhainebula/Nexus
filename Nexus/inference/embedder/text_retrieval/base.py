@@ -616,9 +616,9 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         
         session_type=self.config['infer_mode']
         if session_type == 'tensorrt':
-            return self._inference_tensorrt(inputs, *args, **kwargs)
+            return self._inference_tensorrt(inputs, encode_query=encode_query, *args, **kwargs)
         elif session_type == 'onnx':
-            return self._inference_onnx(inputs, *args, **kwargs)
+            return self._inference_onnx(inputs,encode_query = encode_query ,*args, **kwargs)
         elif session_type == 'normal':
             return self._inference_normal(inputs, encode_query=encode_query,*args, **kwargs)
         else:
@@ -690,7 +690,12 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
             
         return all_outputs
 
-    def _inference_tensorrt(self, inputs, normalize=True, batch_size=None, *args, **kwargs):
+    def _inference_tensorrt(self, inputs, encode_query=False,normalize=True, batch_size=None, *args, **kwargs):
+        if encode_query:
+            max_length = self.config['query_max_length']
+        else:
+            max_length = self.config['passage_max_length']
+        
         if not batch_size:
             batch_size = self.batch_size
         
@@ -711,7 +716,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         for idx in trange(0, len(inputs), batch_size, desc='Batch Inference'):
             batch_inputs = inputs[idx: idx + batch_size]
             
-            encoded_inputs = tokenizer(batch_inputs, return_tensors="np", padding='max_length', truncation=True, max_length=512)
+            encoded_inputs = tokenizer(batch_inputs, return_tensors="np", padding='max_length', truncation=True, max_length=max_length)
             inputs_feed = {
                 'input_ids': encoded_inputs['input_ids'],  # (bs, max_length)
                 'attention_mask': encoded_inputs['attention_mask'],
@@ -766,7 +771,11 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
 
 
 
-    def _inference_onnx(self, inputs, normalize = True, batch_size = None, *args, **kwargs):
+    def _inference_onnx(self, inputs,encode_query=False ,normalize = True, batch_size = None, *args, **kwargs):
+        if encode_query:
+            max_length = self.config['query_max_length']
+        else:
+            max_length = self.config['passage_max_length']
         if not batch_size:
             batch_size = self.batch_size
             
@@ -777,7 +786,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         all_outputs=[]
         for i in trange(0, len(inputs), batch_size, desc='Batch Inference'):
             batch_inputs= inputs[i:i+batch_size]
-            encoded_inputs = tokenizer(batch_inputs, return_tensors="np", padding=True,  truncation=True, max_length=512)
+            encoded_inputs = tokenizer(batch_inputs, return_tensors="np", padding=True,  truncation=True, max_length=max_length)
             # input_ids = encoded_inputs['input_ids']
             input_feed={
                 'input_ids':encoded_inputs['input_ids'], #(bs, max_length)
@@ -799,6 +808,10 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
 
 
     def _inference_normal(self, inputs, normalize=True ,batch_size = None, encode_query = False, *args, **kwargs):
+        if encode_query:
+            max_length = self.config['query_max_length']
+        else:
+            max_length = self.config['passage_max_length']
         if not batch_size:
             batch_size = self.batch_size
         if not isinstance(inputs, list):
@@ -811,7 +824,7 @@ class BaseEmbedderInferenceEngine(InferenceEngine):
         for idx in trange(0, len(inputs), batch_size, desc='Batch Inference'):
             batch_inputs = inputs[idx: idx+batch_size]
 
-            encoded_inputs = tokenizer(batch_inputs, return_tensors="pt", padding='max_length', truncation=True, max_length=512)
+            encoded_inputs = tokenizer(batch_inputs, return_tensors="pt", padding='max_length', truncation=True, max_length=max_length)
             encoded_inputs = {key: value.to('cuda') for key, value in encoded_inputs.items()} 
 
             with torch.no_grad():  

@@ -58,3 +58,17 @@ class AbsInferenceArguments(AbsArguments):
             'help':'normalize embeddings'
         }
     )
+    trust_remote_code: bool = field(
+        default=False,
+        metadata={
+            'help':'Trust remote code'
+        }
+    )
+    query_max_length: int = field(
+        default=512,
+        metadata={"help": "query max length"}
+    )
+    passage_max_length: int = field(
+        default=512,
+        metadata={"help": "passage_max_length"}
+    )
