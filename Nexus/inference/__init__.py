@@ -1,4 +1,4 @@
-from .embedder.text_retrieval import TextEmbedder, BaseEmbedderInferenceEngine, BaseLLMEmbedder
+from .embedder.text_retrieval import TextEmbedder, BaseEmbedderInferenceEngine, BaseLLMEmbedder, BaseLLMEMbedderInferenceEngine
 from .reranker.text_retrieval import TextReranker, BaseRerankerInferenceEngine
 
 __all__=[
@@ -6,5 +6,6 @@ __all__=[
     'BaseEmbedderInferenceEngine',
     'TextReranker',
     'BaseRerankerInferenceEngine',
-    'BaseLLMEmbedder'
+    'BaseLLMEmbedder',
+    'BaseLLMEMbedderInferenceEngine'
 ]
