@@ -351,9 +351,26 @@ class SessionParams():
         }
     )
 
+@dataclass
+class AbsLLMInferenceArguments(AbsInferenceArguments):
+    tensor_parallel_size: int = field(
+        default=1,
+        metadata={'help': """The number of GPUs to use for distributed
+            execution with tensor parallelism."""}
+    )
+    gpu_memory_utilization: float = field(
+        default=0.9,
+        metadata={'help' : """The ratio (between 0 and 1) of GPU memory to
+            reserve for the model weights, activations, and KV cache. Higher
+            values will increase the KV cache size and thus improve the model's
+            throughput. However, if the value is too high, it may cause out-of-
+            memory (OOM) errors."""}
+    )
+    
+    
         
 class BaseLLMEMbedderInferenceEngine():
-    def __init__(self, infer_args: AbsInferenceArguments):
+    def __init__(self, infer_args: AbsLLMInferenceArguments):
         self.config = infer_args.to_dict()
         self.batch_size = self.config['infer_batch_size']
         self.model_path = self.config['model_name_or_path']
@@ -364,7 +381,9 @@ class BaseLLMEMbedderInferenceEngine():
             task='embed',
             enforce_eager=True,
             max_model_len=8192,
-            trust_remote_code=self.config['trust_remote_code']
+            trust_remote_code=self.config['trust_remote_code'],
+            tensor_parallel_size=self.config['tensor_parallel_size'],
+            gpu_memory_utilization=self.config['gpu_memory_utilization']
         )
         print('Warm up...')
         self.embedder.embed(['hello world'])

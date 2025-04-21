@@ -1,10 +1,10 @@
-import os
-os.environ['CUDA_VISIBLE_DEVICES']='0'
+# import os
+# os.environ['CUDA_VISIBLE_DEVICES']='0'
 
 import time
 import json
 from tqdm import tqdm
-from Nexus import TextEmbedder, AbsInferenceArguments, BaseLLMEmbedder, BaseLLMEMbedderInferenceEngine
+from Nexus import TextEmbedder, AbsInferenceArguments, BaseLLMEmbedder, BaseLLMEMbedderInferenceEngine, AbsLLMInferenceArguments
 
 
     
@@ -34,9 +34,10 @@ if __name__=='__main__':
 
     
 
-    config = AbsInferenceArguments(
+    config = AbsLLMInferenceArguments(
         model_name_or_path='BAAI/bge-multilingual-gemma2',
-        infer_batch_size=16
+        infer_batch_size=16,
+        tensor_parallel_size=2
     )
     embedder = BaseLLMEMbedderInferenceEngine(config)
     
