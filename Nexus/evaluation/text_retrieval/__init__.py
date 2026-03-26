@@ -1,9 +1,4 @@
-from .arguments import TextRetrievalEvalArgs, TextRetrievalEvalModelArgs
-from .evaluator import TextRetrievalAbsEvaluator
-from .data_loader import TextRetrievalEvalDataLoader
-from .searcher import TextRetrievalEvalRetriever, TextRetrievalEvalDenseRetriever, TextRetrievalEvalReranker
-from .runner import TextRetrievalEvalRunner
-
+from importlib import import_module
 
 __all__ = [
     "TextRetrievalEvalArgs",
@@ -15,3 +10,22 @@ __all__ = [
     "TextRetrievalEvalReranker",
     "TextRetrievalEvalRunner",
 ]
+
+
+def __getattr__(name):
+    if name in {"TextRetrievalEvalArgs", "TextRetrievalEvalModelArgs"}:
+        module = import_module("Nexus.evaluation.text_retrieval.arguments")
+        return getattr(module, name)
+    if name == "TextRetrievalAbsEvaluator":
+        module = import_module("Nexus.evaluation.text_retrieval.evaluator")
+        return getattr(module, name)
+    if name == "TextRetrievalEvalDataLoader":
+        module = import_module("Nexus.evaluation.text_retrieval.data_loader")
+        return getattr(module, name)
+    if name in {"TextRetrievalEvalRetriever", "TextRetrievalEvalDenseRetriever", "TextRetrievalEvalReranker"}:
+        module = import_module("Nexus.evaluation.text_retrieval.searcher")
+        return getattr(module, name)
+    if name == "TextRetrievalEvalRunner":
+        module = import_module("Nexus.evaluation.text_retrieval.runner")
+        return getattr(module, name)
+    raise AttributeError(f"module 'Nexus.evaluation.text_retrieval' has no attribute {name!r}")

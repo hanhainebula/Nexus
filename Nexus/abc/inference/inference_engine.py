@@ -5,9 +5,20 @@ from typing import Union, List, Tuple, Any
 
 import pandas as pd
 
-import onnx
-import onnxruntime as ort
-import tensorrt as trt
+try:
+    import onnx
+except ImportError:
+    onnx = None
+
+try:
+    import onnxruntime as ort
+except ImportError:
+    ort = None
+
+try:
+    import tensorrt as trt
+except ImportError:
+    trt = None
 
 from .arguments import AbsInferenceArguments
 
@@ -23,6 +34,8 @@ class InferenceEngine(ABC):
 
     @staticmethod
     def load_onnx_model(onnx_model_path: Union[str, Path]):
+        if onnx is None:
+            raise ImportError("onnx is required to load ONNX models.")
         onnx_model = onnx.load(onnx_model_path)
         onnx.checker.check_model(onnx_model)
         logger.info(f"====== Loaded ONNX model from {onnx_model_path} ======")
@@ -34,11 +47,11 @@ class InferenceEngine(ABC):
     #     pass
 
     @abstractmethod
-    def get_ort_session(self) -> ort.InferenceSession:
+    def get_ort_session(self) -> Any:
         pass
 
     @abstractmethod
-    def get_trt_session(self) -> trt.ICudaEngine:
+    def get_trt_session(self) -> Any:
         pass
 
     def get_inference_session(self):

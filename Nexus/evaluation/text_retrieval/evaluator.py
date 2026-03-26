@@ -1,14 +1,17 @@
+from __future__ import annotations
+
 import json
 import logging
 import os
-import json
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
+
 import pandas as pd
-from typing import Dict, Optional, List, Union
 
 from .data_loader import TextRetrievalEvalDataLoader
-from .searcher import TextRetrievalEvalRetriever, TextRetrievalEvalReranker
-from .utils import evaluate_metrics, evaluate_mrr
 from Nexus.abc.evaluation import AbsEvaluator
+
+if TYPE_CHECKING:
+    from .searcher import TextRetrievalEvalRetriever, TextRetrievalEvalReranker
 
 logger = logging.getLogger(__name__)
 
@@ -323,6 +326,8 @@ class TextRetrievalAbsEvaluator(AbsEvaluator):
         Returns:
             dict: The results of the metrics.
         """
+        from .utils import evaluate_metrics, evaluate_mrr
+
         ndcg, _map, recall, precision = evaluate_metrics(
             qrels=qrels,
             results=search_results,

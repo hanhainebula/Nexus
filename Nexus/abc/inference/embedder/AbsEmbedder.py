@@ -200,6 +200,14 @@ class AbsEmbedder(ABC):
 
         pool["input"].close()
         pool["output"].close()
+        try:
+            pool["input"].join_thread()
+        except Exception:
+            pass
+        try:
+            pool["output"].join_thread()
+        except Exception:
+            pass
         pool = None
 
     # adapted from https://github.com/UKPLab/sentence-transformers/blob/1802076d4eae42ff0a5629e1b04e75785d4e193b/sentence_transformers/SentenceTransformer.py#L877
@@ -254,4 +262,3 @@ class AbsEmbedder(ABC):
             return np.concatenate(results_list, axis=0)
         else:
             raise NotImplementedError("Unsupported type for results_list")
-

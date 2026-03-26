@@ -8,4 +8,4 @@ from .sampler import *
 from .feature_interaction import *
 from .score import *
 from .loss import *
-
+from .multimodal import *

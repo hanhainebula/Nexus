@@ -15,13 +15,27 @@ setup(
     include_package_data=True,
     install_requires=[
         'torch>=1.6.0',
-        'transformers==4.44.2',
-        'datasets==2.19.0',
+        'transformers>=4.44.2',
+        'datasets>=2.19.0',
         'accelerate>=0.20.1',
         'sentence_transformers',
         'peft',
         'ir-datasets',
         'sentencepiece',
-        'protobuf'
+        'protobuf',
+        'pyyaml'
     ],
+    extras_require={
+        'eval': [
+            'faiss-cpu',
+            'pytrec_eval'
+        ],
+        'multimodal': [
+            'transformers>=4.57.3',
+            'Pillow',
+            'qwen-vl-utils>=0.0.14',
+            'decord>=0.6.0',
+            'torchvision>=0.23.0'
+        ]
+    }
 )

@@ -17,3 +17,18 @@ The key industry features are as follows:
 
 ## Tutorial
 The following tutorials provide detailed introduction on training, evaluation, and deploying [recommendation](./examples/recommendation/tutorial.ipynb) or [textual](./examples/text_retrieval/tutorial.ipynb) models using Nexus.
+
+## Multimodal Retrieval
+
+Nexus now includes a dedicated multimodal embedder pipeline under `Nexus/training/embedder/multimodal_retrieval`, `Nexus/inference/embedder/multimodal_retrieval`, and `Nexus/evaluation/multimodal_retrieval`. Usage examples and dataset format are documented in [`examples/multimodal_retrieval/README.md`](./examples/multimodal_retrieval/README.md).
+
+
+## Multimodal Embedding
+
+Nexus now includes a multimodal embedding pipeline for retrieval-oriented VLM finetuning, inference, and local evaluation.
+
+- Finetuning entrypoint: `python -m Nexus.training.embedder.multimodal_retrieval --model_config ... --data_config ... --training_config ...`
+- Inference class: `Nexus.MultimodalEmbedder`
+- Evaluation entrypoint: `python -m Nexus.evaluation.multimodal_retrieval --eval_config ... --model_config ...`
+
+The reference configs and data format are documented in [examples/multimodal_retrieval/README.md](./examples/multimodal_retrieval/README.md).
