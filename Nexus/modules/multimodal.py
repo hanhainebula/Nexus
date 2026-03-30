@@ -1,5 +1,7 @@
 import base64
 import io
+import json
+import math
 import os
 from copy import deepcopy
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -10,17 +12,28 @@ from transformers import AutoConfig, AutoModel, AutoModelForCausalLM, AutoProces
 
 
 DEFAULT_MULTIMODAL_MODEL_TYPE = "auto"
-CHAT_TEMPLATE_MODEL_TYPES = {"qwen2_vl", "qwen2_5_vl", "qwen3_vl", "llava_next"}
+CHAT_TEMPLATE_MODEL_TYPES = {"qwen2_vl", "qwen2_5_vl", "qwen3_vl", "qwen3_5", "llava_next"}
 CONDITIONAL_GENERATION_MODEL_TYPES = {
     "qwen2_vl": "Qwen2VLForConditionalGeneration",
     "qwen2_5_vl": "Qwen2_5_VLForConditionalGeneration",
     "qwen3_vl": "Qwen3VLForConditionalGeneration",
+    "qwen3_5": "Qwen3_5ForConditionalGeneration",
     "llava_next": "LlavaNextForConditionalGeneration",
+}
+BACKBONE_MODEL_TYPES = {
+    "qwen2_vl": "Qwen2VLModel",
+    "qwen2_5_vl": "Qwen2_5_VLModel",
+    "qwen3_vl": "Qwen3VLModel",
+    "qwen3_5": "Qwen3_5Model",
 }
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tif", ".tiff")
 VIDEO_SUFFIXES = (".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v", ".mpg", ".mpeg", ".wmv")
-VIDEO_MODEL_TYPES = {"qwen2_vl", "qwen2_5_vl", "qwen3_vl"}
+VIDEO_MODEL_TYPES = {"qwen2_vl", "qwen2_5_vl", "qwen3_vl", "qwen3_5"}
 DEFAULT_VIDEO_NUM_FRAMES = 8
+DEFAULT_BACKBONE_LOAD_STRATEGY = "auto"
+SUPPORTED_BACKBONE_LOAD_STRATEGIES = {DEFAULT_BACKBONE_LOAD_STRATEGY, "prefer_base_model"}
+OUTPUT_MODE_LAST_HIDDEN_STATE = "last_hidden_state"
+OUTPUT_MODE_HIDDEN_STATES = "hidden_states"
 
 
 def resolve_torch_dtype(dtype_name: Optional[str]):
@@ -35,6 +48,98 @@ def infer_multimodal_model_type(config) -> str:
     if config is None:
         return DEFAULT_MULTIMODAL_MODEL_TYPE
     return getattr(config, "model_type", DEFAULT_MULTIMODAL_MODEL_TYPE) or DEFAULT_MULTIMODAL_MODEL_TYPE
+
+
+def parse_optional_json_dict(value: Optional[Any], field_name: str) -> Optional[Dict[str, Any]]:
+    if value in [None, "", {}]:
+        return None
+    if isinstance(value, dict):
+        return {key: item for key, item in value.items() if item is not None}
+    if isinstance(value, str):
+        parsed = json.loads(value)
+        if not isinstance(parsed, dict):
+            raise ValueError(f"`{field_name}` must decode to a JSON object.")
+        return {key: item for key, item in parsed.items() if item is not None}
+    raise TypeError(f"`{field_name}` must be a dict or a JSON object string.")
+
+
+def _resolve_model_type_for_processor(
+    model_name_or_path: str,
+    cache_dir: Optional[str] = None,
+    trust_remote_code: bool = False,
+    token: Optional[str] = None,
+    model_type: Optional[str] = None,
+) -> str:
+    if model_type not in [None, "", DEFAULT_MULTIMODAL_MODEL_TYPE]:
+        return model_type
+
+    peft_config = _maybe_load_peft_config(
+        model_name_or_path,
+        cache_dir=cache_dir,
+        token=token,
+    )
+    config_path = peft_config.base_model_name_or_path if peft_config is not None else model_name_or_path
+
+    try:
+        config = AutoConfig.from_pretrained(
+            config_path,
+            cache_dir=cache_dir,
+            trust_remote_code=trust_remote_code,
+            token=token,
+        )
+    except Exception:
+        return DEFAULT_MULTIMODAL_MODEL_TYPE
+
+    return infer_multimodal_model_type(config)
+
+
+def _square_edge_from_pixel_budget(pixel_budget: Any, *, round_up: bool) -> int:
+    numeric_value = float(pixel_budget)
+    if numeric_value <= 0:
+        raise ValueError("Pixel budgets such as `min_pixels` and `max_pixels` must be positive.")
+
+    budget_int = int(math.ceil(numeric_value))
+    edge = math.isqrt(budget_int)
+    if round_up and edge * edge < budget_int:
+        edge += 1
+    return max(edge, 1)
+
+
+def _normalize_processor_kwargs_for_model_type(
+    processor_kwargs: Optional[Dict[str, Any]],
+    model_type: Optional[str],
+) -> Dict[str, Any]:
+    normalized_kwargs = deepcopy(processor_kwargs) if processor_kwargs is not None else {}
+    if model_type != "llava_next":
+        return normalized_kwargs
+
+    max_pixels = normalized_kwargs.pop("max_pixels", None)
+    min_pixels = normalized_kwargs.pop("min_pixels", None)
+    if "size" in normalized_kwargs or "crop_size" in normalized_kwargs:
+        return normalized_kwargs
+
+    target_edge = None
+    if max_pixels is not None:
+        # Llava-NeXT uses a single square resize/crop target instead of Qwen-style
+        # min/max pixel budgets, so we approximate the requested budget with a square edge.
+        target_edge = _square_edge_from_pixel_budget(max_pixels, round_up=False)
+    elif min_pixels is not None:
+        target_edge = _square_edge_from_pixel_budget(min_pixels, round_up=True)
+
+    if target_edge is None:
+        return normalized_kwargs
+
+    normalized_kwargs["size"] = {"shortest_edge": target_edge}
+    normalized_kwargs["crop_size"] = {"height": target_edge, "width": target_edge}
+    return normalized_kwargs
+
+
+def resolve_backbone_load_strategy(strategy: Optional[str]) -> str:
+    resolved = strategy or DEFAULT_BACKBONE_LOAD_STRATEGY
+    if resolved not in SUPPORTED_BACKBONE_LOAD_STRATEGIES:
+        supported = ", ".join(sorted(SUPPORTED_BACKBONE_LOAD_STRATEGIES))
+        raise ValueError(f"Unsupported backbone load strategy: {resolved}. Expected one of: {supported}.")
+    return resolved
 
 
 def _maybe_load_peft_config(
@@ -64,14 +169,29 @@ def load_multimodal_processor(
     cache_dir: Optional[str] = None,
     trust_remote_code: bool = False,
     token: Optional[str] = None,
+    processor_kwargs: Optional[Any] = None,
+    model_type: str = DEFAULT_MULTIMODAL_MODEL_TYPE,
 ):
     processor_path = processor_name_or_path or model_name_or_path
+    resolved_model_type = _resolve_model_type_for_processor(
+        processor_path,
+        cache_dir=cache_dir,
+        trust_remote_code=trust_remote_code,
+        token=token,
+        model_type=model_type,
+    )
+    resolved_processor_kwargs = parse_optional_json_dict(processor_kwargs, field_name="processor_kwargs") or {}
+    resolved_processor_kwargs = _normalize_processor_kwargs_for_model_type(
+        resolved_processor_kwargs,
+        resolved_model_type,
+    )
     try:
         return AutoProcessor.from_pretrained(
             processor_path,
             cache_dir=cache_dir,
             trust_remote_code=trust_remote_code,
             token=token,
+            **resolved_processor_kwargs,
         )
     except Exception:
         peft_config = _maybe_load_peft_config(
@@ -86,6 +206,7 @@ def load_multimodal_processor(
             cache_dir=cache_dir,
             trust_remote_code=trust_remote_code,
             token=token,
+            **resolved_processor_kwargs,
         )
 
 
@@ -101,11 +222,49 @@ def _maybe_load_registered_conditional_generation_model(
     return model_cls.from_pretrained(model_name_or_path, **load_kwargs)
 
 
-def _get_registered_conditional_generation_model_class(
-    model_type: str,
-    transformers_module=None,
+def _maybe_load_registered_backbone_model(
+    config,
+    model_name_or_path: str,
+    load_kwargs: Dict[str, Any],
 ):
-    class_name = CONDITIONAL_GENERATION_MODEL_TYPES.get(model_type)
+    model_type = infer_multimodal_model_type(config)
+    model_cls = _get_registered_backbone_model_class(model_type)
+    if model_cls is None:
+        return None
+    return model_cls.from_pretrained(model_name_or_path, **load_kwargs)
+
+
+def _unwrap_multimodal_base_model(model):
+    for attr_name in ["model", "base_model"]:
+        candidate = getattr(model, attr_name, None)
+        if candidate is not None and candidate is not model:
+            return candidate
+    return None
+
+
+def _maybe_load_base_model_from_conditional_generation_wrapper(
+    config,
+    model_name_or_path: str,
+    load_kwargs: Dict[str, Any],
+):
+    conditional_model = _maybe_load_registered_conditional_generation_model(
+        config=config,
+        model_name_or_path=model_name_or_path,
+        load_kwargs=load_kwargs,
+    )
+    if conditional_model is None:
+        return None
+    return _unwrap_multimodal_base_model(conditional_model)
+
+
+def _get_registered_model_class(
+    model_type: str,
+    class_name_map: Dict[str, str],
+    version_hints: Optional[Dict[str, str]] = None,
+    transformers_module=None,
+    strict: bool = True,
+):
+    class_name = class_name_map.get(model_type)
     if class_name is None:
         return None
 
@@ -116,15 +275,113 @@ def _get_registered_conditional_generation_model_class(
     if model_cls is not None:
         return model_cls
 
+    if not strict:
+        return None
+
     transformers_version = getattr(transformers_module, "__version__", "unknown")
-    if model_type == "qwen3_vl":
-        version_hint = "transformers>=4.57.3"
-    else:
-        version_hint = "a newer transformers version with the required multimodal classes"
+    version_hint = "a newer transformers version with the required multimodal classes"
+    if version_hints is not None:
+        version_hint = version_hints.get(model_type, version_hint)
     raise ImportError(
         f"Model type '{model_type}' requires `{class_name}`, but it is unavailable in "
         f"transformers {transformers_version}. Install Nexus with `pip install -e .[multimodal]` "
         f"or upgrade to {version_hint}."
+    )
+
+
+def _get_registered_conditional_generation_model_class(
+    model_type: str,
+    transformers_module=None,
+):
+    return _get_registered_model_class(
+        model_type=model_type,
+        class_name_map=CONDITIONAL_GENERATION_MODEL_TYPES,
+        version_hints={
+            "qwen3_vl": "transformers>=4.57.3",
+            "qwen3_5": "a transformers main build with Qwen3.5 support",
+        },
+        transformers_module=transformers_module,
+        strict=True,
+    )
+
+
+def _get_registered_backbone_model_class(
+    model_type: str,
+    transformers_module=None,
+):
+    return _get_registered_model_class(
+        model_type=model_type,
+        class_name_map=BACKBONE_MODEL_TYPES,
+        version_hints={
+            "qwen3_vl": "transformers>=4.57.3",
+            "qwen3_5": "a transformers main build with Qwen3.5 support",
+        },
+        transformers_module=transformers_module,
+        strict=False,
+    )
+
+
+def annotate_multimodal_backbone(
+    model,
+    output_mode: str,
+    backbone_load_strategy: Optional[str] = None,
+    loader_kind: Optional[str] = None,
+):
+    try:
+        setattr(model, "_nexus_multimodal_output_mode", output_mode)
+        if backbone_load_strategy is not None:
+            setattr(model, "_nexus_backbone_load_strategy", backbone_load_strategy)
+        if loader_kind is not None:
+            setattr(model, "_nexus_multimodal_loader_kind", loader_kind)
+    except (AttributeError, TypeError):
+        # Some tests stub the backbone with immutable sentinels such as strings.
+        return model
+    return model
+
+
+def _lookup_multimodal_runtime_attr(model, attr_name: str):
+    current = model
+    visited = set()
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+        if hasattr(current, attr_name):
+            return getattr(current, attr_name)
+        next_model = None
+        for candidate_attr in ["base_model", "model"]:
+            candidate = getattr(current, candidate_attr, None)
+            if candidate is not None and candidate is not current:
+                next_model = candidate
+                break
+        current = next_model
+    return None
+
+
+def infer_multimodal_output_mode(model) -> str:
+    output_mode = _lookup_multimodal_runtime_attr(model, "_nexus_multimodal_output_mode")
+    if output_mode in [OUTPUT_MODE_LAST_HIDDEN_STATE, OUTPUT_MODE_HIDDEN_STATES]:
+        return output_mode
+    return OUTPUT_MODE_LAST_HIDDEN_STATE
+
+
+def build_multimodal_forward_kwargs(model) -> Dict[str, Any]:
+    forward_kwargs: Dict[str, Any] = {"return_dict": True}
+    if infer_multimodal_output_mode(model) == OUTPUT_MODE_HIDDEN_STATES:
+        forward_kwargs["output_hidden_states"] = True
+    return forward_kwargs
+
+
+def extract_multimodal_hidden_states(outputs):
+    last_hidden_state = getattr(outputs, "last_hidden_state", None)
+    if last_hidden_state is not None:
+        return last_hidden_state
+
+    hidden_states = getattr(outputs, "hidden_states", None)
+    if hidden_states is not None:
+        return hidden_states[-1] if isinstance(hidden_states, (list, tuple)) else hidden_states
+
+    raise AttributeError(
+        "The multimodal backbone output does not expose `last_hidden_state` or `hidden_states`. "
+        "Try enabling `prefer_base_model` for compatible backbones."
     )
 
 
@@ -137,7 +394,9 @@ def load_multimodal_backbone(
     torch_dtype_name: Optional[str] = None,
     attn_implementation: Optional[str] = None,
     peft_is_trainable: bool = False,
+    backbone_load_strategy: str = DEFAULT_BACKBONE_LOAD_STRATEGY,
 ):
+    resolved_load_strategy = resolve_backbone_load_strategy(backbone_load_strategy)
     peft_config = _maybe_load_peft_config(
         model_name_or_path,
         cache_dir=cache_dir,
@@ -170,16 +429,64 @@ def load_multimodal_backbone(
     if attn_implementation is not None:
         load_kwargs["attn_implementation"] = attn_implementation
 
-    model = _maybe_load_registered_conditional_generation_model(
-        config=config,
-        model_name_or_path=base_model_name_or_path,
-        load_kwargs=load_kwargs,
-    )
+    model = None
+    loader_kind = None
+
+    if resolved_load_strategy == "prefer_base_model":
+        model = _maybe_load_base_model_from_conditional_generation_wrapper(
+            config=config,
+            model_name_or_path=base_model_name_or_path,
+            load_kwargs=load_kwargs,
+        )
+        if model is not None:
+            loader_kind = "conditional_wrapper_base_model"
+
+    if model is None and resolved_load_strategy == "prefer_base_model":
+        model = _maybe_load_registered_backbone_model(
+            config=config,
+            model_name_or_path=base_model_name_or_path,
+            load_kwargs=load_kwargs,
+        )
+        if model is not None:
+            loader_kind = "registered_backbone_model"
+
+    if model is None and resolved_load_strategy == DEFAULT_BACKBONE_LOAD_STRATEGY:
+        model = _maybe_load_registered_conditional_generation_model(
+            config=config,
+            model_name_or_path=base_model_name_or_path,
+            load_kwargs=load_kwargs,
+        )
+        if model is not None:
+            loader_kind = "registered_conditional_generation"
+
     if model is None:
         try:
             model = AutoModel.from_pretrained(base_model_name_or_path, **load_kwargs)
+            loader_kind = "auto_model"
         except Exception:
-            model = AutoModelForCausalLM.from_pretrained(base_model_name_or_path, **load_kwargs)
+            if resolved_load_strategy == "prefer_base_model":
+                model = _maybe_load_registered_conditional_generation_model(
+                    config=config,
+                    model_name_or_path=base_model_name_or_path,
+                    load_kwargs=load_kwargs,
+                )
+                if model is not None:
+                    loader_kind = "registered_conditional_generation"
+            if model is None:
+                model = AutoModelForCausalLM.from_pretrained(base_model_name_or_path, **load_kwargs)
+                loader_kind = "auto_causal_lm"
+
+    output_mode = (
+        OUTPUT_MODE_LAST_HIDDEN_STATE
+        if loader_kind in {"conditional_wrapper_base_model", "registered_backbone_model", "auto_model"}
+        else OUTPUT_MODE_HIDDEN_STATES
+    )
+    model = annotate_multimodal_backbone(
+        model,
+        output_mode=output_mode,
+        backbone_load_strategy=resolved_load_strategy,
+        loader_kind=loader_kind,
+    )
 
     if peft_config is not None:
         from peft import PeftModel
@@ -188,6 +495,12 @@ def load_multimodal_backbone(
             model,
             model_name_or_path,
             is_trainable=peft_is_trainable,
+        )
+        model = annotate_multimodal_backbone(
+            model,
+            output_mode=output_mode,
+            backbone_load_strategy=resolved_load_strategy,
+            loader_kind=loader_kind,
         )
     return model, config
 
@@ -723,10 +1036,16 @@ class MultimodalProcessorAdapter:
         processor,
         model_type: str = DEFAULT_MULTIMODAL_MODEL_TYPE,
         use_chat_template: bool = True,
+        processor_call_kwargs: Optional[Any] = None,
     ):
         self.processor = processor
         self.model_type = model_type
         self.use_chat_template = use_chat_template
+        parsed_call_kwargs = parse_optional_json_dict(processor_call_kwargs, field_name="processor_call_kwargs") or {}
+        self.processor_call_kwargs = _normalize_processor_kwargs_for_model_type(
+            parsed_call_kwargs,
+            self.model_type,
+        )
 
     def _supports_video_inputs(self) -> bool:
         return self.model_type in VIDEO_MODEL_TYPES or hasattr(self.processor, "video_processor")
@@ -789,6 +1108,7 @@ class MultimodalProcessorAdapter:
                 call_kwargs["images"] = current_images
             if len(current_videos) > 0:
                 call_kwargs["videos"] = current_videos
+            call_kwargs.update(getattr(self, "processor_call_kwargs", {}) or {})
             return call_kwargs
 
         try:
@@ -828,22 +1148,59 @@ class MultimodalProcessorAdapter:
                 "Please use a processor with padding support."
             )
 
-        tokenizer_features = []
-        for item in encoded_items:
-            feature = {}
-            for key in ["input_ids", "attention_mask", "token_type_ids"]:
-                if key in item:
-                    feature[key] = self._strip_singleton_batch(item[key])
-            tokenizer_features.append(feature)
-
-        batch = tokenizer.pad(tokenizer_features, padding=True, return_tensors="pt")
-        for key in [
+        tokenizer_pad_keys = {"input_ids", "attention_mask", "token_type_ids"}
+        media_keys = {
             "pixel_values",
             "image_grid_thw",
             "pixel_values_videos",
             "video_grid_thw",
             "image_sizes",
-        ]:
+        }
+        extra_sequence_keys = set()
+        tokenizer_features = []
+        for item in encoded_items:
+            feature = {}
+            for key in tokenizer_pad_keys:
+                if key in item:
+                    feature[key] = self._strip_singleton_batch(item[key])
+            for key, value in item.items():
+                if key in tokenizer_pad_keys or key in media_keys or value is None:
+                    continue
+                if isinstance(value, list):
+                    extra_sequence_keys.add(key)
+            tokenizer_features.append(feature)
+
+        batch = tokenizer.pad(tokenizer_features, padding=True, return_tensors="pt")
+        for key in tokenizer_pad_keys:
+            value = batch.get(key)
+            if isinstance(value, torch.Tensor) and value.ndim == 1:
+                batch[key] = value.unsqueeze(0)
+        max_length = batch["input_ids"].shape[1]
+        padding_side = getattr(tokenizer, "padding_side", "right")
+
+        for key in sorted(extra_sequence_keys):
+            padded_values = []
+            for item in encoded_items:
+                raw_value = item.get(key)
+                if raw_value is None:
+                    sequence = []
+                else:
+                    sequence = self._strip_singleton_batch(raw_value)
+                tensor = torch.as_tensor(sequence, dtype=torch.long)
+                pad_length = max_length - tensor.shape[0]
+                if pad_length < 0:
+                    raise ValueError(f"Unexpected sequence length for `{key}`: {tensor.shape[0]} > {max_length}")
+                if pad_length > 0:
+                    pad_tensor = torch.zeros(pad_length, dtype=tensor.dtype)
+                    tensor = (
+                        torch.cat([pad_tensor, tensor], dim=0)
+                        if padding_side == "left"
+                        else torch.cat([tensor, pad_tensor], dim=0)
+                    )
+                padded_values.append(tensor)
+            batch[key] = torch.stack(padded_values, dim=0)
+
+        for key in media_keys:
             values = [item[key] for item in encoded_items if item.get(key) is not None]
             if len(values) == 0:
                 continue

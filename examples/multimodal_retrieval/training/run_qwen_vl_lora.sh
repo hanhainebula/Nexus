@@ -37,6 +37,20 @@ fi
 
 echo "Using CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
 
+EXTRA_ARGS=()
+if [[ -n "${BACKBONE_LOAD_STRATEGY:-}" ]]; then
+  EXTRA_ARGS+=(--backbone_load_strategy "${BACKBONE_LOAD_STRATEGY}")
+fi
+if [[ -n "${PROCESSOR_KWARGS:-}" ]]; then
+  # Example (Qwen families): PROCESSOR_KWARGS='{"max_pixels":262144}'
+  # Example (Llava-Next explicit): PROCESSOR_KWARGS='{"size":{"shortest_edge":448},"crop_size":{"height":448,"width":448}}'
+  EXTRA_ARGS+=(--processor_kwargs "${PROCESSOR_KWARGS}")
+fi
+if [[ -n "${PROCESSOR_CALL_KWARGS:-}" ]]; then
+  # Nexus also translates Llava-Next Qwen-style pixel budgets into size/crop_size when model_type=llava_next.
+  EXTRA_ARGS+=(--processor_call_kwargs "${PROCESSOR_CALL_KWARGS}")
+fi
+
 "${TORCHRUN_BIN}" --nproc_per_node="${NPROC_PER_NODE:-1}" \
   -m Nexus.training.embedder.multimodal_retrieval \
   --model_name_or_path "${MODEL_NAME_OR_PATH}" \
@@ -64,4 +78,5 @@ echo "Using CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
   --attn_implementation "${ATTN_IMPLEMENTATION:-flash_attention_2}" \
   --logging_steps "${LOGGING_STEPS:-10}" \
   --save_steps "${SAVE_STEPS:-500}" \
+  "${EXTRA_ARGS[@]}" \
   "${PRECISION_ARGS[@]}"

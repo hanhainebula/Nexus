@@ -75,8 +75,53 @@ If your converted dataset stores JSONL files and media files under different dir
 - A tiny local smoke dataset is bundled under [`data/`](./data/) so the example configs have concrete paths to point at.
 - The example JSON configs now resolve relative paths against the config file directory, so they can be launched from outside the repo root as well.
 - Precision settings must match the GPU you actually use. `bf16` is suitable for datacenter GPUs such as A100/H100, while many consumer GPUs are safer with `PRECISION_MODE=fp16` or `PRECISION_MODE=fp32`.
+- If you are setting up a fresh machine for multimodal experiments, start from [`requirements.txt`](./requirements.txt). This is the dependency set we validated against `Qwen2-VL`, `Qwen2.5-VL`, `Qwen3-VL`, `Qwen3.5`, and `Llava-Next`. A typical setup is:
+
+```bash
+python3.10 -m venv nexus-mm
+source nexus-mm/bin/activate
+pip install --upgrade pip
+pip install -r examples/multimodal_retrieval/requirements.txt
+pip install -e . --no-deps
+```
+
 - Config-file entrypoints: [`training/run_single_device.sh`](./training/run_single_device.sh) and [`evaluation/run_local.sh`](./evaluation/run_local.sh)
 - CLI-style training: [`training/run_qwen_vl_lora.sh`](./training/run_qwen_vl_lora.sh)
 - CLI-style evaluation: [`evaluation/run_local_eval.sh`](./evaluation/run_local_eval.sh)
 - Inference: [`inference/encode_demo.py`](./inference/encode_demo.py)
 - Data conversion tools: `tools/multimodal_retrieval/`
+
+## Verified backbone families
+
+The current multimodal retrieval stack has already been exercised on these backbone families:
+
+- `Qwen2-VL`
+- `Qwen2.5-VL`
+- `Qwen3-VL`
+- `Qwen3.5`
+
+Notes:
+
+- `Qwen3-VL` and `Qwen3.5` require a newer multimodal runtime than older local environments that only ship legacy `transformers` releases.
+- [`requirements.txt`](./requirements.txt) pins the runtime that we actually used to load and exercise the currently supported multimodal backbones on this branch.
+- The `backbone_load_strategy` config knob can now be used to compare the default loading path with `prefer_base_model`, which is helpful when validating direct `last_hidden_state` pooling on compatible VLM backbones.
+- The training, inference, and evaluation entrypoints all accept `processor_kwargs` and `processor_call_kwargs`, so image-related overrides such as `size`, `min_pixels`, or `max_pixels` can be explored without patching the code.
+- On `Qwen2-VL`, `Qwen2.5-VL`, `Qwen3-VL`, and `Qwen3.5`, `min_pixels` / `max_pixels` are forwarded to the underlying image processor directly. For example:
+
+```json
+{
+  "processor_kwargs": {"max_pixels": 262144},
+  "processor_call_kwargs": {"min_pixels": 50176, "max_pixels": 262144}
+}
+```
+
+- `Llava-Next` uses `size` / `crop_size` instead of Qwen-style pixel-budget names. Nexus now translates `min_pixels` / `max_pixels` into an approximate square `size` / `crop_size` pair when `model_type=llava_next`, but explicit `size` / `crop_size` values still take precedence. For example:
+
+```json
+{
+  "processor_kwargs": {
+    "size": {"shortest_edge": 448},
+    "crop_size": {"height": 448, "width": 448}
+  }
+}
+```

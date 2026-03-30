@@ -23,6 +23,7 @@ FAMILY_CLASS_NAMES = {
     "qwen2_vl": "Qwen2VLForConditionalGeneration",
     "qwen2_5_vl": "Qwen2_5_VLForConditionalGeneration",
     "qwen3_vl": "Qwen3VLForConditionalGeneration",
+    "qwen3_5": "Qwen3_5ForConditionalGeneration",
     "llava_next": "LlavaNextForConditionalGeneration",
 }
 
@@ -115,6 +116,56 @@ def build_qwen3_vl_case() -> Tuple[object, object]:
     return config, transformers.Qwen3VLForConditionalGeneration
 
 
+def build_qwen3_5_case() -> Tuple[object, object]:
+    config = transformers.Qwen3_5Config(
+        text_config={
+            "vocab_size": 256,
+            "hidden_size": 64,
+            "intermediate_size": 128,
+            "num_hidden_layers": 2,
+            "num_attention_heads": 4,
+            "num_key_value_heads": 2,
+            "head_dim": 16,
+            "max_position_embeddings": 128,
+            "full_attention_interval": 2,
+            "layer_types": ["linear_attention", "full_attention"],
+            "linear_conv_kernel_dim": 4,
+            "linear_num_key_heads": 4,
+            "linear_num_value_heads": 4,
+            "linear_key_head_dim": 16,
+            "linear_value_head_dim": 16,
+            "rope_parameters": {
+                "rope_type": "default",
+                "mrope_section": [4, 4, 4],
+                "mrope_interleaved": True,
+                "rope_theta": 1000000,
+                "partial_rotary_factor": 0.25,
+            },
+            "attn_output_gate": True,
+            "attention_bias": False,
+            "attention_dropout": 0.0,
+            "mamba_ssm_dtype": "float32",
+            "mlp_only_layers": [],
+        },
+        vision_config={
+            "depth": 2,
+            "hidden_size": 64,
+            "intermediate_size": 128,
+            "hidden_act": "gelu_pytorch_tanh",
+            "num_heads": 4,
+            "in_channels": 3,
+            "patch_size": 16,
+            "spatial_merge_size": 2,
+            "temporal_patch_size": 2,
+            "out_hidden_size": 64,
+            "num_position_embeddings": 64,
+            "deepstack_visual_indexes": [],
+        },
+        tie_word_embeddings=False,
+    )
+    return config, transformers.Qwen3_5ForConditionalGeneration
+
+
 def build_llava_next_case() -> Tuple[object, object]:
     config = transformers.LlavaNextConfig(
         text_config=transformers.LlamaConfig(
@@ -145,6 +196,7 @@ CASE_BUILDERS: Dict[str, Callable[[], Tuple[object, object]]] = {
     "qwen2_vl": build_qwen2_vl_case,
     "qwen2_5_vl": build_qwen2_5_vl_case,
     "qwen3_vl": build_qwen3_vl_case,
+    "qwen3_5": build_qwen3_5_case,
     "llava_next": build_llava_next_case,
 }
 

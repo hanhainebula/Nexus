@@ -1,5 +1,6 @@
 import logging
 import os
+import inspect
 from typing import Optional
 
 import torch
@@ -51,13 +52,15 @@ class MultimodalEmbedderRunner(AbsEmbedderRunner):
             passage_max_len=self.data_args.passage_max_len,
             model_type=self.model_args.model_type,
             use_chat_template=self.model_args.use_chat_template,
+            processor_call_kwargs=self.model_args.processor_call_kwargs,
         )
 
+        overwrite_output_dir = getattr(training_args, "overwrite_output_dir", True)
         if (
             os.path.exists(training_args.output_dir)
             and os.listdir(training_args.output_dir)
             and training_args.do_train
-            and not training_args.overwrite_output_dir
+            and not overwrite_output_dir
         ):
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and is not empty. "
@@ -106,13 +109,18 @@ class MultimodalEmbedderRunner(AbsEmbedderRunner):
         return model
 
     def load_trainer(self) -> MultimodalEmbedderTrainer:
-        return MultimodalEmbedderTrainer(
-            model=self.model,
-            args=self.training_args,
-            train_dataset=self.train_dataset,
-            data_collator=self.data_collator,
-            tokenizer=getattr(self.processor, "tokenizer", None),
-        )
+        trainer_kwargs = {
+            "model": self.model,
+            "args": self.training_args,
+            "train_dataset": self.train_dataset,
+            "data_collator": self.data_collator,
+        }
+        trainer_init_params = inspect.signature(MultimodalEmbedderTrainer.__init__).parameters
+        if "processing_class" in trainer_init_params:
+            trainer_kwargs["processing_class"] = self.processor
+        elif "tokenizer" in trainer_init_params:
+            trainer_kwargs["tokenizer"] = getattr(self.processor, "tokenizer", None)
+        return MultimodalEmbedderTrainer(**trainer_kwargs)
 
     def load_dataset(self) -> AbsMultimodalEmbedderTrainDataset:
         return AbsMultimodalEmbedderTrainDataset(
@@ -126,4 +134,3 @@ class MultimodalEmbedderRunner(AbsEmbedderRunner):
             padding=True,
             return_tensors="pt",
         )
-

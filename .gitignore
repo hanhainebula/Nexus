@@ -15,6 +15,10 @@ examples/recommendation/inference/inference_data/recflow/*
 .vscode/
 saves/
 */saves/
+.cache/
+experiments/stage1_validation/backbone_matrix/*/tiny_checkpoints/
+experiments/stage1_validation/mmeb_real_eval/raw/.cache/
+experiments/stage1_validation/mmeb_real_eval/prepared_eval/_cache/
 
 checkpoints/
 eval_scripts/
@@ -25,3 +29,4 @@ nexus_test*
 
 common_commands
 logs/
+code_docs/

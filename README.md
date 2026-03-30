@@ -20,7 +20,7 @@ The following tutorials provide detailed introduction on training, evaluation, a
 
 ## Multimodal Retrieval
 
-Nexus now includes a dedicated multimodal embedder pipeline under `Nexus/training/embedder/multimodal_retrieval`, `Nexus/inference/embedder/multimodal_retrieval`, and `Nexus/evaluation/multimodal_retrieval`. Usage examples and dataset format are documented in [`examples/multimodal_retrieval/README.md`](./examples/multimodal_retrieval/README.md).
+Nexus now includes a dedicated multimodal embedder pipeline under `Nexus/training/embedder/multimodal_retrieval`, `Nexus/inference/embedder/multimodal_retrieval`, and `Nexus/evaluation/multimodal_retrieval`. Usage examples and dataset format are documented in [`examples/multimodal_retrieval/README.md`](./examples/multimodal_retrieval/README.md). If you are preparing a machine specifically for multimodal experiments, start from [`examples/multimodal_retrieval/requirements.txt`](./examples/multimodal_retrieval/requirements.txt), which captures the dependency set we validated for the current Qwen/Llava multimodal stack.
 
 
 ## Multimodal Embedding
@@ -31,4 +31,4 @@ Nexus now includes a multimodal embedding pipeline for retrieval-oriented VLM fi
 - Inference class: `Nexus.MultimodalEmbedder`
 - Evaluation entrypoint: `python -m Nexus.evaluation.multimodal_retrieval --eval_config ... --model_config ...`
 
-The reference configs and data format are documented in [examples/multimodal_retrieval/README.md](./examples/multimodal_retrieval/README.md).
+The reference configs, validated multimodal runtime, and data format are documented in [examples/multimodal_retrieval/README.md](./examples/multimodal_retrieval/README.md) and [examples/multimodal_retrieval/requirements.txt](./examples/multimodal_retrieval/requirements.txt).

@@ -43,6 +43,7 @@ echo "[1/4] py_compile"
   "${REPO_ROOT}/tools/multimodal_retrieval/export_mmeb_v2_inventory.py" \
   "${REPO_ROOT}/tools/multimodal_retrieval/export_mmeb_v2_manifest.py" \
   "${REPO_ROOT}/tools/multimodal_retrieval/hf_dataset_manager.py" \
+  "${REPO_ROOT}/tools/multimodal_retrieval/prepare_exploration_train_data.py" \
   "${REPO_ROOT}/tools/multimodal_retrieval/prepare_mmeb_v2_eval_data.py" \
   "${REPO_ROOT}/tools/multimodal_retrieval/prepare_mmeb_v2_train_data.py" \
   "${REPO_ROOT}/tools/multimodal_retrieval/prepare_public_data.py" \

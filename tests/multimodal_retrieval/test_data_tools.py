@@ -53,6 +53,14 @@ gpu_tool = load_module_from_path(
     "check_idle_gpus",
     "tools/multimodal_retrieval/check_idle_gpus.py",
 )
+exploration_tool = load_module_from_path(
+    "prepare_exploration_train_data",
+    "tools/multimodal_retrieval/prepare_exploration_train_data.py",
+)
+repair_train_media_tool = load_module_from_path(
+    "repair_mmeb_train_media_paths",
+    "tools/multimodal_retrieval/repair_mmeb_train_media_paths.py",
+)
 text_eval_utils = load_module_from_path(
     "text_retrieval_utils",
     "Nexus/evaluation/text_retrieval/utils.py",
@@ -254,6 +262,52 @@ def test_prepare_train_source_resolves_local_mmeb_subset(tmp_path):
     assert resolved["split"] == "original"
     assert resolved["image_root"] == str(image_root)
     assert resolved["is_local"] is True
+
+
+def test_prepare_train_source_prefers_existing_images_dir(tmp_path):
+    raw_root = tmp_path / "raw"
+    subset_root = raw_root / "vlm2vec_train" / "MMEB-train" / "HatefulMemes"
+    subset_root.mkdir(parents=True)
+    image_root = raw_root / "vlm2vec_train" / "MMEB-train" / "images"
+    image_root.mkdir(parents=True)
+
+    entry = {
+        "modality": "image",
+        "source_name": "HatefulMemes",
+        "dataset_parser": "mmeb",
+        "dataset_name": "TIGER-Lab/MMEB-train",
+        "subset_name": "HatefulMemes",
+        "dataset_split": "original",
+        "image_dir": "vlm2vec_train/MMEB-train/image",
+        "image_root_candidates": ["images", "image"],
+    }
+
+    resolved = prepare_train_tool.resolve_train_source(entry, raw_root)
+
+    assert resolved["image_root"] == str(image_root)
+    assert resolved["is_local"] is True
+
+
+def test_repair_mmeb_train_media_paths_rewrites_to_existing_archive_layout(tmp_path):
+    image_root = tmp_path / "MMEB" / "HatefulMemes"
+    image_root.mkdir(parents=True)
+    (image_root / "image_0.jpg").write_bytes(b"fake")
+
+    row = {
+        "query": {
+            "text": "classify meme",
+            "image_path": "images/HatefulMemes/Train/HatefulMemes_image_0.jpg",
+        },
+        "pos": [{"text": "Yes"}],
+        "neg": [{"text": "No"}],
+        "image_root": "/stale/root",
+    }
+
+    rewritten, unresolved = repair_train_media_tool.rewrite_row_image_paths(row, image_root)
+
+    assert unresolved == []
+    assert rewritten["image_root"] == str(image_root)
+    assert rewritten["query"]["image_path"] == "image_0.jpg"
 
 
 def test_prepare_public_data_augment_source_for_legacy_manifest():
@@ -480,6 +534,30 @@ def test_convert_instruction_style_eval_row_for_image_t2i():
     assert qrels == [{"query-id": "q1", "corpus-id": "images/cat.jpg", "score": 1}]
 
 
+def test_convert_legacy_pair_style_eval_row_for_hatefulmemes():
+    args = types.SimpleNamespace(
+        sequence_mode="auto",
+        dataset_name="HatefulMemes",
+        query_prefix="q",
+    )
+    row = {
+        "qry": "<|image_1|>\nRepresent the given image for binary classification to determine whether it constitutes hateful speech or not\n",
+        "qry_image_path": "images/HatefulMemes/Train/HatefulMemes_image_0.jpg",
+        "pos_text": "Yes",
+        "pos_image_path": "",
+        "neg_text": "No",
+        "neg_image_path": "",
+    }
+
+    query_record, corpus_records, qrels = convert_eval.convert_legacy_pair_style_row(0, row, args)
+
+    assert query_record["_id"] == "q0"
+    assert query_record["image_path"] == "images/HatefulMemes/Train/HatefulMemes_image_0.jpg"
+    assert "<|image_1|>" not in query_record["text"]
+    assert [record["_id"] for record in corpus_records] == ["Yes", "No"]
+    assert qrels == [{"query-id": "q0", "corpus-id": "Yes", "score": 1}]
+
+
 def test_serialize_image_like_supports_pil_images():
     from PIL import Image
 
@@ -550,3 +628,33 @@ def test_text_eval_utils_fallback_to_numpy_when_faiss_is_missing(monkeypatch):
 
     assert scores.shape == (1, 1)
     assert indices.tolist() == [[0]]
+
+
+def test_prepare_exploration_train_data_repeats_to_target(tmp_path):
+    input_file = tmp_path / "train.jsonl"
+    input_file.write_text('{"query":"q1"}\n{"query":"q2"}\n', encoding="utf-8")
+
+    records = exploration_tool.load_records([str(input_file)])
+    output_records = exploration_tool.materialize_target_records(
+        records=records,
+        target_size=5,
+        seed=7,
+        fill_mode="repeat_to_target",
+        shuffle=False,
+    )
+
+    assert len(output_records) == 5
+    assert output_records[0]["query"] == "q1"
+    assert output_records[1]["query"] == "q2"
+
+
+def test_prepare_exploration_train_data_discovers_nested_json_inputs(tmp_path):
+    shard_dir = tmp_path / "dataset" / "nested"
+    shard_dir.mkdir(parents=True)
+    (shard_dir / "part.json").write_text('[{"query":"a"},{"query":"b"}]', encoding="utf-8")
+
+    files = exploration_tool.iter_input_files([str(tmp_path / "dataset")])
+    records = exploration_tool.load_records([str(tmp_path / "dataset")])
+
+    assert files == [shard_dir / "part.json"]
+    assert [record["query"] for record in records] == ["a", "b"]

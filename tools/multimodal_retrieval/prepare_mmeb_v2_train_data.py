@@ -176,6 +176,16 @@ def resolve_repo_dir(raw_root: Path, candidate_names: List[str]) -> Optional[Pat
     return find_first_existing_path(candidates)
 
 
+def resolve_existing_subdir(base_dir: Path, candidates: Iterable[str]) -> Optional[Path]:
+    for candidate in candidates:
+        if candidate in [None, ""]:
+            continue
+        candidate_path = base_dir / candidate
+        if candidate_path.exists():
+            return candidate_path
+    return None
+
+
 def resolve_train_source(entry: Dict, raw_root: Path) -> Dict:
     parser_name = entry["dataset_parser"]
     dataset_name = entry.get("dataset_name", "")
@@ -199,7 +209,10 @@ def resolve_train_source(entry: Dict, raw_root: Path) -> Dict:
                 resolved["subset"] = None
                 resolved["split"] = entry.get("dataset_split", "original")
                 resolved["is_local"] = True
-        if "image_dir" in entry:
+            image_root = resolve_existing_subdir(repo_dir, entry.get("image_root_candidates", []))
+            if image_root is not None:
+                resolved["image_root"] = str(image_root)
+        if resolved["image_root"] is None and "image_dir" in entry:
             resolved["image_root"] = str(raw_root / entry["image_dir"])
         if resolved["input"] is None:
             resolved["input"] = dataset_name

@@ -6,6 +6,8 @@ from tqdm import tqdm
 
 from Nexus.abc.inference import AbsEmbedder
 from Nexus.modules.multimodal import (
+    build_multimodal_forward_kwargs,
+    extract_multimodal_hidden_states,
     MultimodalProcessorAdapter,
     apply_instruction,
     infer_multimodal_model_type,
@@ -44,6 +46,9 @@ class MultimodalEmbedder(AbsEmbedder):
         use_chat_template: bool = True,
         torch_dtype: Optional[str] = None,
         attn_implementation: Optional[str] = None,
+        processor_kwargs: Optional[str] = None,
+        processor_call_kwargs: Optional[str] = None,
+        backbone_load_strategy: str = "auto",
         *args,
         **kwargs,
     ):
@@ -69,6 +74,8 @@ class MultimodalEmbedder(AbsEmbedder):
             cache_dir=cache_dir,
             trust_remote_code=trust_remote_code,
             token=token,
+            processor_kwargs=processor_kwargs,
+            model_type=model_type,
         )
         self.model, config = load_multimodal_backbone(
             model_name_or_path=model_name_or_path,
@@ -78,12 +85,14 @@ class MultimodalEmbedder(AbsEmbedder):
             model_type=model_type,
             torch_dtype_name=torch_dtype,
             attn_implementation=attn_implementation,
+            backbone_load_strategy=backbone_load_strategy,
         )
         self.model_type = infer_multimodal_model_type(config) if model_type in [None, "", "auto"] else model_type
         self.processor_adapter = MultimodalProcessorAdapter(
             processor=self.processor,
             model_type=self.model_type,
             use_chat_template=use_chat_template,
+            processor_call_kwargs=processor_call_kwargs,
         )
 
     def _get_model_device(self):
@@ -138,12 +147,8 @@ class MultimodalEmbedder(AbsEmbedder):
         )
         model_inputs = move_batch_to_device(model_inputs, self._get_model_device())
 
-        outputs = self.model(**model_inputs, return_dict=True, output_hidden_states=True)
-        hidden_states = getattr(outputs, "hidden_states", None)
-        if hidden_states is None:
-            hidden_states = outputs.last_hidden_state
-        else:
-            hidden_states = hidden_states[-1]
+        outputs = self.model(**model_inputs, **build_multimodal_forward_kwargs(self.model))
+        hidden_states = extract_multimodal_hidden_states(outputs)
         return self._pool_hidden_states(hidden_states, model_inputs["attention_mask"])
 
     def encode_queries(

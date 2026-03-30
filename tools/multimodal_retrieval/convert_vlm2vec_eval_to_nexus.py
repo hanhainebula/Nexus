@@ -360,6 +360,21 @@ def row_uses_instruction_style_schema(row: Dict[str, Any]) -> bool:
     )
 
 
+def row_uses_legacy_pair_style_schema(row: Dict[str, Any]) -> bool:
+    return any(
+        key in row
+        for key in [
+            "qry",
+            "qry_image_path",
+            "qry_video_path",
+            "pos_text",
+            "pos_image_path",
+            "neg_text",
+            "neg_image_path",
+        ]
+    )
+
+
 def build_instruction_style_query(row: Dict[str, Any], sequence_mode: str) -> Dict[str, Any]:
     item = {}
     query_text = combine_instruction_and_text(row.get("qry_inst"), row.get("qry_text"))
@@ -406,6 +421,65 @@ def build_instruction_style_candidates(row: Dict[str, Any], sequence_mode: str) 
         candidate["_name"] = ":".join(name_parts) if len(name_parts) > 1 else (name_parts[0] if name_parts else f"cand_{index}")
         candidates.append(candidate)
     return candidates
+
+
+def build_legacy_pair_style_query(row: Dict[str, Any], sequence_mode: str) -> Dict[str, Any]:
+    item = {}
+    query_text = clean_instruction_text(row.get("qry"))
+    if query_text not in [None, ""]:
+        item["text"] = query_text
+    if row.get("qry_image_path") not in [None, "", []]:
+        attach_media(item, [row.get("qry_image_path")], sequence_mode=sequence_mode)
+    elif row.get("qry_video_path") not in [None, "", []]:
+        attach_media(item, [row.get("qry_video_path")], sequence_mode="video")
+    return item
+
+
+def build_legacy_pair_style_candidates(row: Dict[str, Any], sequence_mode: str) -> List[Dict[str, Any]]:
+    candidates = []
+    for prefix in ["pos", "neg"]:
+        text_value = row.get(f"{prefix}_text")
+        image_path = row.get(f"{prefix}_image_path")
+        if text_value in [None, ""] and image_path in [None, "", []]:
+            continue
+
+        candidate = {}
+        candidate_text = first_text_value(text_value).strip()
+        if candidate_text not in [None, ""]:
+            candidate["text"] = candidate_text
+        if image_path not in [None, "", []]:
+            attach_media(candidate, [image_path], sequence_mode=sequence_mode)
+
+        name_parts = []
+        if image_path not in [None, "", []]:
+            name_parts.append(str(image_path))
+        if candidate_text not in [None, ""]:
+            name_parts.append(candidate_text)
+        candidate["_name"] = ":".join(name_parts) if len(name_parts) > 1 else (name_parts[0] if name_parts else prefix)
+        candidates.append(candidate)
+    return candidates
+
+
+def convert_legacy_pair_style_row(
+    row_index: int,
+    row: Dict[str, Any],
+    args,
+):
+    sequence_mode = resolve_sequence_mode(args, row=row)
+    query_record = {"_id": f"{args.query_prefix}{row_index}"}
+    query_record.update(build_legacy_pair_style_query(row, sequence_mode=sequence_mode))
+
+    candidates = build_legacy_pair_style_candidates(row, sequence_mode=sequence_mode)
+    corpus_records = []
+    qrels = []
+    for candidate_index, candidate in enumerate(candidates):
+        corpus_id = candidate.pop("_name")
+        corpus_record = {"_id": corpus_id}
+        corpus_record.update(candidate)
+        corpus_records.append(corpus_record)
+        if candidate_index == 0:
+            qrels.append({"query-id": query_record["_id"], "corpus-id": corpus_id, "score": 1})
+    return query_record, corpus_records, qrels
 
 
 def convert_instruction_style_row(
@@ -525,6 +599,13 @@ def main():
     for row_index, row in iter_rows(dataset, max_rows=args.max_rows):
         if row_uses_instruction_style_schema(row):
             query_record, corpus_records, row_qrels = convert_instruction_style_row(row_index, row, args)
+            queries.append(query_record)
+            for corpus_record in corpus_records:
+                corpus[corpus_record["_id"]] = corpus_record
+            qrels.extend(row_qrels)
+            continue
+        if row_uses_legacy_pair_style_schema(row):
+            query_record, corpus_records, row_qrels = convert_legacy_pair_style_row(row_index, row, args)
             queries.append(query_record)
             for corpus_record in corpus_records:
                 corpus[corpus_record["_id"]] = corpus_record

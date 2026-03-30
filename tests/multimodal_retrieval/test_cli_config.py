@@ -102,6 +102,54 @@ def test_eval_cli_accepts_json_configs_without_onnx(tmp_path):
     assert model_args.devices == ["cuda:0"]
 
 
+def test_train_cli_accepts_processor_overrides_in_json_config(tmp_path):
+    model_config = tmp_path / "model.json"
+    data_config = tmp_path / "data.json"
+    training_config = tmp_path / "training.json"
+    train_data = tmp_path / "dataset" / "train.jsonl"
+    train_data.parent.mkdir(parents=True)
+    train_data.write_text("{}", encoding="utf-8")
+
+    write_json(
+        model_config,
+        {
+            "model_name_or_path": "Qwen/Qwen3-VL-2B-Instruct",
+            "processor_name_or_path": "Qwen/Qwen3-VL-2B-Instruct",
+            "backbone_load_strategy": "prefer_base_model",
+            "processor_kwargs": {"max_pixels": 262144},
+            "processor_call_kwargs": {"size": {"shortest_edge": 448}},
+        },
+    )
+    write_json(
+        data_config,
+        {
+            "train_data": ["dataset/train.jsonl"],
+        },
+    )
+    write_json(
+        training_config,
+        {
+            "output_dir": "output",
+            "overwrite_output_dir": True,
+        },
+    )
+
+    model_args, _, _ = parse_train_cli_args(
+        [
+            "--model_config",
+            str(model_config),
+            "--data_config",
+            str(data_config),
+            "--training_config",
+            str(training_config),
+        ]
+    )
+
+    assert model_args.backbone_load_strategy == "prefer_base_model"
+    assert model_args.processor_kwargs == {"max_pixels": 262144}
+    assert model_args.processor_call_kwargs == {"size": {"shortest_edge": 448}}
+
+
 def test_training_import_patches_accelerate_unwrap_model_signature():
     from accelerate import Accelerator
 

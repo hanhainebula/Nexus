@@ -32,6 +32,7 @@ class MultimodalRetrievalEvalRunner(AbsEvalRunner):
             model_name_or_path=model_args.embedder_name_or_path,
             processor_name_or_path=model_args.processor_name_or_path,
             model_type=model_args.model_type,
+            backbone_load_strategy=model_args.backbone_load_strategy,
             normalize_embeddings=model_args.normalize_embeddings,
             use_fp16=model_args.use_fp16,
             query_instruction_for_retrieval=model_args.query_instruction_for_retrieval,
@@ -47,6 +48,8 @@ class MultimodalRetrievalEvalRunner(AbsEvalRunner):
             query_max_length=model_args.embedder_query_max_length,
             passage_max_length=model_args.embedder_passage_max_length,
             use_chat_template=model_args.use_chat_template,
+            processor_kwargs=model_args.processor_kwargs,
+            processor_call_kwargs=model_args.processor_call_kwargs,
             torch_dtype=model_args.torch_dtype,
             attn_implementation=model_args.attn_implementation,
         )

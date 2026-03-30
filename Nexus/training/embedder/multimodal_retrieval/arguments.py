@@ -32,6 +32,14 @@ class MultimodalEmbedderModelArguments(AbsEmbedderModelArguments):
         default="auto",
         metadata={"help": "Explicit model type override. Default uses the HF config."},
     )
+    backbone_load_strategy: str = field(
+        default="auto",
+        metadata={
+            "help": "Backbone loading strategy. `auto` preserves the current path, while "
+            "`prefer_base_model` tries base Model/AutoModel first for direct `last_hidden_state` pooling.",
+            "choices": ["auto", "prefer_base_model"],
+        },
+    )
     torch_dtype: Optional[str] = field(
         default="bfloat16",
         metadata={"help": "Torch dtype string for loading the backbone. Use `auto` to defer."},
@@ -43,6 +51,20 @@ class MultimodalEmbedderModelArguments(AbsEmbedderModelArguments):
     use_chat_template: bool = field(
         default=True,
         metadata={"help": "Use processor chat template for VLM backbones that support it."},
+    )
+    processor_kwargs: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Optional JSON object passed to AutoProcessor.from_pretrained. "
+            "Config-file mode may provide either a JSON string or a JSON object.",
+        },
+    )
+    processor_call_kwargs: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Optional JSON object merged into each processor(...) call. "
+            "Useful for `size`, `min_pixels`, or `max_pixels` exploration.",
+        },
     )
     use_lora: bool = field(
         default=False,
@@ -124,4 +146,4 @@ class WrappedMultimodalEmbedderModelArguments(AbsModelArguments):
     passage_max_len: int = field(default=1024)
     model_type: str = field(default="auto")
     use_chat_template: bool = field(default=True)
-
+    processor_call_kwargs: Optional[str] = field(default=None)

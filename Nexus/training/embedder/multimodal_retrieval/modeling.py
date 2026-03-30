@@ -11,7 +11,11 @@ from torch import Tensor
 from Nexus.abc.training.embedder import AbsEmbedderModel, EmbedderOutput
 from Nexus.modules.loss import CrossEntropyLoss, KLDivLoss, M3KDLoss
 from Nexus.modules.multimodal import (
+    annotate_multimodal_backbone,
+    build_multimodal_forward_kwargs,
+    extract_multimodal_hidden_states,
     infer_multimodal_model_type,
+    infer_multimodal_output_mode,
     MultimodalProcessorAdapter,
     load_multimodal_backbone,
     load_multimodal_processor,
@@ -66,6 +70,7 @@ class BiMultimodalEmbedderModel(AbsEmbedderModel):
             processor=processor,
             model_type=model_args.model_type,
             use_chat_template=model_args.use_chat_template,
+            processor_call_kwargs=model_args.processor_call_kwargs,
         )
         self.temperature = model_args.temperature
         self.negatives_cross_device = model_args.negatives_cross_device
@@ -95,6 +100,8 @@ class BiMultimodalEmbedderModel(AbsEmbedderModel):
             cache_dir=model_args.cache_dir,
             trust_remote_code=model_args.trust_remote_code,
             token=model_args.token,
+            processor_kwargs=model_args.processor_kwargs,
+            model_type=model_args.model_type,
         )
         model, config = load_multimodal_backbone(
             model_name_or_path=model_args.model_name_or_path,
@@ -105,6 +112,7 @@ class BiMultimodalEmbedderModel(AbsEmbedderModel):
             torch_dtype_name=model_args.torch_dtype,
             attn_implementation=model_args.attn_implementation,
             peft_is_trainable=True,
+            backbone_load_strategy=model_args.backbone_load_strategy,
         )
         effective_model_type = (
             infer_multimodal_model_type(config)
@@ -127,6 +135,10 @@ class BiMultimodalEmbedderModel(AbsEmbedderModel):
                 inference_mode=False,
             )
             model = get_peft_model(model, lora_config)
+            model = annotate_multimodal_backbone(
+                model,
+                output_mode=infer_multimodal_output_mode(model),
+            )
 
         if hasattr(model, "peft_config"):
             # Keep trainable adapter weights in fp32 for stable LoRA optimization.
@@ -179,13 +191,8 @@ class BiMultimodalEmbedderModel(AbsEmbedderModel):
         model_inputs = self.processor_adapter.encode_batch(features, max_length=max_length)
         model_device = next(self.model.parameters()).device
         model_inputs = move_batch_to_device(model_inputs, model_device)
-        outputs = self.model(**model_inputs, return_dict=True, output_hidden_states=True)
-
-        hidden_states = getattr(outputs, "hidden_states", None)
-        if hidden_states is None:
-            hidden_states = outputs.last_hidden_state
-        else:
-            hidden_states = hidden_states[-1]
+        outputs = self.model(**model_inputs, **build_multimodal_forward_kwargs(self.model))
+        hidden_states = extract_multimodal_hidden_states(outputs)
 
         return self._pool_hidden_states(hidden_states, model_inputs["attention_mask"])
 

@@ -173,10 +173,11 @@ Prepared in this repository:
 - stage-oriented train-data preparation tooling
 - validation script
 - GPU-safety helper
+- validated multimodal retrieval code paths for `Qwen3-VL` and `Qwen3.5` family backbones in isolated runtimes
+- local HatefulMemes conversion and evaluation paths exercised on both fixed-size exploration subsets and larger local mirrors
 
 Still not executed here:
 
 - full raw data download
 - full-scale conversion of all public sources
-- full training run
 - full MMEB v2 benchmark run

@@ -73,6 +73,14 @@ class MultimodalRetrievalEvalModelArgs(AbsArguments):
         metadata={"help": "Optional processor path. Defaults to the model path."},
     )
     model_type: str = field(default="auto", metadata={"help": "Explicit model type override."})
+    backbone_load_strategy: str = field(
+        default="auto",
+        metadata={
+            "help": "Backbone loading strategy. `prefer_base_model` is useful when validating "
+            "whether a VLM can expose `last_hidden_state` directly.",
+            "choices": ["auto", "prefer_base_model"],
+        },
+    )
     normalize_embeddings: bool = field(default=True)
     pooling_method: str = field(default="last_token")
     use_fp16: bool = field(default=False)
@@ -88,5 +96,7 @@ class MultimodalRetrievalEvalModelArgs(AbsArguments):
     embedder_query_max_length: int = field(default=512)
     embedder_passage_max_length: int = field(default=1024)
     use_chat_template: bool = field(default=True)
+    processor_kwargs: Optional[str] = field(default=None)
+    processor_call_kwargs: Optional[str] = field(default=None)
     torch_dtype: Optional[str] = field(default=None)
     attn_implementation: Optional[str] = field(default=None)

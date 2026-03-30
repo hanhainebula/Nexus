@@ -13,7 +13,9 @@ import Nexus
 from Nexus.modules.multimodal import (
     build_media_base_dir,
     build_prefixed_multimodal_group,
+    extract_multimodal_hidden_states,
     _get_registered_conditional_generation_model_class,
+    infer_multimodal_output_mode,
     load_multimodal_backbone,
     load_multimodal_processor,
     MultimodalProcessorAdapter,
@@ -148,6 +150,51 @@ def test_processor_adapter_batches_visual_tensors_without_processor_pad():
     assert tuple(batch["image_grid_thw"].shape) == (2, 3)
 
 
+def test_processor_adapter_preserves_mm_token_type_ids_without_processor_pad():
+    class FakeTokenizer:
+        padding_side = "right"
+
+        def pad(self, features, padding=True, return_tensors="pt"):
+            max_len = max(len(feature["input_ids"]) for feature in features)
+            input_ids = []
+            attention_mask = []
+            for feature in features:
+                ids = list(feature["input_ids"])
+                mask = list(feature.get("attention_mask", [1] * len(ids)))
+                pad_len = max_len - len(ids)
+                input_ids.append(ids + [0] * pad_len)
+                attention_mask.append(mask + [0] * pad_len)
+            return {
+                "input_ids": torch.tensor(input_ids, dtype=torch.long),
+                "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
+            }
+
+    class FakeProcessor:
+        def __init__(self):
+            self.tokenizer = FakeTokenizer()
+
+    adapter = MultimodalProcessorAdapter(FakeProcessor(), model_type="qwen3_5", use_chat_template=False)
+    encoded_items = [
+        {
+            "input_ids": [[11, 12, 13]],
+            "attention_mask": [[1, 1, 1]],
+            "mm_token_type_ids": [[0, 1, 1]],
+        },
+        {
+            "input_ids": [[21, 22]],
+            "attention_mask": [[1, 1]],
+            "mm_token_type_ids": [[0, 1]],
+        },
+    ]
+    adapter._encode_single = lambda item, max_length=None: encoded_items.pop(0)
+
+    batch = adapter.encode_batch([{"text": "a"}, {"text": "b"}], max_length=8)
+
+    assert tuple(batch["input_ids"].shape) == (2, 3)
+    assert tuple(batch["mm_token_type_ids"].shape) == (2, 3)
+    assert batch["mm_token_type_ids"].tolist() == [[0, 1, 1], [0, 1, 0]]
+
+
 def test_processor_adapter_preserves_llava_next_image_sizes_without_processor_pad():
     class FakeTokenizer:
         def pad(self, features, padding=True, return_tensors="pt"):
@@ -259,10 +306,59 @@ def test_load_multimodal_processor_falls_back_to_base_model_for_adapter(monkeypa
     assert attempted_paths == [str(adapter_dir), "/tmp/base-model"]
 
 
-def test_missing_qwen3_loader_reports_version_hint():
-    with pytest.raises(ImportError, match="transformers>=4.57.3"):
+def test_load_multimodal_processor_accepts_processor_kwargs(monkeypatch):
+    recorded = {}
+
+    def fake_auto_processor(path, **kwargs):
+        recorded["path"] = path
+        recorded["kwargs"] = kwargs
+        return {"loaded_from": path}
+
+    monkeypatch.setattr("Nexus.modules.multimodal.AutoProcessor.from_pretrained", fake_auto_processor)
+
+    processor = load_multimodal_processor(
+        "demo-model",
+        processor_kwargs={"max_pixels": 1024, "size": {"shortest_edge": 448}},
+    )
+
+    assert processor == {"loaded_from": "demo-model"}
+    assert recorded["kwargs"]["max_pixels"] == 1024
+    assert recorded["kwargs"]["size"] == {"shortest_edge": 448}
+
+
+def test_load_multimodal_processor_translates_llava_next_pixel_budgets(monkeypatch):
+    recorded = {}
+
+    def fake_auto_processor(path, **kwargs):
+        recorded["path"] = path
+        recorded["kwargs"] = kwargs
+        return {"loaded_from": path}
+
+    monkeypatch.setattr("Nexus.modules.multimodal.AutoProcessor.from_pretrained", fake_auto_processor)
+
+    processor = load_multimodal_processor(
+        "demo-model",
+        model_type="llava_next",
+        processor_kwargs={"max_pixels": 262144},
+    )
+
+    assert processor == {"loaded_from": "demo-model"}
+    assert "max_pixels" not in recorded["kwargs"]
+    assert recorded["kwargs"]["size"] == {"shortest_edge": 512}
+    assert recorded["kwargs"]["crop_size"] == {"height": 512, "width": 512}
+
+
+@pytest.mark.parametrize(
+    ("model_type", "version_hint"),
+    [
+        ("qwen3_vl", "transformers>=4.57.3"),
+        ("qwen3_5", "Qwen3.5 support"),
+    ],
+)
+def test_missing_qwen_loader_reports_version_hint(model_type, version_hint):
+    with pytest.raises(ImportError, match=version_hint):
         _get_registered_conditional_generation_model_class(
-            "qwen3_vl",
+            model_type,
             transformers_module=SimpleNamespace(__version__="4.52.3"),
         )
 
@@ -296,6 +392,17 @@ def test_encode_single_device_casts_bfloat16_before_numpy():
     assert embeddings.dtype == np.float32
 
 
+def test_extract_multimodal_hidden_states_prefers_last_hidden_state():
+    outputs = SimpleNamespace(
+        last_hidden_state=torch.tensor([[1.0, 2.0]]),
+        hidden_states=[torch.tensor([[3.0, 4.0]])],
+    )
+
+    hidden_states = extract_multimodal_hidden_states(outputs)
+
+    assert torch.equal(hidden_states, outputs.last_hidden_state)
+
+
 def test_processor_adapter_retries_without_truncation_on_mm_token_mismatch():
     adapter = MultimodalProcessorAdapter.__new__(MultimodalProcessorAdapter)
     adapter.processor = None
@@ -326,6 +433,93 @@ def test_processor_adapter_retries_without_truncation_on_mm_token_mismatch():
     assert adapter.processor.calls[0]["max_length"] == 8
     assert adapter.processor.calls[1]["truncation"] is False
     assert "max_length" not in adapter.processor.calls[1]
+
+
+def test_processor_adapter_merges_processor_call_kwargs():
+    recorded = {}
+
+    class FakeTokenizer:
+        def pad(self, features, padding=True, return_tensors="pt"):
+            return {
+                "input_ids": torch.tensor([feature["input_ids"][0] for feature in features], dtype=torch.long),
+                "attention_mask": torch.tensor([feature["attention_mask"][0] for feature in features], dtype=torch.long),
+            }
+
+    class FakeProcessor:
+        def __init__(self):
+            self.tokenizer = FakeTokenizer()
+
+        def __call__(self, **kwargs):
+            recorded["kwargs"] = kwargs
+            return {"input_ids": [[1, 2]], "attention_mask": [[1, 1]]}
+
+    adapter = MultimodalProcessorAdapter(
+        FakeProcessor(),
+        model_type="qwen2_vl",
+        use_chat_template=False,
+        processor_call_kwargs={"max_pixels": 2048},
+    )
+
+    adapter.encode_batch([{"text": "question"}], max_length=16)
+
+    assert recorded["kwargs"]["max_pixels"] == 2048
+    assert recorded["kwargs"]["max_length"] == 16
+
+
+def test_processor_adapter_translates_llava_next_processor_call_pixel_budgets():
+    recorded = {}
+
+    class FakeTokenizer:
+        def pad(self, features, padding=True, return_tensors="pt"):
+            return {
+                "input_ids": torch.tensor([feature["input_ids"][0] for feature in features], dtype=torch.long),
+                "attention_mask": torch.tensor([feature["attention_mask"][0] for feature in features], dtype=torch.long),
+            }
+
+    class FakeProcessor:
+        def __init__(self):
+            self.tokenizer = FakeTokenizer()
+
+        def __call__(self, **kwargs):
+            recorded["kwargs"] = kwargs
+            return {"input_ids": [[1, 2]], "attention_mask": [[1, 1]]}
+
+    adapter = MultimodalProcessorAdapter(
+        FakeProcessor(),
+        model_type="llava_next",
+        use_chat_template=False,
+        processor_call_kwargs={"max_pixels": 262144},
+    )
+
+    adapter.encode_batch([{"text": "question"}], max_length=16)
+
+    assert "max_pixels" not in recorded["kwargs"]
+    assert recorded["kwargs"]["size"] == {"shortest_edge": 512}
+    assert recorded["kwargs"]["crop_size"] == {"height": 512, "width": 512}
+    assert recorded["kwargs"]["max_length"] == 16
+
+
+def test_load_multimodal_backbone_marks_prefer_base_model_output_mode(monkeypatch):
+    class DummyConfig:
+        model_type = "qwen3_5"
+
+    class DummyModel:
+        pass
+
+    monkeypatch.setattr("Nexus.modules.multimodal._maybe_load_peft_config", lambda *args, **kwargs: None)
+    monkeypatch.setattr("Nexus.modules.multimodal.AutoConfig.from_pretrained", lambda *args, **kwargs: DummyConfig())
+    monkeypatch.setattr(
+        "Nexus.modules.multimodal._maybe_load_base_model_from_conditional_generation_wrapper",
+        lambda *args, **kwargs: DummyModel(),
+    )
+
+    model, _ = load_multimodal_backbone(
+        "demo-model",
+        model_type="qwen3_5",
+        backbone_load_strategy="prefer_base_model",
+    )
+
+    assert infer_multimodal_output_mode(model) == "last_hidden_state"
 
 
 def test_build_casts_lora_trainable_params_to_fp32(monkeypatch):
