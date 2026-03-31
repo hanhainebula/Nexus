@@ -1,1 +1,1 @@
-{"query":{"text":"find the matching color grid","image_path":"query.ppm"},"pos":[{"text":"the reference grid with a red corner and green center","image_path":"doc.ppm"}],"neg":[{"text":"an alternate grid dominated by blue pixels","image_path":"neg.ppm"}]}
+{"query":{"text":"find the matching color grid","image_path":"query.png"},"pos":[{"text":"the reference grid with a red corner and green center","image_path":"doc.png"}],"neg":[{"text":"an alternate grid dominated by blue pixels","image_path":"neg.png"}]}

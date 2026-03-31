@@ -72,7 +72,7 @@ If your converted dataset stores JSONL files and media files under different dir
 
 ## Quick start
 
-- A tiny local smoke dataset is bundled under [`data/`](./data/) so the example configs have concrete paths to point at.
+- A tiny local smoke dataset is bundled under [`data/`](./data/) so the example configs have concrete paths to point at. The sample media files under `data/media/` are tiny synthetic `32x32` `.png` images intended only for repository-friendly smoke testing.
 - The example JSON configs now resolve relative paths against the config file directory, so they can be launched from outside the repo root as well.
 - Precision settings must match the GPU you actually use. `bf16` is suitable for datacenter GPUs such as A100/H100, while many consumer GPUs are safer with `PRECISION_MODE=fp16` or `PRECISION_MODE=fp32`.
 - If you are setting up a fresh machine for multimodal experiments, start from [`requirements.txt`](./requirements.txt). This is the dependency set we validated against `Qwen2-VL`, `Qwen2.5-VL`, `Qwen3-VL`, `Qwen3.5`, and `Llava-Next`. A typical setup is:

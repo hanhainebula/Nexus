@@ -29,7 +29,7 @@ def main():
     queries = [
         {
             "text": "Find the matching color grid",
-            "images": [str(MEDIA_ROOT / "query.ppm")],
+            "images": [str(MEDIA_ROOT / "query.png")],
         },
         {
             "text": "Retrieve the reference grid with a red corner",
@@ -38,11 +38,11 @@ def main():
     passages = [
         {
             "text": "The reference grid with a red corner and green center",
-            "images": [str(MEDIA_ROOT / "doc.ppm")],
+            "images": [str(MEDIA_ROOT / "doc.png")],
         },
         {
             "text": "An alternate grid dominated by blue pixels",
-            "images": [str(MEDIA_ROOT / "neg.ppm")],
+            "images": [str(MEDIA_ROOT / "neg.png")],
         },
     ]
 

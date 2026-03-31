@@ -28,12 +28,12 @@ def main():
     queries = [
         {
             "text": "Find the matching color grid.",
-            "image_path": str(MEDIA_ROOT / "query.ppm"),
+            "image_path": str(MEDIA_ROOT / "query.png"),
         }
     ]
     corpus = [
-        {"text": "The reference grid with a red corner and green center.", "image_path": str(MEDIA_ROOT / "doc.ppm")},
-        {"text": "The negative grid dominated by blue pixels.", "image_path": str(MEDIA_ROOT / "neg.ppm")},
+        {"text": "The reference grid with a red corner and green center.", "image_path": str(MEDIA_ROOT / "doc.png")},
+        {"text": "The negative grid dominated by blue pixels.", "image_path": str(MEDIA_ROOT / "neg.png")},
     ]
 
     q_emb = model.encode_queries(queries)
