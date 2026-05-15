@@ -1,0 +1,23 @@
+{
+    "output_dir": "./outputs/multimodal_embedder",
+    "overwrite_output_dir": true,
+    "do_train": true,
+    "per_device_train_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "learning_rate": 2e-5,
+    "num_train_epochs": 1,
+    "warmup_ratio": 0.03,
+    "logging_steps": 10,
+    "save_steps": 200,
+    "bf16": true,
+    "gradient_checkpointing": true,
+    "remove_unused_columns": false,
+    "dataloader_drop_last": true,
+    "negatives_cross_device": false,
+    "temperature": 0.02,
+    "sentence_pooling_method": "last_token",
+    "normalize_embeddings": true,
+    "sub_batch_size": null,
+    "kd_loss_type": "kl_div"
+}
+

@@ -1,0 +1,27 @@
+ChartQA:
+    dataset_parser: image_qa
+    dataset_name: ChartQA
+    dataset_split: test
+    image_root: image-tasks/
+    num_sample_per_subset: 8
+    eval_type: local
+MSCOCO_i2t:
+    dataset_parser: image_i2t
+    dataset_name: MSCOCO_i2t
+    dataset_split: test
+    image_root: image-tasks/
+    num_sample_per_subset: 8
+    eval_type: local
+VisDial:
+    dataset_parser: image_t2i
+    dataset_name: VisDial
+    dataset_split: test
+    image_root: image-tasks/
+    num_sample_per_subset: 8
+    eval_type: local
+ViDoRe_docvqa:
+    dataset_parser: vidore
+    dataset_name: ViDoRe_docvqa
+    image_root: visdoc-tasks/images/ViDoRe_docvqa
+    num_sample_per_subset: 8
+    eval_type: global

@@ -17,3 +17,21 @@ The key industry features are as follows:
 
 ## Tutorial
 The following tutorials provide detailed introduction on training, evaluation, and deploying [recommendation](./examples/recommendation/tutorial.ipynb) or [textual](./examples/text_retrieval/tutorial.ipynb) models using Nexus.
+
+## Multimodal Retrieval
+
+Nexus now includes a dedicated multimodal embedder pipeline under `Nexus/training/embedder/multimodal_retrieval`, `Nexus/inference/embedder/multimodal_retrieval`, and `Nexus/evaluation/multimodal_retrieval`. Usage examples and dataset format are documented in [`examples/multimodal_retrieval/README.md`](./examples/multimodal_retrieval/README.md). If you are preparing a machine specifically for multimodal experiments, start from [`examples/multimodal_retrieval/requirements.txt`](./examples/multimodal_retrieval/requirements.txt), which captures the dependency set we validated for the current Qwen/Llava multimodal stack.
+
+
+## Multimodal Embedding
+
+Nexus now includes a multimodal embedding pipeline for retrieval-oriented VLM finetuning, inference, local evaluation, and MMEB v2 benchmark evaluation.
+
+- Finetuning entrypoint: `python -m Nexus.training.embedder.multimodal_retrieval --model_config ... --data_config ... --training_config ...`
+- Inference class: `Nexus.MultimodalEmbedder`
+- Evaluation entrypoint: `python -m Nexus.evaluation.multimodal_retrieval --eval_config ... --model_config ...`
+- MMEB v2 benchmark entrypoint: `python -m Nexus.evaluation.mmeb_v2.eval_embedding`
+
+The reference configs, validated multimodal runtime, and data format are documented in [examples/multimodal_retrieval/README.md](./examples/multimodal_retrieval/README.md) and [examples/multimodal_retrieval/requirements.txt](./examples/multimodal_retrieval/requirements.txt).
+
+For official-style MMEB v2 scoring, the embedded evaluator covers image, VisDoc/VisRAG, video, and retrieval task configs. Representative scripts and configs live under [examples/multimodal_retrieval/evaluation/mmeb_v2](./examples/multimodal_retrieval/evaluation/mmeb_v2/), including `ImageNet-1K`, `VisRAG_ChartQA`, and `HMDB51` examples plus output checks such as `num_pred == num_data`.

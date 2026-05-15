@@ -1,0 +1,26 @@
+{
+    "embedder_name_or_path": "./outputs/multimodal_embedder",
+    "processor_name_or_path": "./outputs/multimodal_embedder",
+    "model_type": "auto",
+    "backbone_load_strategy": "auto",
+    "normalize_embeddings": true,
+    "pooling_method": "last_token",
+    "use_fp16": false,
+    "devices": [
+        "cuda:0"
+    ],
+    "query_instruction_for_retrieval": "Represent this multimodal query for retrieving matching targets: ",
+    "query_instruction_format_for_retrieval": "{}{}",
+    "passage_instruction_for_retrieval": null,
+    "passage_instruction_format_for_retrieval": "{}{}",
+    "trust_remote_code": true,
+    "cache_dir": null,
+    "embedder_batch_size": 8,
+    "embedder_query_max_length": 512,
+    "embedder_passage_max_length": 1024,
+    "use_chat_template": true,
+    "processor_kwargs": null,
+    "processor_call_kwargs": null,
+    "torch_dtype": "bfloat16",
+    "attn_implementation": null
+}

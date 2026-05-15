@@ -1,0 +1,25 @@
+ViDoRe_arxivqa:
+    dataset_parser: vidore
+    dataset_name: ViDoRe_arxivqa
+    image_root: visdoc-tasks/images/ViDoRe_arxivqa
+    eval_type: global
+ViDoRe_docvqa:
+    dataset_parser: vidore
+    dataset_name: ViDoRe_docvqa
+    image_root: visdoc-tasks/images/ViDoRe_docvqa
+    eval_type: global
+ViDoRe_infovqa:
+    dataset_parser: vidore
+    dataset_name: ViDoRe_infovqa
+    image_root: visdoc-tasks/images/ViDoRe_infovqa
+    eval_type: global
+ViDoRe_tabfquad:
+    dataset_parser: vidore
+    dataset_name: ViDoRe_tabfquad
+    image_root: visdoc-tasks/images/ViDoRe_tabfquad
+    eval_type: global
+ViDoRe_tatdqa:
+    dataset_parser: vidore
+    dataset_name: ViDoRe_tatdqa
+    image_root: visdoc-tasks/images/ViDoRe_tatdqa
+    eval_type: global

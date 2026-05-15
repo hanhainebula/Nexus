@@ -1,0 +1,6 @@
+CIRR:
+    dataset_parser: image_i2i_vg
+    dataset_name: CIRR
+    dataset_split: test
+    image_root: image-tasks/
+    eval_type: local

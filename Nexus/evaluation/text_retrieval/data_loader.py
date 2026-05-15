@@ -1,11 +1,34 @@
 import os
 import logging
+import tempfile
 import datasets
 import subprocess
 from typing import List, Optional, Union
 
 from Nexus.abc.evaluation import AbsEvalDataLoader
 logger = logging.getLogger(__name__)
+
+
+def _default_hf_cache_dir() -> str:
+    candidates = []
+    for env_key in ["HF_HUB_CACHE", "HF_HOME", "XDG_CACHE_HOME"]:
+        env_value = os.getenv(env_key)
+        if env_value not in [None, ""]:
+            expanded = os.path.expanduser(env_value)
+            if env_key != "HF_HUB_CACHE":
+                expanded = os.path.join(expanded, "huggingface", "hub")
+            candidates.append(expanded)
+    candidates.append("/tmp/huggingface/hub")
+
+    for candidate in candidates:
+        try:
+            os.makedirs(candidate, exist_ok=True)
+            with tempfile.NamedTemporaryFile(dir=candidate):
+                pass
+            return candidate
+        except OSError:
+            continue
+    return "/tmp/huggingface/hub"
 
 
 class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
@@ -31,8 +54,13 @@ class TextRetrievalEvalDataLoader(AbsEvalDataLoader):
         self.eval_name = eval_name
         self.dataset_dir = dataset_dir
         if cache_dir is None:
-            cache_dir = os.getenv('HF_HUB_CACHE', '~/.cache/huggingface/hub')
+            cache_dir = _default_hf_cache_dir()
         self.cache_dir = os.path.join(cache_dir, eval_name)
+        try:
+            os.makedirs(self.cache_dir, exist_ok=True)
+        except OSError:
+            self.cache_dir = os.path.join("/tmp/huggingface/hub", eval_name)
+            os.makedirs(self.cache_dir, exist_ok=True)
         self.token = token
         self.force_redownload = force_redownload
         self.hf_download_mode = None if not force_redownload else "force_redownload"

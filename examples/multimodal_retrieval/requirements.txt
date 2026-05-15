@@ -1,0 +1,60 @@
+# Unified multimodal runtime validated on 2026-05-15.
+# Tested Python version: 3.10.19
+#
+# This dependency set was empirically validated to load processor/backbone for:
+# - Qwen2-VL
+# - Qwen2.5-VL
+# - Qwen3-VL
+# - Qwen3.5-VL (0.8B / 2B)
+# - Llava-Next
+# - MMEB v2 official-style image / video / VisDoc evaluation on 8xA100
+#
+# Recommended setup on a fresh machine:
+#   python3.10 -m venv nexus-mm
+#   source nexus-mm/bin/activate
+#   pip install --upgrade pip
+#   pip install -r examples/multimodal_retrieval/requirements.txt
+#   pip install -e . --no-deps
+#
+# Notes:
+# - Qwen3.5 and Qwen3-VL embedding evaluation require a transformers main/dev
+#   build rather than the stable 4.57.x series.
+# - The MMEB v2 evaluator was validated with `attn_implementation=flash_attention_2`.
+#   Install `flash-attn` after torch is installed. On CUDA clusters, a prebuilt
+#   wheel matching Python/CUDA/SM architecture is usually more reliable than
+#   building from source.
+
+torch==2.6.0
+torchvision==0.21.0
+accelerate==1.13.0
+datasets==3.6.0
+peft==0.9.0
+sentence-transformers==4.1.0
+sentencepiece==0.2.0
+protobuf==5.29.5
+Pillow==11.2.1
+decord==0.6.0
+av==17.0.0
+faiss-cpu==1.13.2
+pytrec_eval==0.5
+numpy==2.2.6
+scipy==1.15.3
+scikit-learn==1.7.2
+pandas==2.2.3
+pyarrow==20.0.0
+huggingface-hub==1.8.0
+tokenizers==0.22.2
+safetensors==0.7.0
+packaging==26.0
+PyYAML==6.0.3
+regex==2026.3.32
+requests==2.32.3
+filelock==3.25.2
+fsspec==2026.3.0
+psutil==7.0.0
+tqdm==4.67.3
+typing_extensions==4.15.0
+einops==0.8.2
+qwen-vl-utils==0.0.14
+flash-attn==2.8.3
+transformers @ https://codeload.github.com/huggingface/transformers/tar.gz/main#sha256=eaab0a18a76c2f780e678738f8115047a8ebb86d8c1df3cab4a573e25f14e9c2

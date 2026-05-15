@@ -1,13 +1,40 @@
-import faiss
 import torch
 import logging
 import numpy as np
-import pytrec_eval
 from tqdm import tqdm
 from collections import defaultdict
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional
+
+try:
+    import faiss
+except ImportError:  # pragma: no cover - exercised via fallback unit test
+    faiss = None
 
 logger = logging.getLogger(__name__)
+
+
+class NumpyIPIndex:
+    def __init__(self, embeddings: np.ndarray):
+        self.embeddings = embeddings.astype(np.float32)
+
+    def search(self, query_embeddings: np.ndarray, k: int):
+        query_embeddings = query_embeddings.astype(np.float32)
+        scores = query_embeddings @ self.embeddings.T
+        top_k = min(k, self.embeddings.shape[0])
+        if top_k <= 0:
+            empty_scores = np.empty((query_embeddings.shape[0], 0), dtype=np.float32)
+            empty_indices = np.empty((query_embeddings.shape[0], 0), dtype=np.int64)
+            return empty_scores, empty_indices
+
+        sorted_indices = np.argsort(-scores, axis=1)[:, :top_k]
+        sorted_scores = np.take_along_axis(scores, sorted_indices, axis=1)
+        return sorted_scores, sorted_indices
+
+
+def _faiss_supports_gpu() -> bool:
+    if faiss is None:
+        return False
+    return hasattr(faiss, "GpuMultipleClonerOptions") and hasattr(faiss, "index_cpu_to_all_gpus")
 
 
 # Modified from https://github.com/beir-cellar/beir/blob/f062f038c4bfd19a8ca942a9910b1e0d218759d4/beir/retrieval/custom_metrics.py#L4
@@ -76,6 +103,14 @@ def evaluate_metrics(
         Tuple[ Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, float], ]: Results of different metrics at 
             different provided k values.
     """
+    try:
+        import pytrec_eval
+    except ImportError as exc:
+        raise ImportError(
+            "pytrec_eval is required to compute retrieval metrics. "
+            "Install `pytrec_eval` in the active environment before running evaluation."
+        ) from exc
+
     all_ndcgs, all_aps, all_recalls, all_precisions = defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list)
 
     map_string = "map_cut." + ",".join([str(k) for k in k_values])
@@ -125,27 +160,31 @@ def index(
         device (Optional[str], optional): Device to hold Faiss index. Defaults to None.
 
     Returns:
-        faiss.Index: The Faiss index that contains all the corpus embeddings.
+        Any: The search index that contains all the corpus embeddings.
     """
     if corpus_embeddings is None:
         corpus_embeddings = np.load(load_path)
     
     logger.info(f"Shape of embeddings: {corpus_embeddings.shape}")
+    corpus_embeddings = corpus_embeddings.astype(np.float32)
+    if faiss is None:
+        logger.warning("faiss is not installed. Falling back to a numpy inner-product index.")
+        return NumpyIPIndex(corpus_embeddings)
+
     # create faiss index
     logger.info(f'Indexing {corpus_embeddings.shape[0]} documents...')
     faiss_index = faiss.index_factory(corpus_embeddings.shape[-1], index_factory, faiss.METRIC_INNER_PRODUCT)
     
-    if device is None and torch.cuda.is_available():
+    if device is None and torch.cuda.is_available() and _faiss_supports_gpu():
         try:
             co = faiss.GpuMultipleClonerOptions()
             co.shard = True
             co.useFloat16 = True
             faiss_index = faiss.index_cpu_to_all_gpus(faiss_index, co)
-        except:
-            print('faiss do not support GPU, please uninstall faiss-cpu, faiss-gpu and install faiss-gpu again.')
+        except Exception:
+            logger.warning("faiss GPU acceleration is unavailable. Falling back to a CPU faiss index.")
 
     logger.info('Adding embeddings ...')
-    corpus_embeddings = corpus_embeddings.astype(np.float32)
     faiss_index.train(corpus_embeddings)
     faiss_index.add(corpus_embeddings)
     logger.info('Embeddings add over...')
@@ -153,7 +192,7 @@ def index(
 
 
 def search(
-    faiss_index: faiss.Index, 
+    faiss_index: Any, 
     k: int = 100, 
     query_embeddings: Optional[np.ndarray] = None,
     load_path: Optional[str] = None
@@ -163,7 +202,7 @@ def search(
     2. Search through faiss index
 
     Args:
-        faiss_index (faiss.Index): The Faiss index that contains all the corpus embeddings.
+        faiss_index (Any): The search index that contains all the corpus embeddings.
         k (int, optional): Top k numbers of closest neighbours. Defaults to :data:`100`.
         query_embeddings (Optional[np.ndarray], optional): The embedding vectors of queries. Defaults to :data:`None`.
         load_path (Optional[str], optional): Path to load embeddings from. Defaults to :data:`None`.
