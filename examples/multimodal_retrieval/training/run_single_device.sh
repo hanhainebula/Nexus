@@ -8,7 +8,7 @@ cd "${REPO_ROOT}"
 
 if [[ "${REQUIRE_EXPLICIT_GPUS:-1}" == "1" && -z "${CUDA_VISIBLE_DEVICES:-}" ]]; then
   echo "Set CUDA_VISIBLE_DEVICES to an idle GPU before training."
-  echo "Use tools/multimodal_retrieval/check_idle_gpus.py first on shared machines."
+  echo "Inspect shared GPU usage with your cluster scheduler or nvidia-smi first."
   exit 1
 fi
 

@@ -89,7 +89,6 @@ pip install -e . --no-deps
 - CLI-style training: [`training/run_qwen_vl_lora.sh`](./training/run_qwen_vl_lora.sh)
 - CLI-style evaluation: [`evaluation/run_local_eval.sh`](./evaluation/run_local_eval.sh)
 - Inference: [`inference/encode_demo.py`](./inference/encode_demo.py)
-- Data conversion tools: `tools/multimodal_retrieval/`
 
 ## Verified backbone families
 
@@ -125,3 +124,21 @@ Notes:
   }
 }
 ```
+
+## MMEB v2 Benchmark Evaluation
+
+The evaluation examples in this directory use the Nexus-native local retrieval layout: `corpus.jsonl`, query JSONL files, and qrels JSONL files. To run official-style MMEB v2 benchmark evaluation, use:
+
+```text
+examples/multimodal_retrieval/evaluation/mmeb_v2/
+```
+
+That path documents the embedded evaluator entrypoint:
+
+```bash
+python -m Nexus.evaluation.mmeb_v2.eval_embedding
+```
+
+After finetuning a Nexus multimodal checkpoint, set `MODEL=/path/to/checkpoint` and reuse the MMEB v2 scripts without changing the evaluator code.
+
+Relative path from this directory: `evaluation/mmeb_v2/`.

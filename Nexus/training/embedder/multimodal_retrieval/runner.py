@@ -43,6 +43,7 @@ class MultimodalEmbedderRunner(AbsEmbedderRunner):
         self.training_args = training_args
         self.wrapped_model_args = WrappedMultimodalEmbedderModelArguments(
             negatives_cross_device=self.training_args.negatives_cross_device,
+            local_loss_weight=self.training_args.local_loss_weight,
             temperature=self.training_args.temperature,
             sub_batch_size=self.training_args.sub_batch_size,
             kd_loss_type=self.training_args.kd_loss_type,
@@ -133,4 +134,5 @@ class MultimodalEmbedderRunner(AbsEmbedderRunner):
             tokenizer=getattr(self.processor, "tokenizer", None),
             padding=True,
             return_tensors="pt",
+            no_in_batch_neg=self.data_args.no_in_batch_neg,
         )

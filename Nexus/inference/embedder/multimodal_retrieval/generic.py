@@ -17,6 +17,9 @@ from Nexus.modules.multimodal import (
     normalize_multimodal_item,
 )
 
+
+CHAT_INSTRUCTION_MODEL_TYPES = {"qwen2_vl", "qwen2_5_vl", "qwen3_vl", "qwen3_5", "llava_next"}
+
 logger = logging.getLogger(__name__)
 
 
@@ -132,11 +135,14 @@ class MultimodalEmbedder(AbsEmbedder):
         normalized_items = []
         for item in items:
             normalized_item = normalize_multimodal_item(item)
-            normalized_item["text"] = apply_instruction(
-                normalized_item.get("text", ""),
-                instruction=instruction,
-                instruction_format=instruction_format,
-            )
+            if instruction is not None and self.model_type in CHAT_INSTRUCTION_MODEL_TYPES:
+                normalized_item.setdefault("instruction", instruction)
+            else:
+                normalized_item["text"] = apply_instruction(
+                    normalized_item.get("text", ""),
+                    instruction=instruction,
+                    instruction_format=instruction_format,
+                )
             normalized_items.append(normalized_item)
 
         model_inputs = self.processor_adapter.encode_batch(

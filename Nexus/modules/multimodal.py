@@ -3,6 +3,7 @@ import io
 import json
 import math
 import os
+import unicodedata
 from copy import deepcopy
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -29,6 +30,11 @@ BACKBONE_MODEL_TYPES = {
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tif", ".tiff")
 VIDEO_SUFFIXES = (".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v", ".mpg", ".mpeg", ".wmv")
 VIDEO_MODEL_TYPES = {"qwen2_vl", "qwen2_5_vl", "qwen3_vl", "qwen3_5"}
+QWEN_OFFICIAL_CHAT_MODEL_TYPES = {"qwen3_vl", "qwen3_5"}
+QWEN_DEFAULT_INSTRUCTION = "Represent the user's input."
+QWEN_MIN_PIXELS = 4 * 32 * 32
+QWEN_MAX_PIXELS = 1800 * 32 * 32
+QWEN_MAX_TOTAL_PIXELS = 10 * 768 * 32 * 32
 DEFAULT_VIDEO_NUM_FRAMES = 8
 DEFAULT_BACKBONE_LOAD_STRATEGY = "auto"
 SUPPORTED_BACKBONE_LOAD_STRATEGIES = {DEFAULT_BACKBONE_LOAD_STRATEGY, "prefer_base_model"}
@@ -718,6 +724,7 @@ def normalize_multimodal_item(item: Any, base_dir: Optional[str] = None) -> Dict
         raise TypeError(f"Unsupported multimodal item type: {type(item)}")
 
     metadata = deepcopy(item.get("metadata", {}))
+    instruction = _extract_item_instruction(item)
     title = item.get("title", "")
     text = item.get("text")
     if text is None:
@@ -751,12 +758,18 @@ def normalize_multimodal_item(item: Any, base_dir: Optional[str] = None) -> Dict
                 video_value = item[key]
                 break
 
-    return {
+    normalized_item = {
         "text": text,
         "images": _coerce_image_specs(image_value, base_dir=base_dir),
         "videos": _coerce_video_specs(video_value, base_dir=base_dir),
         "metadata": metadata,
     }
+    if instruction is not None:
+        normalized_item["instruction"] = instruction
+    for key in ["fps", "max_frames", "num_frames", "sample_frames", "n_frames"]:
+        if item.get(key) not in [None, ""]:
+            normalized_item[key] = item[key]
+    return normalized_item
 
 
 def normalize_multimodal_group(items: Any, base_dir: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -865,6 +878,104 @@ def apply_instruction(text: str, instruction: Optional[str], instruction_format:
     if instruction is None:
         return text
     return instruction_format.format(instruction, text)
+
+
+def _non_empty_string(value: Any) -> Optional[str]:
+    if value in [None, ""]:
+        return None
+    value = str(value).strip()
+    return value or None
+
+
+def _has_nonempty_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return value != ""
+    if isinstance(value, (list, tuple, dict, set)):
+        return len(value) > 0
+    if isinstance(value, bytes):
+        return len(value) > 0
+    return True
+
+
+def _extract_item_instruction(item: Dict[str, Any]) -> Optional[str]:
+    for key in [
+        "instruction",
+        "task_instruction",
+        "query_instruction",
+        "candidate_instruction",
+        "target_instruction",
+        "prompt_instruction",
+        "qry_inst",
+        "tgt_inst",
+    ]:
+        if key in item:
+            instruction = _non_empty_string(item.get(key))
+            if instruction is not None:
+                return instruction
+    return None
+
+
+def _ensure_instruction_punctuation(instruction: str) -> str:
+    instruction = instruction.strip()
+    if instruction and not unicodedata.category(instruction[-1]).startswith("P"):
+        instruction += "."
+    return instruction
+
+
+def _apply_instruction_once(text: str, instruction: Optional[str], instruction_format: str) -> str:
+    instruction = _non_empty_string(instruction)
+    if instruction is None:
+        return text
+    text = text or ""
+    if text.strip().startswith(instruction):
+        return text
+    return apply_instruction(text, instruction=instruction, instruction_format=instruction_format)
+
+
+def _as_positive_int(value: Any) -> Optional[int]:
+    if value in [None, "", "None"]:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _as_positive_float(value: Any) -> Optional[float]:
+    if value in [None, "", "None"]:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _resolve_frame_limit(item_max_frames: Any, default_max_frames: Any) -> Optional[int]:
+    item_limit = _as_positive_int(item_max_frames)
+    default_limit = _as_positive_int(default_max_frames)
+    if item_limit is not None and default_limit is not None:
+        return min(item_limit, default_limit)
+    return item_limit if item_limit is not None else default_limit
+
+
+def _sample_sequence_evenly(values: Sequence[Any], max_items: Optional[int]) -> List[Any]:
+    values = list(values)
+    if max_items is None or len(values) <= max_items:
+        return values
+    if max_items == 1:
+        return [values[len(values) // 2]]
+    step = (len(values) - 1) / float(max_items - 1)
+    return [values[min(int(round(index * step)), len(values) - 1)] for index in range(max_items)]
+
+
+def _qwen_media_reference(value: Any) -> Any:
+    if isinstance(value, str) and not value.startswith(("http://", "https://", "file://")):
+        return "file://" + value
+    return value
 
 
 def is_empty_multimodal_item(item: Dict[str, Any]) -> bool:
@@ -1059,17 +1170,192 @@ class MultimodalProcessorAdapter:
                 flattened_frames.append(video)
         return flattened_frames
 
+    def _uses_qwen_official_chat_path(self) -> bool:
+        return (
+            self.use_chat_template
+            and self.model_type in QWEN_OFFICIAL_CHAT_MODEL_TYPES
+            and hasattr(self.processor, "apply_chat_template")
+        )
+
+    def _uses_chat_template(self) -> bool:
+        return (
+            self.use_chat_template
+            and self.model_type in CHAT_TEMPLATE_MODEL_TYPES
+            and hasattr(self.processor, "apply_chat_template")
+        )
+
+    def _processor_call_value(self, key: str, default: Any = None) -> Any:
+        return (getattr(self, "processor_call_kwargs", {}) or {}).get(key, default)
+
+    def _qwen_default_instruction(self, fallback_instruction: Optional[str] = None) -> str:
+        return _non_empty_string(fallback_instruction) or QWEN_DEFAULT_INSTRUCTION
+
+    def _qwen_item_instruction(self, item: Dict[str, Any], fallback_instruction: Optional[str] = None) -> str:
+        instruction = _non_empty_string(item.get("instruction")) or self._qwen_default_instruction(fallback_instruction)
+        return _ensure_instruction_punctuation(instruction)
+
+    def _qwen_image_contents(self, item: Dict[str, Any]) -> List[Dict[str, Any]]:
+        min_pixels = _as_positive_int(self._processor_call_value("min_pixels")) or QWEN_MIN_PIXELS
+        max_pixels = _as_positive_int(self._processor_call_value("max_pixels")) or QWEN_MAX_PIXELS
+        image_contents = []
+        for image_spec in item.get("images", []):
+            values = image_spec.get("paths") if "paths" in image_spec else [image_spec.get("path")]
+            if _has_nonempty_value(image_spec.get("bytes")):
+                values = [load_image_from_spec(image_spec)]
+            if _has_nonempty_value(image_spec.get("b64")):
+                values = [load_image_from_spec(image_spec)]
+            if image_spec.get("pil") is not None:
+                values = [image_spec.get("pil")]
+            for value in values or []:
+                if not _has_nonempty_value(value):
+                    continue
+                image_contents.append(
+                    {
+                        "type": "image",
+                        "image": _qwen_media_reference(value),
+                        "min_pixels": min_pixels,
+                        "max_pixels": max_pixels,
+                    }
+                )
+        return image_contents
+
+    def _qwen_video_content(self, video_spec: Dict[str, Any], fallback_max_frames: Any = None) -> Dict[str, Any]:
+        total_pixels = _as_positive_int(self._processor_call_value("total_pixels")) or QWEN_MAX_TOTAL_PIXELS
+        default_fps = self._processor_call_value("fps")
+        default_max_frames = self._processor_call_value("max_frames", fallback_max_frames)
+        max_frames = _resolve_frame_limit(video_spec.get("max_frames"), default_max_frames)
+        fps = _as_positive_float(video_spec.get("fps")) or _as_positive_float(default_fps)
+
+        frame_values = None
+        for key in ["paths", "frame_paths"]:
+            if _has_nonempty_value(video_spec.get(key)):
+                frame_values = video_spec.get(key)
+                break
+        if frame_values is None and _has_nonempty_value(video_spec.get("frames")):
+            frame_values = [load_image_from_spec(frame_spec) for frame_spec in _build_frame_specs_from_video_spec(video_spec)]
+        if _has_nonempty_value(frame_values):
+            sampled_frames = _sample_sequence_evenly(frame_values, max_frames)
+            return {
+                "type": "video",
+                "video": [_qwen_media_reference(frame) for frame in sampled_frames],
+                "total_pixels": total_pixels,
+            }
+
+        path_value = video_spec.get("path") or video_spec.get("video") or video_spec.get("video_path")
+        if _has_nonempty_value(path_value):
+            content = {
+                "type": "video",
+                "video": _qwen_media_reference(path_value),
+                "fps": fps,
+                "max_frames": max_frames,
+            }
+            return {key: value for key, value in content.items() if value is not None}
+
+        raise ValueError(f"Unsupported Qwen video specification: {video_spec}")
+
+    def _qwen_conversation(self, item: Dict[str, Any], fallback_instruction: Optional[str] = None) -> List[Dict[str, Any]]:
+        content = []
+        conversation = [
+            {"role": "system", "content": [{"type": "text", "text": self._qwen_item_instruction(item, fallback_instruction)}]},
+            {"role": "user", "content": content},
+        ]
+
+        for video_spec in item.get("videos", []):
+            content.append(self._qwen_video_content(video_spec, fallback_max_frames=item.get("max_frames")))
+        content.extend(self._qwen_image_contents(item))
+
+        text = item.get("text", "")
+        if isinstance(text, (list, tuple)):
+            text_values = text
+        else:
+            text_values = [text]
+        for text_value in text_values:
+            if text_value not in [None, ""]:
+                content.append({"type": "text", "text": str(text_value)})
+        if len(content) == 0:
+            content.append({"type": "text", "text": "NULL"})
+        return conversation
+
+    def _qwen_preprocess_batch(
+        self,
+        items: List[Dict[str, Any]],
+        max_length: Optional[int] = None,
+        fallback_instruction: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        try:
+            from qwen_vl_utils.vision_process import process_vision_info
+        except ImportError as exc:
+            raise ImportError(
+                "Qwen3-VL official-style preprocessing requires `qwen-vl-utils`. "
+                "Install it in the active Nexus environment before running Qwen3-VL multimodal encoding."
+            ) from exc
+
+        conversations = [self._qwen_conversation(item, fallback_instruction=fallback_instruction) for item in items]
+        text = self.processor.apply_chat_template(
+            conversations,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+        images, video_inputs, video_kwargs = process_vision_info(
+            conversations,
+            image_patch_size=16,
+            return_video_metadata=True,
+            return_video_kwargs=True,
+        )
+        if video_inputs is not None:
+            videos, video_metadata = zip(*video_inputs)
+            videos = list(videos)
+            video_metadata = list(video_metadata)
+        else:
+            videos, video_metadata = None, None
+
+        call_kwargs = {
+            "text": text,
+            "images": images,
+            "videos": videos,
+            "video_metadata": video_metadata,
+            "padding": True,
+            "truncation": max_length is not None,
+            "do_resize": False,
+            "return_tensors": "pt",
+        }
+        if max_length is not None:
+            call_kwargs["max_length"] = max_length
+        for key, value in video_kwargs.items():
+            if value is not None:
+                call_kwargs[key] = value
+        return self.processor(**call_kwargs)
+
     def _build_chat_text(self, item: Dict[str, Any], images: Sequence[Any], videos: Sequence[Any]) -> str:
         contents = [{"type": "image"} for _ in images]
         contents.extend({"type": "video"} for _ in videos)
         if item.get("text", "").strip() or len(contents) == 0:
             contents.append({"type": "text", "text": item.get("text", "") or " "})
-        messages = [{"role": "user", "content": contents}]
-        return self.processor.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=False,
-        )
+        instruction = _non_empty_string(item.get("instruction"))
+        messages = []
+        if instruction is not None:
+            messages.append({"role": "system", "content": [{"type": "text", "text": instruction}]})
+        messages.append({"role": "user", "content": contents})
+        try:
+            return self.processor.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+        except Exception:
+            contents = [{"type": "image"} for _ in images]
+            contents.extend({"type": "video"} for _ in videos)
+            fallback_text = item.get("text", "") or ""
+            if instruction is not None:
+                fallback_text = _apply_instruction_once(fallback_text, instruction, "{}{}")
+            if fallback_text.strip() or len(contents) == 0:
+                contents.append({"type": "text", "text": fallback_text or " "})
+            messages = [{"role": "user", "content": contents}]
+            return self.processor.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
 
     def _encode_single(
         self,
@@ -1215,14 +1501,27 @@ class MultimodalProcessorAdapter:
         instruction_format: str = "{}{}",
     ) -> Dict[str, Any]:
         normalized_items = []
+        use_qwen_official_chat_path = self._uses_qwen_official_chat_path()
+        use_chat_template = self._uses_chat_template()
         for item in items:
             normalized_item = normalize_multimodal_item(item)
-            normalized_item["text"] = apply_instruction(
-                normalized_item.get("text", ""),
-                instruction=instruction,
-                instruction_format=instruction_format,
-            )
+            item_instruction = _non_empty_string(normalized_item.get("instruction"))
+            if instruction is not None and item_instruction is None and (use_qwen_official_chat_path or use_chat_template):
+                normalized_item["instruction"] = instruction
+            elif instruction is not None and not use_qwen_official_chat_path:
+                normalized_item["text"] = _apply_instruction_once(
+                    normalized_item.get("text", ""),
+                    instruction=instruction,
+                    instruction_format=instruction_format,
+                )
             normalized_items.append(normalized_item)
+
+        if use_qwen_official_chat_path:
+            return self._qwen_preprocess_batch(
+                normalized_items,
+                max_length=max_length,
+                fallback_instruction=instruction,
+            )
 
         encoded_items = [self._encode_single(item, max_length=max_length) for item in normalized_items]
 

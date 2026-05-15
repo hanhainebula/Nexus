@@ -74,6 +74,9 @@ class BiMultimodalEmbedderModel(AbsEmbedderModel):
         )
         self.temperature = model_args.temperature
         self.negatives_cross_device = model_args.negatives_cross_device
+        self.local_loss_weight = getattr(model_args, "local_loss_weight", 0.0)
+        if self.local_loss_weight < 0:
+            raise ValueError("local_loss_weight must be non-negative.")
         if self.negatives_cross_device:
             if not dist.is_initialized():
                 raise ValueError("Distributed training has not been initialized for cross-device negatives.")
@@ -314,13 +317,27 @@ class BiMultimodalEmbedderModel(AbsEmbedderModel):
                 teacher_targets = None
 
             if no_in_batch_neg_flag:
-                compute_loss_func = self._compute_no_in_batch_neg_loss
+                scores, loss = self._compute_no_in_batch_neg_loss(
+                    q_reps, p_reps, teacher_targets=teacher_targets
+                )
             elif self.negatives_cross_device:
-                compute_loss_func = self._compute_cross_device_neg_loss
+                scores, loss = self._compute_cross_device_neg_loss(
+                    q_reps, p_reps, teacher_targets=teacher_targets
+                )
+                if self.local_loss_weight > 0:
+                    _, local_loss = self._compute_no_in_batch_neg_loss(
+                        q_reps, p_reps, teacher_targets=teacher_targets
+                    )
+                    loss = loss + self.local_loss_weight * local_loss
             else:
-                compute_loss_func = self._compute_in_batch_neg_loss
-
-            scores, loss = compute_loss_func(q_reps, p_reps, teacher_targets=teacher_targets)
+                scores, loss = self._compute_in_batch_neg_loss(
+                    q_reps, p_reps, teacher_targets=teacher_targets
+                )
+                if self.local_loss_weight > 0:
+                    _, local_loss = self._compute_no_in_batch_neg_loss(
+                        q_reps, p_reps, teacher_targets=teacher_targets
+                    )
+                    loss = loss + self.local_loss_weight * local_loss
         else:
             scores = self.compute_score(q_reps, p_reps)
             loss = None

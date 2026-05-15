@@ -1,0 +1,10 @@
+HMDB51:
+    dataset_parser: video_classification
+    dataset_name: HMDB51
+    data_path: video-tasks/data/hmdb51.jsonl
+    video_root: video-tasks/videos/video_cls/HMDB51
+    frame_root: video-tasks/frames/video_cls/HMDB51
+    num_sample_per_subset: 8
+    max_frames_saved: 8
+    num_frames: 8
+    eval_type: global

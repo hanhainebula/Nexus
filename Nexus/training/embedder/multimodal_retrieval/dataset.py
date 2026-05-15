@@ -189,6 +189,8 @@ class AbsMultimodalEmbedderTrainDataset(AbsEmbedderTrainDataset):
 
 @dataclass
 class AbsMultimodalEmbedderCollator(AbsEmbedderCollator, DataCollatorWithPadding):
+    no_in_batch_neg: bool = False
+
     def __call__(self, features):
         queries = [feature[0] for feature in features]
         passages = [feature[1] for feature in features]
@@ -205,4 +207,4 @@ class AbsMultimodalEmbedderCollator(AbsEmbedderCollator, DataCollatorWithPadding
             for scores in teacher_scores:
                 flattened_teacher_scores.extend(scores)
 
-        return queries, flattened_passages, flattened_teacher_scores, False
+        return queries, flattened_passages, flattened_teacher_scores, self.no_in_batch_neg

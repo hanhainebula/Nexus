@@ -1,0 +1,51 @@
+SmthSmthV2:
+    dataset_parser: ssv2
+    dataset_name: SmthSmthV2
+    data_path: video-tasks/data/ssv2.jsonl
+    video_root: video-tasks/videos/video_cls/SSv2
+    frame_root: video-tasks/frames/video_cls/SSv2
+    num_sample_per_subset: 1000
+    max_frames_saved: 64
+    num_frames: 64
+    eval_type: local
+HMDB51:
+    dataset_parser: video_classification
+    dataset_name: HMDB51
+    data_path: video-tasks/data/hmdb51.jsonl
+    video_root: video-tasks/videos/video_cls/HMDB51
+    frame_root: video-tasks/frames/video_cls/HMDB51
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 64
+    eval_type: global
+
+K700:
+    dataset_parser: video_classification
+    dataset_name: Kinetics-700
+    data_path: video-tasks/data/k700.jsonl
+    video_root: video-tasks/videos/video_cls/K700
+    frame_root: video-tasks/frames/video_cls/K700
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 64
+    eval_type: global
+Breakfast:
+    dataset_parser: video_classification
+    dataset_name: Breakfast
+    data_path: video-tasks/data/breakfast.jsonl
+    video_root: video-tasks/videos/video_cls/Breakfast
+    frame_root: video-tasks/frames/video_cls/Breakfast
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 64
+    eval_type: global
+
+MSR-VTT:
+    dataset_parser: msrvtt
+    dataset_name: MSR-VTT
+    video_root: video-tasks/videos/video_ret/MSR-VTT/
+    frame_root: video-tasks/frames/video_ret/data/ziyan/video_retrieval/MSR-VTT/frames
+    num_sample_per_subset: None
+    max_frames_saved: 64
+    num_frames: 64
+    eval_type: global

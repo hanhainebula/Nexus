@@ -1,0 +1,44 @@
+ImageNet-1K:
+    dataset_parser: image_cls
+    dataset_name: ImageNet-1K
+    dataset_split: test
+    image_root: image-tasks/
+    eval_type: local
+N24News:
+    dataset_parser: image_cls
+    dataset_name: N24News
+    dataset_split: test
+    image_root: image-tasks/
+    eval_type: local
+HatefulMemes:
+    dataset_parser: image_cls
+    dataset_name: HatefulMemes
+    dataset_split: test
+    image_root: image-tasks/
+    eval_type: local
+
+OVEN:
+    dataset_parser: image_i2i_vg
+    dataset_name: OVEN
+    dataset_split: test
+    image_root: image-tasks/
+    eval_type: local
+FashionIQ:
+    dataset_parser: image_i2i_vg
+    dataset_name: FashionIQ
+    dataset_split: test
+    image_root: image-tasks/
+    eval_type: local
+# VG (i -> i)
+MSCOCO:
+    dataset_parser: image_i2i_vg
+    dataset_name: MSCOCO
+    dataset_split: test
+    image_root: image-tasks/
+    eval_type: local
+RefCOCO:
+    dataset_parser: image_i2i_vg
+    dataset_name: RefCOCO
+    dataset_split: test
+    image_root: image-tasks/
+    eval_type: local

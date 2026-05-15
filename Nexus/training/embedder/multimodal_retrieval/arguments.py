@@ -86,6 +86,10 @@ class MultimodalEmbedderDataArguments(AbsEmbedderDataArguments):
         metadata={"help": "Base directory used to resolve relative media paths."},
     )
     train_group_size: int = field(default=8)
+    no_in_batch_neg: bool = field(
+        default=False,
+        metadata={"help": "Use only each query own positive/negative group as negatives."},
+    )
     query_max_len: int = field(default=512)
     passage_max_len: int = field(default=1024)
     max_example_num_per_dataset: int = field(
@@ -121,6 +125,10 @@ class MultimodalEmbedderDataArguments(AbsEmbedderDataArguments):
 @dataclass
 class MultimodalEmbedderTrainingArguments(AbsEmbedderTrainingArguments):
     negatives_cross_device: bool = field(default=False, metadata={"help": "Share negatives across devices."})
+    local_loss_weight: float = field(
+        default=0.0,
+        metadata={"help": "Weight for auxiliary local candidate-only loss added to the global in-batch loss."},
+    )
     temperature: Optional[float] = field(default=0.02, metadata={"help": "Softmax temperature."})
     sentence_pooling_method: str = field(
         default="last_token",
@@ -137,6 +145,7 @@ class MultimodalEmbedderTrainingArguments(AbsEmbedderTrainingArguments):
 @dataclass
 class WrappedMultimodalEmbedderModelArguments(AbsModelArguments):
     negatives_cross_device: bool = field(default=False)
+    local_loss_weight: float = field(default=0.0)
     temperature: float = field(default=1.0)
     sub_batch_size: int = field(default=-1)
     kd_loss_type: str = field(default="kl_div")

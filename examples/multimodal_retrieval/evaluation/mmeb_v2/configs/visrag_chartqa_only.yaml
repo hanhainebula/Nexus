@@ -1,0 +1,5 @@
+VisRAG_ChartQA:
+    dataset_parser: visrag
+    dataset_name: VisRAG_ChartQA
+    image_root: visdoc-tasks/images/VisRAG_ChartQA
+    eval_type: global
