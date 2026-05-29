@@ -1,0 +1,4 @@
+{"query":{"text":"Find a document page about neural network training."},"pos":[{"text":"This page explains neural network training, loss functions, and optimization."}],"neg":[{"text":"This page is about gardening tools and soil."}]}
+{"query":{"text":"Find an image of a red dress."},"pos":[{"text":"A model wearing a red dress in a fashion catalog."}],"neg":[{"text":"A blue shirt displayed on a hanger."}]}
+{"query":{"text":"Find a video segment of a person cooking breakfast."},"pos":[{"text":"A person cracks eggs and cooks breakfast in a kitchen."}],"neg":[{"text":"A person drives a car on a highway."}]}
+{"query":{"text":"Find a chart about quarterly revenue."},"pos":[{"text":"A report page with a bar chart showing quarterly revenue."}],"neg":[{"text":"A map showing public transport routes."}]}
