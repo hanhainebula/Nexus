@@ -274,8 +274,9 @@ torchrun --nproc_per_node=8 -m Nexus.training.embedder.multimodal_retrieval \
 | `--score_block_size` | 大候选池分块 exact top-k 的块大小，默认 `4096`。它不截断候选，只避免一次性构造完整 `query x candidate` 大矩阵。 |
 | `--score_device` | 可选，指定分块算分设备；不写时用第一个 `--devices` 或 `--device`。 |
 | `--false_negative_margin` | 如果候选比正例分数还高太多，可能是假负例，默认跳过。 |
-| `--filter_duplicate_text` | 过滤重复文本。普通图文任务常用；VisDoc 不建议盲目开。 |
-| `--filter_duplicate_media` | 过滤重复图片/视频路径，通常建议开启。 |
+| `--max_negative_score_ratio_to_positive` | 可选，限制负例 teacher 分数不能超过最佳正例分数的一定比例，例如 `0.95` 表示只保留 `negative_score <= positive_score * 0.95` 的候选。 |
+| `--filter_duplicate_text` | 过滤和正例文本重复、或和本行已选负例文本重复的候选。普通图文任务常用；VisDoc 不建议盲目开。 |
+| `--filter_duplicate_media` | 过滤和正例媒体重复、或和本行已选负例媒体重复的候选。会检查规范化路径、文件名 basename，以及本地文件 md5。 |
 | `--require_existing_media` | 要求媒体文件真实存在。数据是远程 URI 或延迟生成时可用 `--no-require_existing_media`。 |
 | `--write_scores` | 写出 `pos_scores/neg_scores`，方便后续 KD。 |
 | `--report_path` | 输出 JSON 统计报告。 |

@@ -38,6 +38,7 @@ class MiningArguments:
     min_teacher_positive_score: Optional[float] = None
     min_teacher_negative_score: Optional[float] = None
     false_negative_margin: float = 0.02
+    max_negative_score_ratio_to_positive: Optional[float] = None
     filter_duplicate_text: bool = False
     filter_duplicate_media: bool = False
     batch_size: int = 8
@@ -217,14 +218,27 @@ def parse_args(argv: Optional[list[str]] = None) -> MiningArguments:
         help="Skip non-positive candidates scoring above best_positive + margin.",
     )
     parser.add_argument(
+        "--max_negative_score_ratio_to_positive",
+        type=float,
+        default=None,
+        help=(
+            "Optional upper bound for selected negatives relative to the best positive teacher score. "
+            "For example, 0.95 keeps only negatives with teacher_score <= best_positive_score * 0.95, "
+            "then still picks the hardest remaining negatives from --top_k. Leave unset to preserve old behavior."
+        ),
+    )
+    parser.add_argument(
         "--filter_duplicate_text",
         action="store_true",
-        help="Skip negatives whose normalized text exactly matches a positive text in the same row.",
+        help="Skip negatives whose normalized text matches a positive or already selected negative in the same row.",
     )
     parser.add_argument(
         "--filter_duplicate_media",
         action="store_true",
-        help="Skip negatives sharing exact media paths or frame paths with a positive in the same row.",
+        help=(
+            "Skip negatives sharing media with a positive or already selected negative in the same row. "
+            "Matches exact paths, basenames, and local file md5 when available."
+        ),
     )
     parser.add_argument("--batch_size", type=int, default=8, help="Embedding batch size.")
     parser.add_argument("--query_max_len", type=int, default=2048, help="Teacher query max length.")

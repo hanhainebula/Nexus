@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from copy import deepcopy
 from datetime import datetime
@@ -406,11 +407,43 @@ def _positive_texts(items: list[dict[str, Any]]) -> set[str]:
     return {text for text in (_normalize_text(item.get("text")) for item in items) if text}
 
 
-def _positive_media_paths(items: list[dict[str, Any]]) -> set[str]:
-    paths: set[str] = set()
+def _media_dedupe_keys(item: dict[str, Any], hash_cache: dict[str, str]) -> set[str]:
+    keys: set[str] = set()
+    for media_path in item_media_paths(item):
+        norm_path = os.path.normpath(media_path)
+        keys.add(f"path:{norm_path}")
+        basename = os.path.basename(norm_path).casefold()
+        if basename:
+            keys.add(f"basename:{basename}")
+        digest = _media_md5(norm_path, hash_cache)
+        if digest:
+            keys.add(f"md5:{digest}")
+    return keys
+
+
+def _media_md5(media_path: str, hash_cache: dict[str, str]) -> str:
+    if media_path in hash_cache:
+        return hash_cache[media_path]
+    if not os.path.isfile(media_path):
+        hash_cache[media_path] = ""
+        return ""
+    try:
+        digest = hashlib.md5()
+        with open(media_path, "rb") as media_file:
+            for chunk in iter(lambda: media_file.read(1024 * 1024), b""):
+                digest.update(chunk)
+        value = digest.hexdigest()
+    except OSError:
+        value = ""
+    hash_cache[media_path] = value
+    return value
+
+
+def _items_media_dedupe_keys(items: list[dict[str, Any]], hash_cache: dict[str, str]) -> set[str]:
+    keys: set[str] = set()
     for item in items:
-        paths.update(item_media_paths(item))
-    return paths
+        keys.update(_media_dedupe_keys(item, hash_cache))
+    return keys
 
 
 def _item_preview(item: dict[str, Any]) -> dict[str, Any]:
@@ -480,9 +513,12 @@ def _mine_from_score_matrix(
         "positive_key": 0,
         "modality_mismatch": 0,
         "above_false_negative_margin": 0,
+        "above_max_negative_score_ratio": 0,
         "below_min_negative_score": 0,
         "duplicate_text": 0,
         "duplicate_media": 0,
+        "duplicate_selected_text": 0,
+        "duplicate_selected_media": 0,
     }
     if args.candidate_source == "all_pos_plus_own_neg":
         skip_reasons["not_own_negative"] = 0
@@ -490,6 +526,7 @@ def _mine_from_score_matrix(
     mined_negative_scores_all: list[float] = []
     hardness_margins: list[float] = []
     rows_with_zero_negatives = 0
+    media_hash_cache: dict[str, str] = {}
 
     for row_idx, row in enumerate(rows):
         positive_keys = row_positive_keys(row)
@@ -519,7 +556,12 @@ def _mine_from_score_matrix(
 
         pos_items = normalize_group(row, "pos")
         positive_texts = _positive_texts(pos_items)
-        positive_media_paths = _positive_media_paths(pos_items)
+        positive_media_keys = _items_media_dedupe_keys(pos_items, media_hash_cache) if args.filter_duplicate_media else set()
+        original_negs = normalize_group(row, "neg") if args.keep_existing_negatives else []
+        selected_texts = _positive_texts(original_negs) if args.filter_duplicate_text else set()
+        selected_media_keys = (
+            _items_media_dedupe_keys(original_negs, media_hash_cache) if args.filter_duplicate_media else set()
+        )
         best_positive_scores.append(best_positive_score)
 
         selected = []
@@ -553,21 +595,45 @@ def _mine_from_score_matrix(
                 skip_reasons["above_false_negative_margin"] += 1
                 skipped_for_row["above_false_negative_margin"] = skipped_for_row.get("above_false_negative_margin", 0) + 1
                 continue
+            if args.max_negative_score_ratio_to_positive is not None:
+                max_allowed_negative_score = best_positive_score * args.max_negative_score_ratio_to_positive
+                if teacher_score > max_allowed_negative_score:
+                    skip_reasons["above_max_negative_score_ratio"] += 1
+                    skipped_for_row["above_max_negative_score_ratio"] = (
+                        skipped_for_row.get("above_max_negative_score_ratio", 0) + 1
+                    )
+                    continue
             if args.min_teacher_negative_score is not None and teacher_score < args.min_teacher_negative_score:
                 skip_reasons["below_min_negative_score"] += 1
                 skipped_for_row["below_min_negative_score"] = skipped_for_row.get("below_min_negative_score", 0) + 1
                 continue
-            if args.filter_duplicate_text and _normalize_text(cand.item.get("text")) in positive_texts:
+            candidate_text = _normalize_text(cand.item.get("text"))
+            if args.filter_duplicate_text and candidate_text and candidate_text in positive_texts:
                 skip_reasons["duplicate_text"] += 1
                 skipped_for_row["duplicate_text"] = skipped_for_row.get("duplicate_text", 0) + 1
                 continue
-            if args.filter_duplicate_media and positive_media_paths.intersection(item_media_paths(cand.item)):
-                skip_reasons["duplicate_media"] += 1
-                skipped_for_row["duplicate_media"] = skipped_for_row.get("duplicate_media", 0) + 1
+            if args.filter_duplicate_text and candidate_text and candidate_text in selected_texts:
+                skip_reasons["duplicate_selected_text"] += 1
+                skipped_for_row["duplicate_selected_text"] = skipped_for_row.get("duplicate_selected_text", 0) + 1
                 continue
+            candidate_media_keys: set[str] = set()
+            if args.filter_duplicate_media:
+                candidate_media_keys = _media_dedupe_keys(cand.item, media_hash_cache)
+                if positive_media_keys.intersection(candidate_media_keys):
+                    skip_reasons["duplicate_media"] += 1
+                    skipped_for_row["duplicate_media"] = skipped_for_row.get("duplicate_media", 0) + 1
+                    continue
+                if selected_media_keys.intersection(candidate_media_keys):
+                    skip_reasons["duplicate_selected_media"] += 1
+                    skipped_for_row["duplicate_selected_media"] = skipped_for_row.get("duplicate_selected_media", 0) + 1
+                    continue
             selected.append(deepcopy(cand.item))
             selected_scores.append(teacher_score)
             selected_teacher_scores.append(teacher_score)
+            if args.filter_duplicate_text and candidate_text:
+                selected_texts.add(candidate_text)
+            if args.filter_duplicate_media:
+                selected_media_keys.update(candidate_media_keys)
             if student_score is not None:
                 selected_student_scores.append(student_score)
             mined_negative_scores_all.append(teacher_score)
@@ -598,7 +664,6 @@ def _mine_from_score_matrix(
             rows_with_zero_negatives += 1
 
         new_row = deepcopy(row)
-        original_negs = normalize_group(row, "neg") if args.keep_existing_negatives else []
         new_row["neg"] = original_negs + selected
         if args.write_scores:
             pos_items = normalize_group(new_row, "pos")
@@ -616,6 +681,7 @@ def _mine_from_score_matrix(
                 "teacher_model": args.teacher_model,
                 "student_model": args.student_model,
                 "dry_run": args.dry_run,
+                "max_negative_score_ratio_to_positive": args.max_negative_score_ratio_to_positive,
             }
         )
         new_row["metadata"] = metadata
